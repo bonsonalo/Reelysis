@@ -1,5 +1,5 @@
 from pydantic import EmailStr
-from sqlmodel import SQLModel, Field, Column
+from sqlmodel import SQLModel, Field, Column, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime, timezone
@@ -20,3 +20,24 @@ class User(SQLModel, table= True):
     created_at: datetime= Field(
         default_factory= lambda: datetime.now(timezone.utc)
         )
+    
+    external_token: "ExternalToken | None"= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    auth_sessions: list["AuthSession"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    instagram_account: "InstagramAccount | None"= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    media_items: list["MediaItem"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    competitor_account: list["CompetitorAccount"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
