@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, Column, ForeignKey
+from sqlmodel import SQLModel, Field, Column, ForeignKey, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime, timezone
@@ -31,3 +31,7 @@ class AuthSession(SQLModel, table= True):
         nullable= False
     )
     revoked_at: datetime | None = Field(default=None)
+
+    user: "User"= Relationship(
+        back_populates= "auth_sessions"
+    )
