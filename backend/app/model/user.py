@@ -41,3 +41,23 @@ class User(SQLModel, table= True):
         back_populates= "user",
         cascade_delete= True
     )
+    competitor_media: list["CompetitorMedia"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    video_analysis: list["VideoAnalysis"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    analysis_jobs: list["AnalysisJob"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    account_reports: list["AccountReport"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    recommendations: list["Recommendation"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
