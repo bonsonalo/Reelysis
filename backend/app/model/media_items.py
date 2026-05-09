@@ -43,3 +43,7 @@ class MediaItem(SQLModel, table= True):
         back_populates= "media_item",
         cascade_delete= True
     )
+    video_analysis: list["VideoAnalysis"]= Relationship(
+        back_populates= "media_item",
+        cascade_delete= True
+    )
