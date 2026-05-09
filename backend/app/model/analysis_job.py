@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 
 class AnalysisJob(SQLModel, table= True):
-    __tavlename__= "analysis_jobs"
+    __tablename__= "analysis_jobs"
 
 
 
