@@ -29,12 +29,10 @@ class CompetitorMedia(SQLModel, table= True):
         )
     )
     competitor_account_id: UUID= Field(
-        sa_column= Field(
-            sa_column= Column(
-                pg.UUID,
-                ForeignKey('competitor_accounts.id', ondelete= "CASCADE"),
-                nullable= False
-            )
+        sa_column= Column(
+            pg.UUID,
+            ForeignKey('competitor_accounts.id', ondelete= "CASCADE"),
+            nullable= False
         )
     )
     provider_media_id: UUID= Field(
@@ -44,7 +42,7 @@ class CompetitorMedia(SQLModel, table= True):
     )
     media_type: str
     caption: str
-    hastags: pg.JSONB
+    hashtags: pg.JSONB
     permalink: str
     thumbnail_url: str
     audio_url: str
