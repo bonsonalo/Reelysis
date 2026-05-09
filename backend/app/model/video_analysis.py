@@ -1,9 +1,7 @@
-from sqlmodel import  Enum, Field, SQLModel, Fiedl, Column, ForeignKey, Relationship
+from sqlmodel import  Enum, Field, SQLModel, Field, Column, ForeignKey, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime
-
-from backend.app.model.competitor_media import CompetitorMedia
 
 
 class MediaSource(str, Enum):
@@ -44,7 +42,7 @@ class VideoAnalysis(SQLModel, table= True):
             nullable= True
         )
     )
-    topics: str
+    topic: str
     category: str
     content_pillar: str
     confidence: int
