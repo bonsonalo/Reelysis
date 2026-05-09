@@ -44,3 +44,11 @@ class CompetitorAccount(SQLModel, table= True):
     user: "User"= Relationship(
         back_populates= "competitor_account"
     )
+    competitor_media: list["CompetitorMedia"]= Relationship(
+        back_populates= "competitor_account",
+        cascade_delete= True
+    )
+    video_analysis: list["VideoAnalysis"]= Relationship(
+        back_populates= "competitor_account",
+        cascade_delete= True
+    )
