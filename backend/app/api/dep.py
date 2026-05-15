@@ -46,7 +46,7 @@ async def create_access_token(email: EmailStr, id: uuid.UUID, token_purpose: str
         encode.update({"exp": expire})
 
 
-        jwt.encode(encode, settings.SECRET_KEY, alogorithm= settings.ALGORITHM)
+        return jwt.encode(encode, settings.SECRET_KEY, algorithm= settings.ALGORITHM)
 
     except Exception as e:
         logger.error(f"Error creating access token: {e}")
