@@ -12,10 +12,10 @@ class AuthSession(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            default= uuid4
         )
     )
     user_id: UUID= Field(
