@@ -15,9 +15,9 @@ class InstagramAccount(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
-            default_factory= uuid4,
             primary_key= True
         )
     )
@@ -31,11 +31,12 @@ class InstagramAccount(SQLModel, table= True):
     instagram_user_id: str
     username: str
     account_type: AccountType
-    biography: str
+    profile_picture_url: str | None = Field(default=None)
+    biography: str | None = Field(default=None)
     niche_detected: str | None= Field(default= None)
     niche_confirmed: str | None= Field(default= None)
     followers_count: int
-    media_count: str
+    media_count: int
     last_synced_at: datetime | None = Field(default= None)
 
 
