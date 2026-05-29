@@ -1,8 +1,9 @@
-from sqlmodel import  Enum, Field, SQLModel, Field, Column, ForeignKey, Relationship
+from sqlmodel import Field, SQLModel, Column, ForeignKey, Relationship
+from enum import Enum
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime
-
+from typing import Any
 
 class MediaSource(str, Enum):
     OWN= "own"
@@ -14,10 +15,10 @@ class VideoAnalysis(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     user_id: UUID= Field(
@@ -48,7 +49,12 @@ class VideoAnalysis(SQLModel, table= True):
     confidence: int
     hook_score: int
     engagement_score: int
-    analysis_detail: pg.JSONB
+    analysis_detail: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     created_at: datetime
 
 
