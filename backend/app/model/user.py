@@ -9,9 +9,9 @@ class User(SQLModel, table= True):
     __tablename__= "users"
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(pg.UUID, 
                           primary_key= True,
-                          default= uuid4
                           )
     )
     email: EmailStr = Field(unique= True)
