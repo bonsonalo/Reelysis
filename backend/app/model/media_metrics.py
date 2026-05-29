@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Column, Relationship, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
+from typing import Any
 
 
 
@@ -12,10 +13,10 @@ class MediaMetric(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     media_item_id: UUID= Field(
@@ -32,7 +33,12 @@ class MediaMetric(SQLModel, table= True):
     saves: int
     shares: int
     total_interactions: int
-    raw_metrics: pg.JSONB
+    raw_metrics: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     captured_at: datetime
 
 
