@@ -9,10 +9,10 @@ class ExternalToken(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     user_id: UUID= Field(
@@ -23,9 +23,14 @@ class ExternalToken(SQLModel, table= True):
         )
     )
     encrypted_access_token: str
-    encrypted_refresh_token: str
+    encrypted_refresh_token: str | None = Field(default= None)
     expires_at: datetime
-    scopes: pg.JSONB
+    scopes: list= Field(
+        sa_column= Column(
+            pg.ARRAY(pg.VARCHAR),
+            nullable= False 
+        )
+    )
 
 
     user: "User"= Relationship(
