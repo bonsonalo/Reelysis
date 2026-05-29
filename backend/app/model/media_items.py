@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
+from typing import Any
 
 
 
@@ -11,10 +12,10 @@ class MediaItem(SQLModel, table= True):
 
 
     id: UUID = Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     user_id: UUID= Field(
@@ -27,9 +28,14 @@ class MediaItem(SQLModel, table= True):
     external_media_id: str
     media_type: str
     caption: str
-    hashtag: pg.JSONB
+    hashtag: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     permalink: str
-    thumbnail_url= str
+    thumbnail_url: str
     transcript_text: str
     transcript_source: str
     published_at: datetime
