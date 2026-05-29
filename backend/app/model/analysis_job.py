@@ -5,6 +5,7 @@ from sqlmodel import Column, ForeignKey, SQLModel, Field, Relationship
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
+from typing import Any
 
 
 
@@ -16,10 +17,10 @@ class AnalysisJob(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     user_id: UUID= Field(
@@ -32,8 +33,18 @@ class AnalysisJob(SQLModel, table= True):
     job_type: str
     status: str
     progress: int
-    input_payload: pg.JSONB
-    result_payload: pg.JSONB
+    input_payload: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
+    result_payload: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     error_message: str
     retry_count: int
     started_at: datetime
@@ -51,4 +62,3 @@ class AnalysisJob(SQLModel, table= True):
     user: "User"= Relationship(
         back_populates= "analysis_jobs"
     )
-
