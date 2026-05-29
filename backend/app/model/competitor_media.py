@@ -4,6 +4,7 @@ from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
 from datetime import datetime
+from typing import Any
 
 
 
@@ -15,10 +16,10 @@ class CompetitorMedia(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
         )
     )
     user_id: UUID= Field(
@@ -42,13 +43,23 @@ class CompetitorMedia(SQLModel, table= True):
     )
     media_type: str
     caption: str
-    hashtags: pg.JSONB
+    hashtags: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     permalink: str
     thumbnail_url: str
     audio_url: str
     transcript_text: str
     transcript_source: str
-    metrics: pg.JSONB
+    metrics: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     published_at: datetime
 
     user: "User"= Relationship(
