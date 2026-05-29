@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
+from typing import Any
 
 
 
@@ -12,10 +13,10 @@ class AccountReport(SQLModel, table= True):
 
 
     id: UUID= Field(
+        default_factory= uuid4,
         sa_column= Column(
             pg.UUID,
             primary_key= True,
-            server_default= uuid4
     )
     )
     user_id: UUID= Field(
@@ -28,7 +29,12 @@ class AccountReport(SQLModel, table= True):
     title: str
     status: str
     summary: str
-    report_json: pg.JSONB
+    report_json: dict[str, Any]= Field(
+        default= {},
+        sa_column= Column(
+            pg.JSONB,
+        )
+    )
     report_markdown: str
     created_at: datetime= Field(
         default_factory= lambda: datetime.now(timezone.utc)
