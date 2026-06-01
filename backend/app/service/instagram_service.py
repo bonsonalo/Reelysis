@@ -15,6 +15,7 @@ from app.model.media_metrics import MediaMetric
 from app.core.celery_app import celery_app
 from app.core.database import engine
 from app.service.ai_service import detect_niche_service
+from app.service.competitor_service import discover_competitors_service
 
 from cryptography.fernet import Fernet
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -146,16 +147,21 @@ async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
 
 async def confirm_instagram_niche_service(user_id: UUID, niche: str, db: AsyncSession):
     """
-    Saves the user-confirmed niche to the database.
+    Saves the user-confirmed niche to the database and triggers competitor discovery.
     """
     stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
     account = (await db.exec(stmt)).first()
     if not account:
         raise ValueError("Instagram account not found.")
+    
     account.niche_confirmed = niche
     db.add(account)
     await db.commit()
     await db.refresh(account)
+
+    # Automatically trigger competitor discovery
+    await discover_competitors_service(user_id, niche, db)
+    
     return account
 
 @celery_app.task(name="app.service.instagram_service.sync_instagram_data_task")
