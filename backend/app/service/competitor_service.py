@@ -11,6 +11,7 @@ from app.api.client.social_data import social_data_client
 from app.model.analysis_job import AnalysisJob
 from app.model.competitor_accounts import CompetitorAccount
 from app.model.instagram_accounts import InstagramAccount
+from app.service.video_analysis_service import run_bulk_video_analysis_service
 
 async def discover_competitors_service(user_id: UUID, niche: str, db: AsyncSession):
     """
@@ -78,6 +79,10 @@ async def _poll_results_internal(job_id: str, user_id: str):
                     job.progress = 100
                     job.completed_at = datetime.now(timezone.utc)
                     await db.commit()
+                    
+                    # Trigger bulk analysis for all videos (own and competitors)
+                    logger.info(f"Triggering bulk video analysis for user {user_id} after competitor discovery.")
+                    await run_bulk_video_analysis_service(UUID(user_id), db)
                     return
                 
                 # Not ready yet, update progress and wait
