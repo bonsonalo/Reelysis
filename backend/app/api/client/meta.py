@@ -13,6 +13,9 @@ class MetaClient:
         state = secrets.token_urlsafe(32)
         return {"url": f"https://www.instagram.com/oauth/authorize?client_id={self.app_id}&redirect_uri={self.redirect_uri}&scope=instagram_business_basic,instagram_business_manage_insights&response_type=code&state={state}", "state": state}
     
+
+    # The exchange_code_for_access_token method is responsible for exchanging the authorization code received from Instagram for a short-lived access token. It makes a POST request to the Instagram API's token endpoint, providing the necessary parameters such as client_id, client_secret, redirect_uri, code, and grant_type. 
+    # If the request is successful, it returns the JSON response containing the access token and other related information.
     async def exchange_code_for_access_token(self, code: str):
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -43,6 +46,8 @@ class MetaClient:
             )
             response.raise_for_status()
             return response.json()
+    # The get_instagram_account method retrieves the Instagram account information associated with the provided access token. 
+    # It makes a GET request to the Instagram Graph API's /me endpoint, including the access token as a query parameter.
     async def get_instagram_account(self, access_token: str):
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -53,6 +58,40 @@ class MetaClient:
                 }
             )
             response.raise_for_status()
+            return response.json()
+
+    async def get_user_media(self, ig_user_id: str, access_token: str):
+        """
+        Fetches the recent media items (Reels/Videos) for the connected Instagram account.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://graph.instagram.com/{ig_user_id}/media",
+                params={
+                    "fields": "id,caption,media_type,media_url,permalink,thumbnail_url,timestamp",
+                    "access_token": access_token
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_media_insights(self, ig_media_id: str, access_token: str):
+        """
+        Fetches engagement metrics (reach, plays, saves, etc.) for a specific media item.
+        """
+        async with httpx.AsyncClient() as client:
+            # Common metrics for Reels/Video in Instagram Graph API
+            metrics = "reach,plays,saved,shares,total_interactions"
+            response = await client.get(
+                f"https://graph.instagram.com/{ig_media_id}/insights",
+                params={
+                    "metric": metrics,
+                    "access_token": access_token
+                }
+            )
+            # If insights aren't available (e.g. too new), return empty instead of crashing
+            if response.status_code != 200:
+                return {}
             return response.json()
         
 
