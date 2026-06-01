@@ -4,10 +4,9 @@ from pydantic import EmailStr
 from sqlmodel import select
 from app.schema.auth_schema import LoginInfo
 from sqlmodel.ext.asyncio.session import AsyncSession
-from uuid import uuid
 from typing import Annotated
 from fastapi import Depends, HTTPException, Request
-
+import uuid
 from app.core.config import settings
 from datetime import datetime, timedelta, timezone
 import jwt
