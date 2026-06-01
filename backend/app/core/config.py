@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     META_GRAPH_API_VERSION: str
     REDIS_URL: str
     GEMINI_API_KEY: str
+    BRIGHT_DATA_API_KEY: str = ""
     AI_MODEL_FLASH: str = "gemini-1.5-flash"
     AI_MODEL_PRO: str = "gemini-1.5-pro"
     AI_SIMULATION_MODE: bool = False
