@@ -14,6 +14,7 @@ from app.model.media_items import MediaItem
 from app.model.media_metrics import MediaMetric
 from app.core.celery_app import celery_app
 from app.core.database import engine
+from app.service.ai_service import detect_niche_service
 
 from cryptography.fernet import Fernet
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -143,19 +144,30 @@ async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
 
     return new_job
 
+async def confirm_instagram_niche_service(user_id: UUID, niche: str, db: AsyncSession):
+    """
+    Saves the user-confirmed niche to the database.
+    """
+    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
+    account = (await db.exec(stmt)).first()
+    if not account:
+        raise ValueError("Instagram account not found.")
+    account.niche_confirmed = niche
+    db.add(account)
+    await db.commit()
+    await db.refresh(account)
+    return account
+
 @celery_app.task(name="app.service.instagram_service.sync_instagram_data_task")
 def sync_instagram_data_task(job_id: str, user_id: str):
     """
     Background task to sync Instagram data.
     """
-    # Celery tasks run in a sync environment by default, 
-    # but our DB and MetaClient are async. We use an event loop to run them.
     return asyncio.run(_sync_instagram_data_internal(job_id, user_id))
 
 async def _sync_instagram_data_internal(job_id: str, user_id: str):
     async with AsyncSession(engine) as db:
         try:
-            # 1. Update job status to running
             job = await db.get(AnalysisJob, UUID(job_id))
             if not job:
                 return
@@ -163,39 +175,38 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
             job.started_at = datetime.now(timezone.utc)
             await db.commit()
 
-            # 2. Get encrypted token
             token_stmt = select(ExternalToken).where(ExternalToken.user_id == UUID(user_id))
             token_record = (await db.exec(token_stmt)).first()
             if not token_record:
                 raise ValueError("Token not found")
 
-            # 3. DECRYPT THE TOKEN
             decrypted_token = fernet.decrypt(token_record.encrypted_access_token.encode()).decode()
 
-            # 4. Get Instagram Account ID
             acc_stmt = select(InstagramAccount).where(InstagramAccount.user_id == UUID(user_id))
             account = (await db.exec(acc_stmt)).first()
             ig_user_id = account.instagram_user_id
 
-            # 5. Fetch Media
             media_data = await meta_client.get_user_media(ig_user_id, decrypted_token)
             items = media_data.get("data", [])
             total_items = len(items)
+            
+            all_captions = []
 
             for index, item in enumerate(items):
-                # Fetch detailed insights for each item
                 insights = await meta_client.get_media_insights(item["id"], decrypted_token)
                 
-                # Check for existing media item
                 existing_media_stmt = select(MediaItem).where(MediaItem.external_media_id == item["id"])
                 media_item = (await db.exec(existing_media_stmt)).first()
+
+                caption = item.get("caption", "")
+                all_captions.append(caption)
 
                 if not media_item:
                     media_item = MediaItem(
                         user_id=UUID(user_id),
                         external_media_id=item["id"],
                         media_type=item["media_type"],
-                        caption=item.get("caption", ""),
+                        caption=caption,
                         permalink=item["permalink"],
                         thumbnail_url=item.get("thumbnail_url") or item.get("media_url"),
                         published_at=datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00")),
@@ -204,17 +215,14 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
                     await db.commit()
                     await db.refresh(media_item)
                 
-                # Create/Update Metrics
-                # We store a history of metrics, or just the latest? 
-                # For MVP, let's just store the latest snapshot.
                 metric_data = {m["name"]: m["values"][0]["value"] for m in insights.get("data", [])}
                 
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
                     view=metric_data.get("plays", 0),
                     reach=metric_data.get("reach", 0),
-                    likes=metric_data.get("total_interactions", 0), # Simplified for MVP
-                    comments="0", # Insights API usually doesn't return text comments
+                    likes=metric_data.get("total_interactions", 0),
+                    comments="0",
                     saves=metric_data.get("saved", 0),
                     shares=metric_data.get("shares", 0),
                     total_interactions=metric_data.get("total_interactions", 0),
@@ -223,11 +231,16 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
                 )
                 db.add(media_metric)
                 
-                # Update progress
-                job.progress = int(((index + 1) / total_items) * 100)
+                job.progress = int(((index + 1) / total_items) * 95)
                 await db.commit()
 
-            # 6. Mark job as succeeded
+            logger.info(f"Starting niche detection for user {user_id}")
+            detected_niche = await detect_niche_service(account.biography or "", all_captions)
+            
+            account.niche_detected = detected_niche
+            db.add(account)
+            
+            job.progress = 100
             job.status = "succeeded"
             job.completed_at = datetime.now(timezone.utc)
             await db.commit()
