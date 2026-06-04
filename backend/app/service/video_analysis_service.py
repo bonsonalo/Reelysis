@@ -9,6 +9,7 @@ from app.core.logger import logger
 from app.core.celery_app import celery_app
 from app.model.media_items import MediaItem
 from app.model.competitor_media import CompetitorMedia
+from app.model.media_metrics import MediaMetric
 from app.model.video_analysis import VideoAnalysis, MediaSource
 from app.model.analysis_job import AnalysisJob
 from app.service.ai_service import analyze_video_service
@@ -63,13 +64,22 @@ async def _run_analysis_internal(job_id: str, user_id: str):
 
             # 2. Analyze own media
             for item in own_media:
+                # Get latest metrics for calculation
+                m_stmt = select(MediaMetric).where(MediaMetric.media_item_id == item.id).order_by(col(MediaMetric.captured_at).desc()).limit(1)
+                latest_m = (await db.exec(m_stmt)).first()
+                
+                score = 0
+                if latest_m:
+                    # Score = (Interactions / Views) * 100
+                    score = _calculate_engagement_score(latest_m.total_interactions, latest_m.view)
+
                 analysis_data = await analyze_video_service(
                     caption=item.caption,
                     transcript=getattr(item, "transcript_text", ""),
                     hashtags=item.hashtag.get("names", []) if isinstance(item.hashtag, dict) else []
                 )
                 if analysis_data:
-                    await _save_analysis(db, UUID(user_id), MediaSource.OWN, analysis_data, media_item_id=item.id)
+                    await _save_analysis(db, UUID(user_id), MediaSource.OWN, analysis_data, engagement_score=score, media_item_id=item.id)
                 
                 processed_count += 1
                 job.progress = int((processed_count / total_videos) * 100)
@@ -77,13 +87,22 @@ async def _run_analysis_internal(job_id: str, user_id: str):
 
             # 3. Analyze competitor media
             for item in comp_media:
+                # Competitor metrics are stored in a JSONB column
+                m = item.metrics or {}
+                # Handle different possible key names from scraping
+                views = m.get("view_count") or m.get("views", 0)
+                likes = m.get("like_count") or m.get("likes", 0)
+                comments = m.get("comment_count") or m.get("comments", 0)
+                
+                score = _calculate_engagement_score(likes + comments, views)
+
                 analysis_data = await analyze_video_service(
                     caption=item.caption,
                     transcript=item.transcript_text,
                     hashtags=item.hashtags.get("names", []) if isinstance(item.hashtags, dict) else []
                 )
                 if analysis_data:
-                    await _save_analysis(db, UUID(user_id), MediaSource.COMPETITOR, analysis_data, competitor_media_id=item.id)
+                    await _save_analysis(db, UUID(user_id), MediaSource.COMPETITOR, analysis_data, engagement_score=score, competitor_media_id=item.id)
                 
                 processed_count += 1
                 job.progress = int((processed_count / total_videos) * 100)
@@ -100,8 +119,14 @@ async def _run_analysis_internal(job_id: str, user_id: str):
                 job.error_message = str(e)
                 await db.commit()
 
+def _calculate_engagement_score(interactions: int, views: int) -> int:
+    """Returns a score from 0-100 representing engagement quality."""
+    if not views or views == 0: return 0
+    # Formula: (interactions / views) * 100, capped at 100
+    score = int((interactions / views) * 100)
+    return min(score, 100)
+
 async def _get_unanalyzed_own_media(db: AsyncSession, user_id: UUID):
-    # Left join MediaItem with VideoAnalysis to find items with NO analysis
     stmt = select(MediaItem).where(
         MediaItem.user_id == user_id
     ).join(
@@ -113,7 +138,6 @@ async def _get_unanalyzed_own_media(db: AsyncSession, user_id: UUID):
     return result.all()
 
 async def _get_unanalyzed_competitor_media(db: AsyncSession, user_id: UUID):
-    # Left join CompetitorMedia with VideoAnalysis
     stmt = select(CompetitorMedia).where(
         CompetitorMedia.user_id == user_id
     ).join(
@@ -124,7 +148,7 @@ async def _get_unanalyzed_competitor_media(db: AsyncSession, user_id: UUID):
     result = await db.exec(stmt)
     return result.all()
 
-async def _save_analysis(db: AsyncSession, user_id: UUID, source: MediaSource, data, media_item_id=None, competitor_media_id=None):
+async def _save_analysis(db: AsyncSession, user_id: UUID, source: MediaSource, data, engagement_score: int, media_item_id=None, competitor_media_id=None):
     analysis = VideoAnalysis(
         user_id=user_id,
         media_source=source,
@@ -135,7 +159,7 @@ async def _save_analysis(db: AsyncSession, user_id: UUID, source: MediaSource, d
         content_pillar=data.content_pillar,
         confidence=data.confidence,
         hook_score=data.hook_score,
-        engagement_score=0, # This will be calculated from metrics later
+        engagement_score=engagement_score,
         analysis_detail=data.model_dump(),
         created_at=datetime.now(timezone.utc)
     )
