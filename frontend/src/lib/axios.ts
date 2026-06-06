@@ -12,7 +12,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       try {
-        await api.post('/auth/refresh')
+        await api.post('/api/v1/auth/refresh')
         return api(original)
       } catch {
         window.location.href = '/login'
