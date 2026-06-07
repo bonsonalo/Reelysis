@@ -59,7 +59,3 @@ class CompetitorAccount(SQLModel, table= True):
         back_populates= "competitor_account",
         cascade_delete= True
     )
-    video_analysis: list["VideoAnalysis"]= Relationship(
-        back_populates= "competitor_account",
-        cascade_delete= True
-    )
