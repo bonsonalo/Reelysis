@@ -42,10 +42,6 @@ class MediaMetric(SQLModel, table= True):
     captured_at: datetime
 
 
-    user: "User" = Relationship(
-        back_populates= ""
-    )
-
     media_item: "MediaItem"= Relationship(
         back_populates= "metrics"
     )
