@@ -1,4 +1,4 @@
-from httpcore import Response
+from fastapi import Response
 from jose import JWTError
 from sqlmodel import select
 from app.core.config import settings
@@ -20,7 +20,7 @@ async def register_user(user_info: UserCreate, db: AsyncSession, response: Respo
     try:
         validate_password_strength(user_info.password)
         stmt = select(User).where(User.email == user_info.email)
-        existing_user = await db.exec(stmt)
+        existing_user = (await db.exec(stmt)).first()
         if existing_user:
             raise ValueError("user with email already exists")
     except ValueError as e:
@@ -41,15 +41,15 @@ async def register_user(user_info: UserCreate, db: AsyncSession, response: Respo
     await db.commit()
     await db.refresh(user_credential)
 
-    access_token= create_access_token(
+    access_token= await create_access_token(
         email= user_credential.email,
-        id= str(user_credential.id),
+        id= user_credential.id,
         token_purpose= "access",
         expires_delta= timedelta(minutes= settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    refresh_token= create_access_token(
+    refresh_token= await create_access_token(
         email= user_credential.email,
-        id= str(user_credential.id),
+        id= user_credential.id,
         token_purpose= "refresh",
         expires_delta= timedelta(days= 30)
     )
@@ -95,15 +95,15 @@ async def login_user(user_credential: LoginInfo, db: AsyncSession, response: Res
             logger.error("Authentication failed for user")
             raise ValueError("Invalid email or password")
             
-        access_token= create_access_token(
+        access_token= await create_access_token(
             email= user.email,
-            id= str(user.id),
+            id= user.id,
             token_purpose= "access",
             expires_delta= timedelta(minutes= settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        refresh_token= create_access_token(
+        refresh_token= await create_access_token(
             email= user.email,
-            id= str(user.id),
+            id= user.id,
             token_purpose= "refresh",
             expires_delta= timedelta(days= 30)
         )
@@ -176,15 +176,15 @@ async def refresh_token_service(response, db: AsyncSession, request):
         logger.error("Refresh token hash mismatch")
         raise ValueError("Invalid refresh token")
         
-    access_token= create_access_token(
+    access_token= await create_access_token(
         email= email,
-        id= str(id),
+        id= id,
         token_purpose= "access",
         expires_delta= timedelta(minutes= settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    refresh_token= create_access_token(
+    refresh_token= await create_access_token(
         email= email,
-        id= str(id),
+        id= id,
         token_purpose= "refresh",
         expires_delta= timedelta(days= 30)
     )
@@ -220,9 +220,9 @@ async def refresh_token_service(response, db: AsyncSession, request):
 
 
 
-async def logout_service( response, db: AsyncSession, current_user):
+async def logout_service( response: Response, db: AsyncSession, current_user):
     stmt = select(AuthSession).where(
-        AuthSession.user_id == current_user.id,
+        AuthSession.user_id == current_user["id"],
         AuthSession.expires_at > datetime.now(timezone.utc),
         AuthSession.revoked_at == None
     )
