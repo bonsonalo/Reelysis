@@ -40,9 +40,9 @@ async def refresh_token(response: Response, db: db_dependency, request: Request)
         raise HTTPException(status_code= status.HTTP_401_UNAUTHORIZED, detail= str(e))
 
 @router.post("/logout")
-async def logout(response: Response, db: db_dependency):
+async def logout(response: Response, db: db_dependency, current_user: user_authentication_dependency):
     try:
-        return await logout_service(response, db)
+        return await logout_service(response, db, current_user)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code= status.HTTP_400_BAD_REQUEST, detail= str(e))
