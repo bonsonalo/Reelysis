@@ -25,7 +25,7 @@ async def authenticate_user(user_credential: LoginInfo, db: AsyncSession):
         user= await db.scalar(select(User).where(User.email == user_credential.email))
         if not user:
             return False
-        if not bcrypt_context.verify(user_credential.password, user.password):
+        if not bcrypt_context.verify(user_credential.password, user.password_hash):
             return False
         return user
     except Exception as e:
