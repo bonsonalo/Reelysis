@@ -21,7 +21,7 @@ class User(SQLModel, table= True):
         default_factory= lambda: datetime.now(timezone.utc)
         )
     
-    external_token: "ExternalToken | None"= Relationship(
+    external_token: "ExternalToken" = Relationship(
         back_populates= "user",
         cascade_delete= True
     )
@@ -29,7 +29,7 @@ class User(SQLModel, table= True):
         back_populates= "user",
         cascade_delete= True
     )
-    instagram_account: "InstagramAccount | None"= Relationship(
+    instagram_account: "InstagramAccount" = Relationship(
         back_populates= "user",
         cascade_delete= True
     )
