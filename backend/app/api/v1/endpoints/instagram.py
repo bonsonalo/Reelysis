@@ -19,7 +19,7 @@ router= APIRouter(
 
 @router.get("/oauth/start")
 async def start_oauth(current_user: user_authentication_dependency):
-    user_id= current_user.id
+    user_id= current_user["id"]
     try:
         oauth_url= await get_oauth_url_service(user_id)
         return {"oauth_url": oauth_url}
@@ -39,7 +39,7 @@ async def oauth_callback(code: str, state: str, db: db_dependency):
 @router.get("/accounts")
 async def get_accounts(current_user: user_authentication_dependency, db: db_dependency):
     try:
-        accounts = await get_connected_accounts_service(current_user.id, db)
+        accounts = await get_connected_accounts_service(current_user["id"], db)
         return accounts
     except Exception as e:
         logger.error(f"Error fetching accounts: {e}")
@@ -48,7 +48,7 @@ async def get_accounts(current_user: user_authentication_dependency, db: db_depe
 @router.delete("/disconnect")
 async def disconnect_instagram(current_user: user_authentication_dependency, db: db_dependency):
     try:
-        await disconnect_instagram_service(current_user.id, db)
+        await disconnect_instagram_service(current_user["id"], db)
         return {"message": "Instagram account disconnected successfully"}
     except Exception as e:
         logger.error(f"Error disconnecting account: {e}")
@@ -61,7 +61,7 @@ async def trigger_sync(current_user: user_authentication_dependency, db: db_depe
     Returns the job_id for polling.
     """
     try:
-        job = await trigger_instagram_sync_service(current_user.id, db)
+        job = await trigger_instagram_sync_service(current_user["id"], db)
         return {
             "message": "Sync job triggered",
             "job_id": job.id
@@ -78,7 +78,7 @@ async def confirm_niche(request: NicheConfirmRequest, current_user: user_authent
     Confirms or manually sets the Instagram account's niche.
     """
     try:
-        account = await confirm_instagram_niche_service(current_user.id, request.niche, db)
+        account = await confirm_instagram_niche_service(current_user["id"], request.niche, db)
         return {"message": "Niche confirmed", "niche": account.niche_confirmed}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
