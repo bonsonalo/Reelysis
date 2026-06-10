@@ -85,7 +85,7 @@ async def register_user(user_info: UserCreate, db: AsyncSession, response: Respo
         "name": user_credential.name,
         "email": user_credential.email
     }
-
+ 
 
 # login
 
