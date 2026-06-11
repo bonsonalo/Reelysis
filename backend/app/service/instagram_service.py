@@ -1,4 +1,5 @@
 import asyncio
+import redis
 from datetime import datetime, timedelta, timezone
 from typing import List
 from uuid import UUID
@@ -26,11 +27,19 @@ fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 async def get_oauth_url_service(user_id: UUID):
     try:
         oauth_data = meta_client.get_oauth_url()
+        
+        if not meta_client.app_id or meta_client.app_id == "None":
+             logger.error("Meta App ID is missing or invalid")
+             raise ValueError("Meta API configuration is missing")
+
         redis_client.setex(f"oauth_state:{oauth_data['state']}", 600, str(user_id))
         return oauth_data['url']
+    except redis.exceptions.ConnectionError as e:
+        logger.error(f"Redis connection failed: {e}")
+        raise ValueError("Temporary storage connection failed")
     except Exception as e:
         logger.error(f"Error generating OAuth URL: {e}")
-        raise ValueError("Failed to generate OAuth URL")
+        raise ValueError(str(e))
 
 async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession):
     try:
