@@ -1,6 +1,7 @@
 from app.core.config import settings
 import secrets
 import httpx
+from urllib.parse import quote
 
 class MetaClient:
     def __init__(self):
@@ -11,7 +12,9 @@ class MetaClient:
 
     def get_oauth_url(self):
         state = secrets.token_urlsafe(32)
-        return {"url": f"https://www.instagram.com/oauth/authorize?client_id={self.app_id}&redirect_uri={self.redirect_uri}&scope=instagram_business_basic,instagram_business_manage_insights&response_type=code&state={state}", "state": state}
+        encoded_uri = quote(self.redirect_uri, safe='')
+        url = f"https://www.instagram.com/oauth/authorize?client_id={self.app_id}&redirect_uri={encoded_uri}&scope=instagram_business_basic,instagram_business_manage_insights&response_type=code&state={state}"
+        return {"url": url, "state": state}
     
 
     # The exchange_code_for_access_token method is responsible for exchanging the authorization code received from Instagram for a short-lived access token. It makes a POST request to the Instagram API's token endpoint, providing the necessary parameters such as client_id, client_secret, redirect_uri, code, and grant_type. 
