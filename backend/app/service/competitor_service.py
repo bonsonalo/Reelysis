@@ -125,6 +125,7 @@ async def _process_and_save_competitors(db: AsyncSession, results: list, user_id
             user_id=user_id,
             handle=entry.get("handle"),
             display_name=entry.get("display_name"),
+            profile_picture_url=entry.get("profile_picture_url"),
             followers_count=entry.get("followers_count", 0),
             media_count=entry.get("media_count", 0),
             engagement_rank=int(entry.get("engagement_rate", 0) * 100),
