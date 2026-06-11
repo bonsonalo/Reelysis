@@ -24,14 +24,17 @@ async def start_oauth(current_user: user_authentication_dependency):
         oauth_url= await get_oauth_url_service(user_id)
         return {"oauth_url": oauth_url}
     except ValueError as e:
-        logger.error(str(e))
+        logger.error(f"OAuth Validation Error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"OAuth System Error (Check Redis): {str(e)}")
+        raise HTTPException(status_code=500, detail="External connection failure. Please ensure Redis is running.")
 
 @router.get("/oauth/callback")
 async def oauth_callback(code: str, state: str, db: db_dependency):
     try:
         await handle_oauth_callback_service(code, state, db)
-        return RedirectResponse(url="http://localhost:3000/dashboard?connected=true", status_code=302)
+        return RedirectResponse(url="http://localhost:3000/onboarding?connected=true", status_code=302)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=400, detail=str(e))
