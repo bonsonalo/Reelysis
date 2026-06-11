@@ -2,10 +2,7 @@ from sqlmodel import SQLModel, Field, Column, Relationship, ForeignKey
 from uuid import UUID, uuid4
 from datetime import datetime
 import sqlalchemy.dialects.postgresql as pg
-from typing import Any
-
-
-
+from typing import Any, Optional
 
 
 class CompetitorAccount(SQLModel, table= True):
@@ -19,7 +16,7 @@ class CompetitorAccount(SQLModel, table= True):
             primary_key= True,
         )
     )
-    
+
     user_id: UUID= Field(
         sa_column= Column(
             pg.UUID,
@@ -32,6 +29,7 @@ class CompetitorAccount(SQLModel, table= True):
     )
     handle: str
     display_name: str
+    profile_picture_url: Optional[str] = None
     followers_count: int
     media_count: int
     niche_tags: dict[str, Any]= Field(
