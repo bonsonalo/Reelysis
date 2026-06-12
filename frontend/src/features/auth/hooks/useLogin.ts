@@ -15,8 +15,8 @@ export function useLogin() {
     onSuccess: (response) => {
       dispatch(setUser(response.data));
     },
-    onError: (error: AxiosError<{ message: string }>) => {
-      dispatch(setError(error.response?.data?.message ?? 'Login failed'));
+    onError: (error: AxiosError<{ detail: string }>) => {
+      dispatch(setError(error.response?.data?.detail ?? 'Login failed'));
     },
   });
 }
