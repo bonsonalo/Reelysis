@@ -1,10 +1,10 @@
-from sqlmodel import select, func, desc
+from sqlmodel import select, func, desc, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.model.media_items import MediaItem
 from app.model.media_metrics import MediaMetric
 from app.model.video_analysis import VideoAnalysis, MediaSource
 from uuid import UUID
-from sqlalchemy.orm import aliased
+from datetime import datetime, timedelta, timezone
 
 async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
     # 1. Get total media items
@@ -24,7 +24,6 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
         }
 
     # 2. Get the latest metric for each media item
-    # Since we might have multiple snapshots, we take the one with the latest captured_at
     subquery = select(
         MediaMetric.media_item_id,
         func.max(MediaMetric.captured_at).label("max_captured")
@@ -58,8 +57,45 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
         "avg_reach": int(avg_reach),
         "avg_engagement": round(avg_engagement, 1),
         "top_hook_score": round(avg_hook_score, 1),
-        "views_change": "+0%", # Placeholder for historical comparison
+        "views_change": "+0%", 
         "reach_change": "+0%",
         "engagement_change": "+0%",
         "hook_change": "+0"
     }
+
+async def get_growth_chart_service(user_id: UUID, db: AsyncSession):
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    stmt = select(
+        func.date_trunc('day', MediaMetric.captured_at).label("day"),
+        func.sum(MediaMetric.view).label("total_views"),
+        func.sum(MediaMetric.reach).label("total_reach")
+    ).join(MediaItem).where(
+        MediaItem.user_id == user_id,
+        MediaMetric.captured_at >= thirty_days_ago
+    ).group_by(col("day")).order_by(col("day"))
+    
+    result = await db.exec(stmt)
+    rows = result.all()
+    return {"data": [{"date": r.day.strftime("%b %d"), "views": int(r.total_views), "reach": int(r.total_reach)} for r in rows]}
+
+async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
+    """
+    Returns aggregated stats for the user's content pillars.
+    """
+    stmt = select(
+        VideoAnalysis.content_pillar,
+        func.count(VideoAnalysis.id).label("count"),
+        func.avg(VideoAnalysis.engagement_score).label("avg_engagement")
+    ).where(
+        VideoAnalysis.user_id == user_id,
+        VideoAnalysis.media_source == MediaSource.OWN
+    ).group_by(
+        VideoAnalysis.content_pillar
+    ).order_by(
+        desc("avg_engagement")
+    )
+    
+    result = await db.exec(stmt)
+    rows = result.all()
+    
+    return {"data": [{"pillar": r.content_pillar, "count": r.count, "avg_engagement": round(float(r.avg_engagement), 1)} for r in rows]}
