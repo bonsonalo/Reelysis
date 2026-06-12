@@ -19,17 +19,17 @@ export interface AuthUser {
 }
 
 export async function loginUser(credentials: LoginCredentials): Promise<AxiosResponse<AuthUser>> {
-  return api.post<AuthUser>('/auth/login', credentials);
+  return api.post<AuthUser>('/api/v1/auth/login', credentials);
 }
 
 export async function registerUser(data: RegisterData): Promise<AxiosResponse<AuthUser>> {
-  return api.post<AuthUser>('/auth/register', data);
+  return api.post<AuthUser>('/api/v1/auth/signup', data);
 }
 
 export async function logoutUser(): Promise<AxiosResponse<void>> {
-  return api.post('/auth/logout');
+  return api.post('/api/v1/auth/logout');
 }
 
 export async function getCurrentUser(): Promise<AxiosResponse<AuthUser>> {
-  return api.get<AuthUser>('/auth/me');
+  return api.get<AuthUser>('/api/v1/auth/profile');
 }
