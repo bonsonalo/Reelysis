@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import {  useAppDispatch } from '../../../store/hook';
-import { getCurrentUser } from '../api';
+import { getCurrentUser, AuthUser } from '../api';
 import { setUser } from '@/store/slices/authSlice';
 
-export function useCurrentUser() {
+export function useCurrentUser(options?: Partial<UseQueryOptions<AuthUser>>) {
   const dispatch = useAppDispatch();
   return useQuery({
     queryKey: ['current-user'],
@@ -14,5 +14,6 @@ export function useCurrentUser() {
     },
     retry: false,
     staleTime: 1000 * 60 * 5,
+    ...options,
   });
 }
