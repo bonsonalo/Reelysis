@@ -32,7 +32,7 @@ async def get_oauth_url_service(user_id: UUID):
              logger.error("Meta App ID is missing or invalid")
              raise ValueError("Meta API configuration is missing")
 
-        redis_client.setex(f"oauth_state:{oauth_data['state']}", 600, str(user_id))
+        await redis_client.setex(f"oauth_state:{oauth_data['state']}", 600, str(user_id))
         return oauth_data['url']
     except redis.exceptions.ConnectionError as e:
         logger.error(f"Redis connection failed: {e}")
@@ -43,12 +43,12 @@ async def get_oauth_url_service(user_id: UUID):
 
 async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession):
     try:
-        user_id_raw = redis_client.get(f"oauth_state:{state}")
+        user_id_raw = await redis_client.get(f"oauth_state:{state}")
         if not user_id_raw:
             raise ValueError("Invalid or expired state parameter")
         
         user_id = UUID(user_id_raw.decode() if isinstance(user_id_raw, bytes) else user_id_raw)
-        redis_client.delete(f"oauth_state:{state}")
+        await redis_client.delete(f"oauth_state:{state}")
         
         token_data = await meta_client.exchange_code_for_access_token(code)
         short_lived_token = token_data.get("access_token")
