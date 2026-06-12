@@ -260,6 +260,11 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
             job.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
+            # Trigger Bulk Video Analysis immediately after sync so hooks/pillars are ready for the roadmap
+            from app.service.video_analysis_service import run_bulk_video_analysis_service
+            await run_bulk_video_analysis_service(UUID(user_id), db)
+            logger.info(f"Video analysis queued for user {user_id}")
+
         except Exception as e:
             logger.error(f"Error in sync task: {e}")
             if job:
