@@ -20,7 +20,8 @@ export default function RegisterForm() {
     }
   }, [status, router]);
 
-  const handleRegister = () => {
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!name || !email || !password || isPending) return;
     register({ name, email, password });
   };
@@ -35,33 +36,27 @@ export default function RegisterForm() {
             <div className="text-white font-bold text-lg mb-10 tracking-tight">
               Reelysis
             </div>
-            <div className="uppercase text-orange-500 text-xs font-semibold mb-3 tracking-wider">
-              Welcome back
+            <div className="uppercase text-gray-500 text-xs font-semibold mb-3 tracking-wider">
+              Registration
             </div>
             <h1 className="text-4xl font-extrabold text-white mb-4 leading-tight">
-              Your growth<br />dashboard awaits.
+              Platform Analytics Registration.
             </h1>
             <p className="text-gray-400 mb-10 text-base">
-              Everything you need to understand your content, outpace competitors, and grow.
+              Establish your account to begin content performance tracking and competitor analysis.
             </p>
             <div className="space-y-4">
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <div>
-                  <div className="text-white font-bold text-base">Transcript-first</div>
-                  <div className="text-gray-500 text-s">AI analysis on every Reel</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Transcript Analysis</div>
+                <div className="text-gray-500 text-sm">Automated processing for all video content.</div>
               </div>
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <div>
-                  <div className="text-white font-bold text-base">10 competitors</div>
-                  <div className="text-gray-500 text-s">Auto-discovered from your niche</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Competitor Tracking</div>
+                <div className="text-gray-500 text-sm">Automated discovery and monitoring.</div>
               </div>
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <div>
-                  <div className="text-white font-bold text-base">One click</div>
-                  <div className="text-gray-500 text-s">From sync to full growth report</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Growth Reporting</div>
+                <div className="text-gray-500 text-sm">Comprehensive performance metrics.</div>
               </div>
             </div>
           </div>
@@ -74,9 +69,9 @@ export default function RegisterForm() {
 
         {/* Right panel */}
         <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-16 bg-[#0d0d0d]">
-            <div className="w-full max-w-sm">
-                <h2 className="text-2xl font-bold text-white mb-1">Create your account</h2>
-                <p className="text-sm text-gray-400 mb-6">Already have one? <a href="/login" className="ml-2 text-orange-500 hover:underline">Sign in →</a></p>
+            <form onSubmit={handleRegister} className="w-full max-w-sm">
+                <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
+                <p className="text-sm text-gray-400 mb-6">Existing user? <a href="/login" className="ml-2 text-orange-500 hover:underline">Sign in →</a></p>
 
                 {error && (
                 <div className="mb-4 text-red-500 text-sm font-medium">{error}</div>
@@ -84,23 +79,23 @@ export default function RegisterForm() {
 
                 <div className="mb-5 mt-6">
                     <label className="block text-gray-300 text-sm mb-1" htmlFor="name">Full name</label>
-                    <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} disabled={isPending} placeholder="Your name" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" />
+                    <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} disabled={isPending} placeholder="Name" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
                 </div>
 
                 <div className="mb-5">
                     <label className="block text-gray-300 text-sm mb-1" htmlFor="email">Email address</label>
-                    <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={isPending} placeholder="you@example.com" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" />
+                    <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={isPending} placeholder="email@example.com" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
                 </div>
 
                 <div className="mb-8">
                     <label className="block text-gray-300 text-sm mb-1" htmlFor="password">Password</label>
-                    <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={isPending} placeholder="********" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" />
+                    <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={isPending} placeholder="********" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
                 </div>
 
-                <Button type="button" onClick={handleRegister} disabled={isPending} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg">
-                {isPending ? 'Creating account...' : 'Create account'}
+                <Button type="submit" disabled={isPending} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg">
+                {isPending ? 'Processing...' : 'Register'}
                 </Button>
-            </div>
+            </form>
         </div>
 
       </div>
