@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLogin } from '../hooks/useLogin'
 import { useAuth } from '@/store/hook'
+import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { Button } from '@/components/ui/button'
 
 export default function LoginForm() {
@@ -12,14 +13,21 @@ export default function LoginForm() {
   const router = useRouter()
   const { mutate: login, isPending } = useLogin()
   const { error, status } = useAuth()
+  const { data: accounts, isLoading: isLoadingAccounts } = useInstagramAccounts({
+    enabled: status === 'succeeded'
+  })
 
   useEffect(() => {
-    if (status === 'succeeded') {
-      router.push('/dashboard')
-    }
-  }, [status, router])
+    if (status !== 'succeeded') return
+    if (isLoadingAccounts) return
+    if (!accounts) return
 
-  const handleLogin = () => {
+    const isConnected = accounts.length > 0
+    router.push(isConnected ? '/dashboard' : '/onboarding')
+  }, [status, accounts, isLoadingAccounts, router])
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
     if (!email || !password || isPending) return
     login({ email, password })
   }
@@ -34,36 +42,27 @@ export default function LoginForm() {
             <div className="text-white font-bold text-lg mb-10 tracking-tight">
               Reelysis
             </div>
-            <div className="uppercase text-orange-500 text-xs font-semibold mb-3 tracking-wider">
-              Welcome back
+            <div className="uppercase text-gray-500 text-xs font-semibold mb-3 tracking-wider">
+              Authentication
             </div>
             <h1 className="text-4xl font-extrabold text-white mb-4 leading-tight">
-              Your growth<br />dashboard awaits.
+              Access your analytics dashboard.
             </h1>
             <p className="text-gray-400 mb-10 text-base">
-              Everything you need to understand your content, outpace competitors, and grow.
+              Monitor content performance, track competitors, and manage growth.
             </p>
             <div className="space-y-4">
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <span className="text-2xl">📊</span>
-                <div>
-                  <div className="text-white font-bold text-base">Transcript-first</div>
-                  <div className="text-gray-500 text-s">AI analysis on every Reel</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Transcript Analysis</div>
+                <div className="text-gray-500 text-sm">Automated processing for all video content.</div>
               </div>
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <span className="text-2xl">🎯</span>
-                <div>
-                  <div className="text-white font-bold text-base">10 competitors</div>
-                  <div className="text-gray-500 text-s">Auto-discovered from your niche</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Competitor Tracking</div>
+                <div className="text-gray-500 text-sm">Automated discovery and monitoring.</div>
               </div>
-              <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-lg p-4">
-                <span className="text-2xl">🏆</span>
-                <div>
-                  <div className="text-white font-bold text-base">One click</div>
-                  <div className="text-gray-500 text-s">From sync to full growth report</div>
-                </div>
+              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
+                <div className="text-white font-bold text-base">Growth Reporting</div>
+                <div className="text-gray-500 text-sm">Comprehensive performance metrics.</div>
               </div>
             </div>
           </div>
@@ -76,13 +75,13 @@ export default function LoginForm() {
 
         {/* Right panel */}
         <div className="flex-1 bg-[#0a0a0a] p-8 md:p-16 flex flex-col justify-center bg-[#0d0d0d]">
-          <div className="mx-auto w-full max-w-md">
+          <form onSubmit={handleLogin} className="mx-auto w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Sign in</h2>
               <span className="text-sm text-gray-400">
-                No account?{' '}
+                New user?{' '}
                 <a href="/register" className="text-orange-500 hover:underline ml-2">
-                  Create one free →
+                  Create account →
                 </a>
               </span>
             </div>
@@ -105,7 +104,8 @@ export default function LoginForm() {
                 className="w-full px-4 py-2 rounded bg-[#232323] text-white focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-500"
                 autoComplete="email"
                 disabled={isPending}
-                placeholder="you@example.com"
+                placeholder="email@example.com"
+                required
               />
             </div>
 
@@ -122,25 +122,25 @@ export default function LoginForm() {
                 autoComplete="current-password"
                 disabled={isPending}
                 placeholder="********"
+                required
               />
             </div>
 
             <div className="flex items-center justify-end mb-6">
               <a href="#" className="text-orange-500 text-sm hover:underline">
-                Forgot password?
+                Reset password
               </a>
             </div>
 
             <Button
-              type="button"
-              onClick={handleLogin}
+              type="submit"
               className="w-full mb-4 text-base py-2 bg-orange-500 hover:bg-orange-600"
               disabled={isPending}
             >
-              {isPending ? 'Signing in...' : 'Sign in'}
+              {isPending ? 'Authenticating...' : 'Sign in'}
             </Button>
 
-          </div>
+          </form>
         </div>
 
       </div>
