@@ -13,7 +13,14 @@ class MetaClient:
     def get_oauth_url(self):
         state = secrets.token_urlsafe(32)
         encoded_uri = quote(self.redirect_uri, safe='')
-        url = f"https://www.instagram.com/oauth/authorize?client_id={self.app_id}&redirect_uri={encoded_uri}&scope=instagram_business_basic,instagram_business_manage_insights&response_type=code&state={state}"
+        # Using Facebook's OAuth dialog which is the correct entry point for Instagram Graph API
+        url = (
+            f"https://www.facebook.com/{self.graph_api_version}/dialog/oauth?"
+            f"client_id={self.app_id}&"
+            f"redirect_uri={encoded_uri}&"
+            f"state={state}&"
+            f"scope=instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement"
+        )
         return {"url": url, "state": state}
     
 
