@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     AI_MODEL_PRO: str = "gemini-1.5-pro"
     AI_SIMULATION_MODE: bool = False
 
-    model_config= SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config= SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        str_strip_whitespace=True
+    )
 
 
 
