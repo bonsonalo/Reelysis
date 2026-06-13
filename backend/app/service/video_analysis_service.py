@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 from sqlmodel import select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import HTTPException
 
 from app.core.database import engine
 from app.core.logger import logger
@@ -64,13 +65,11 @@ async def _run_analysis_internal(job_id: str, user_id: str):
 
             # 2. Analyze own media
             for item in own_media:
-                # Get latest metrics for calculation
                 m_stmt = select(MediaMetric).where(MediaMetric.media_item_id == item.id).order_by(col(MediaMetric.captured_at).desc()).limit(1)
                 latest_m = (await db.exec(m_stmt)).first()
                 
                 score = 0
                 if latest_m:
-                    # Score = (Interactions / Views) * 100
                     score = _calculate_engagement_score(latest_m.total_interactions, latest_m.view)
 
                 analysis_data = await analyze_video_service(
@@ -87,9 +86,7 @@ async def _run_analysis_internal(job_id: str, user_id: str):
 
             # 3. Analyze competitor media
             for item in comp_media:
-                # Competitor metrics are stored in a JSONB column
                 m = item.metrics or {}
-                # Handle different possible key names from scraping
                 views = m.get("view_count") or m.get("views", 0)
                 likes = m.get("like_count") or m.get("likes", 0)
                 comments = m.get("comment_count") or m.get("comments", 0)
@@ -119,10 +116,32 @@ async def _run_analysis_internal(job_id: str, user_id: str):
                 job.error_message = str(e)
                 await db.commit()
 
+async def get_video_analysis_service(video_id: UUID, user_id: UUID, db: AsyncSession):
+    """
+    Retrieves the full AI analysis and performance metrics for a specific video.
+    """
+    # 1. Fetch Media Item
+    media = await db.get(MediaItem, video_id)
+    if not media or media.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    # 2. Fetch Latest Analysis
+    stmt = select(VideoAnalysis).where(VideoAnalysis.media_item_id == video_id)
+    analysis = (await db.exec(stmt)).first()
+    
+    # 3. Fetch Latest Metrics
+    m_stmt = select(MediaMetric).where(MediaMetric.media_item_id == video_id).order_by(desc(MediaMetric.captured_at)).limit(1)
+    latest_metrics = (await db.exec(m_stmt)).first()
+    
+    return {
+        "media": media,
+        "analysis": analysis,
+        "metrics": latest_metrics
+    }
+
 def _calculate_engagement_score(interactions: int, views: int) -> int:
     """Returns a score from 0-100 representing engagement quality."""
     if not views or views == 0: return 0
-    # Formula: (interactions / views) * 100, capped at 100
     score = int((interactions / views) * 100)
     return min(score, 100)
 
