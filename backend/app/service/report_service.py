@@ -2,8 +2,9 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from uuid import UUID
-from sqlmodel import select, col
+from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import HTTPException
 
 from app.core.database import engine
 from app.core.logger import logger
@@ -104,6 +105,25 @@ async def _generate_report_internal(job_id: str, user_id: str):
                 job.status = "failed"
                 job.error_message = str(e)
                 await db.commit()
+
+async def get_latest_report_service(user_id: UUID, db: AsyncSession):
+    """
+    Returns the most recently generated strategic report for the user.
+    """
+    stmt = select(AccountReport).where(AccountReport.user_id == user_id).order_by(desc(AccountReport.created_at)).limit(1)
+    report = (await db.exec(stmt)).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="No growth strategy found. Start onboarding or trigger a new generation.")
+    return report
+
+async def get_roadmap_service(user_id: UUID, db: AsyncSession):
+    """
+    Returns the individual actionable recommendations from the user's latest roadmap.
+    """
+    report = await get_latest_report_service(user_id, db)
+    stmt = select(Recommendation).where(Recommendation.account_report_id == report.id).order_by(desc(Recommendation.priority))
+    results = await db.exec(stmt)
+    return results.all()
 
 async def _prepare_user_brief(db: AsyncSession, user_id: UUID):
     stmt = select(VideoAnalysis).where(
