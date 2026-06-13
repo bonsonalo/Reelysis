@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional, Any
 
 class DashboardStats(BaseModel):
     total_views: int
@@ -27,3 +27,20 @@ class ContentPillarStat(BaseModel):
 
 class DashboardPillarsResponse(BaseModel):
     data: List[ContentPillarStat]
+
+class VideoFeedItem(BaseModel):
+    id: str
+    thumbnail_url: str
+    caption: str
+    hook_score: int
+    views: int
+    engagement_rate: float
+    permalink: str
+
+class DashboardVideosResponse(BaseModel):
+    data: List[VideoFeedItem]
+
+class VideoDetailResponse(BaseModel):
+    media: Any
+    analysis: Any
+    metrics: Any
