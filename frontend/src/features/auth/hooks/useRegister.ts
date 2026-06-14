@@ -14,8 +14,8 @@ export function useRegister() {
     onSuccess: (response) => {
       dispatch(setUser(response.data));
     },
-    onError: (error: AxiosError<{ message: string }>) => {
-      dispatch(setError(error.response?.data?.message ?? 'Registration failed'));
+    onError: (error: AxiosError<{ detail: string }>) => {
+      dispatch(setError(error.response?.data?.detail ?? 'Registration failed'));
     },
   });
 }
