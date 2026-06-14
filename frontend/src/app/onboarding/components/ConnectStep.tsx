@@ -31,7 +31,7 @@ export function ConnectStep({ onConnect, isConnecting }: ConnectStepProps) {
             <p className="text-sm font-semibold uppercase tracking-widest text-primary group-hover:text-primary/80 transition-colors">
               Start by connecting your account above
             </p>
-            <ArrowRight className="h-6 w-6 animate-bounce text-primary group-hover:text-primary/80 transition-colors" />
+            <ArrowRight className="h-6 w-6 text-primary group-hover:text-primary/80 transition-colors" />
           </>
         )}
       </div>
