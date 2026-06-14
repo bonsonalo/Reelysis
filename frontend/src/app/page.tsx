@@ -55,19 +55,22 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        {/* Background Glows */}
-        <div className="absolute top-0 left-1/2 -z-10 h-[500px] w-full -translate-x-1/2 bg-[radial-gradient(circle_at_center,rgba(var(--primary-rgb),0.15)_0,transparent_70%)] blur-[120px]" />
         
         <div className="mx-auto max-w-7xl px-6 text-center">
+          <div className="mx-auto mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-sm">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-widest text-primary/80">Indexing & Analysis Engine</span>
+          </div>
           
           <h1 className="mx-auto mb-8 max-w-4xl text-5xl font-black tracking-tight sm:text-7xl lg:text-8xl">
-            Know exactly what <br />
-            to post <span className="text-primary italic">next.</span>
+            Close the <br />
+            <span className="text-primary italic">Reach-Gap.</span>
           </h1>
           
-          <p className="mx-auto mb-12 max-w-2xl text-lg text-muted-foreground md:text-xl">
-            Connect your Instagram to discover your content pillars, analyze top competitors, 
-            and generate a high-performing growth roadmap in minutes.
+          <p className="mx-auto mb-12 max-w-2xl text-lg text-zinc-500 md:text-xl font-medium leading-relaxed">
+            AI-driven transcription and competitor indexing for high-retention Reels. 
+            Identify winning content pillars and generate data-backed growth roadmaps.
+          </p>
           </p>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
