@@ -4,6 +4,7 @@ import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAcc
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 import { useDashboardGrowth } from '@/features/dashboard/hooks/useDashboardGrowth'
 import { useContentPillars } from '@/features/dashboard/hooks/useContentPillars'
+import { useDashboardVideos } from '@/features/dashboard/hooks/useDashboardVideos'
 import { useCompetitors } from '@/features/competitors/hooks/useCompetitors'
 import { 
   Eye, 
@@ -14,16 +15,21 @@ import {
   Plus,
   Loader2,
   Users2,
-  Sparkles
+  Sparkles,
+  Video,
+  Play,
+  ArrowRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { GrowthChart } from '@/features/dashboard/components/GrowthChart'
 
 export default function DashboardPage() {
   const { data: accounts } = useInstagramAccounts()
   const { data: stats, isLoading } = useDashboardStats()
   const { data: growth } = useDashboardGrowth()
   const { data: pillars } = useContentPillars()
+  const { data: videos } = useDashboardVideos()
   const { data: competitors } = useCompetitors()
   const account = accounts?.[0]
 
@@ -133,11 +139,16 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-[300px] flex items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
-                <p className="text-sm text-muted-foreground italic text-center px-10">
-                   Chart rendering ready. Recharts installation needed to finalize visualization.
-                   Data detected: {growth?.data?.length || 0} points.
-                </p>
+            <div className="h-[300px] w-full">
+                {growth?.data && growth.data.length > 0 ? (
+                  <GrowthChart data={growth.data} />
+                ) : (
+                  <div className="h-full flex items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
+                    <p className="text-sm text-muted-foreground italic text-center px-10">
+                      Not enough data yet. Post more Reels to see your viral growth trends.
+                    </p>
+                  </div>
+                )}
             </div>
         </div>
         
@@ -185,7 +196,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Content Pillars Section */}
-      <div className="space-y-6 pb-12">
+      <div className="space-y-6">
           <div className="flex items-center gap-3">
             <Sparkles className="h-6 w-6 text-primary" />
             <h2 className="text-2xl font-bold text-white">High-Performing Content Pillars</h2>
@@ -213,6 +224,66 @@ export default function DashboardPage() {
               ))
             )}
           </div>
+      </div>
+
+      {/* Recent Reels Grid */}
+      <div className="space-y-6 pb-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Video className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-bold text-white">Recent Reel Performance</h2>
+          </div>
+          <Link href="/videos">
+            <Button variant="ghost" className="text-primary font-bold hover:bg-primary/10">
+              View All Reels <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+
+import Link from 'next/link'
+...
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {videos?.data.map((video) => (
+            <Link 
+              href={`/videos/${video.id}`} 
+              key={video.id} 
+              className="group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/5 bg-zinc-900 transition-all hover:border-primary/50 cursor-pointer"
+            >
+               <img 
+                src={video.thumbnail_url} 
+                alt={video.caption} 
+                className="h-full w-full object-cover opacity-60 transition-transform duration-500 group-hover:scale-110 group-hover:opacity-100" 
+              />
+              
+              {/* Stats Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-4 flex flex-col justify-end">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className={cn(
+                    "px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter",
+                    video.hook_score >= 80 ? "bg-emerald-500 text-black" : "bg-primary text-black"
+                  )}>
+                    Hook: {video.hook_score}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-white font-bold text-sm">
+                  <div className="flex items-center gap-1">
+                    <Play className="h-3 w-3 fill-current" />
+                    {formatNumber(video.views)}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">
+                    {video.engagement_rate}% Eng.
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+...
+          {(!videos || videos.data.length === 0) && (
+             [1,2,3,4,5,6].map(i => (
+                <div key={i} className="aspect-[9/16] rounded-xl border border-white/5 bg-[#09090b] animate-pulse" />
+              ))
+          )}
+        </div>
       </div>
     </div>
   )
