@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+import Markdown from 'react-markdown'
 import { cn } from '@/lib/utils'
 
 export default function StrategicRoadmapPage() {
@@ -31,52 +31,66 @@ export default function StrategicRoadmapPage() {
 
   if (!report) {
     return (
-      <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center text-center">
-        <AlertCircle className="h-12 w-12 text-zinc-500 mb-4" />
-        <h2 className="text-xl font-bold text-white">No roadmap generated yet.</h2>
-        <p className="text-zinc-400 mt-2">Complete your profile analysis to see your growth strategy.</p>
+      <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center text-center p-4">
+        <div className="mb-6 rounded-full bg-primary/10 p-4 border border-primary/20">
+          <Zap className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold text-white mb-2">No Strategic Roadmap Found</h1>
+        <p className="max-w-md text-zinc-500 mb-8">
+          Complete your profile analysis in the onboarding to generate your custom strategy.
+        </p>
+        <Button onClick={() => window.location.href = '/onboarding'}>
+          Go to Onboarding
+        </Button>
       </div>
     )
   }
 
+  const recommendations = roadmap?.recommendations || []
+
   return (
-    <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Hero Header */}
-      <div className="relative rounded-3xl border border-primary/20 bg-primary/5 p-8 md:p-12 overflow-hidden shadow-2xl">
-         <Zap className="absolute -top-10 -right-10 h-64 w-64 text-primary/5 -rotate-12" />
-         <div className="relative z-10 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 text-primary text-xs font-bold uppercase tracking-widest">
-               <Calendar className="h-3 w-3" />
-               Latest Update: {new Date(report.created_at).toLocaleDateString()}
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black text-white leading-tight">
-               Your Viral <br />
-               <span className="text-primary italic font-serif">Roadmap.</span>
-            </h1>
-            <p className="max-w-2xl text-lg text-zinc-300 leading-relaxed font-medium">
-               {report.summary}
-            </p>
-         </div>
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12 pb-24">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <TrendingUp className="h-5 w-5" />
+            <span className="text-xs font-black uppercase tracking-widest">Growth Strategy</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white uppercase">
+            Viral <span className="text-primary italic">Roadmap.</span>
+          </h1>
+          <p className="mt-3 text-zinc-500 max-w-xl font-medium">
+            Based on your recent performance and competitor benchmarks, we've identified these high-impact actions.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+          <div className="flex flex-col text-right pr-4 border-r border-white/10">
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Last Updated</span>
+            <span className="text-sm font-bold text-white">{new Date(report.created_at).toLocaleDateString()}</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-         {/* Left: Actionable Tasks */}
-         <div className="lg:col-span-2 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+         {/* Left: Top Actions */}
+         <div className="space-y-8">
             <div className="flex items-center gap-3">
-               <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
-                  <CheckCircle2 className="h-6 w-6" />
+               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                  <Zap className="h-6 w-6 fill-current" />
                </div>
-               <h2 className="text-2xl font-bold text-white">Priority Recommendations</h2>
+               <h2 className="text-2xl font-bold text-white">Critical Actions</h2>
             </div>
 
             <div className="space-y-4">
-               {roadmap?.map((item, index) => (
-                  <div key={item.id} className="group relative rounded-2xl border border-white/5 bg-[#09090b] p-6 hover:border-primary/30 transition-all hover:bg-[#0c0c0e]">
+               {recommendations.map((item: any, i: number) => (
+                  <div key={i} className="group rounded-2xl border border-white/5 bg-[#09090b] p-6 hover:border-primary/20 transition-all hover:bg-[#0c0c0e]">
                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800 text-xs font-bold text-white group-hover:bg-primary group-hover:text-black transition-colors">
-                              {index + 1}
-                           </span>
+                        <div className="flex flex-col gap-1">
                            <div className={cn(
                               "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border",
                               item.priority >= 4 ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-primary/10 border-primary/20 text-primary"
@@ -104,6 +118,12 @@ export default function StrategicRoadmapPage() {
                      </div>
                   </div>
                ))}
+               {recommendations.length === 0 && (
+                  <div className="py-12 text-center border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
+                     <AlertCircle className="h-10 w-10 text-zinc-700 mx-auto mb-4" />
+                     <p className="text-sm text-zinc-500">Scanning for new recommendations...</p>
+                  </div>
+               )}
             </div>
          </div>
 
@@ -118,7 +138,7 @@ export default function StrategicRoadmapPage() {
 
             <div className="rounded-2xl border border-white/5 bg-[#09090b] p-8 max-h-[800px] overflow-y-auto custom-scrollbar">
                <div className="prose prose-invert prose-sm prose-primary max-w-none prose-headings:font-black prose-headings:tracking-tight prose-p:text-zinc-400 prose-p:leading-relaxed">
-                  <ReactMarkdown>{report.report_markdown}</ReactMarkdown>
+                  <Markdown>{report.report_markdown}</Markdown>
                </div>
             </div>
 
