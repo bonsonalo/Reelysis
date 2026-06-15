@@ -71,7 +71,6 @@ export default function LandingPage() {
             AI-driven transcription and competitor indexing for high-retention Reels. 
             Identify winning content pillars and generate data-backed growth roadmaps.
           </p>
-          </p>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link href="/register">
