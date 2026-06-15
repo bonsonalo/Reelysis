@@ -51,13 +51,25 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Nav Links */}
       <nav className="flex-1 space-y-1 px-4 py-4">
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname?.startsWith(item.href)
           return (
             <Link
               key={item.name}
               href={item.href}
               onClick={handleNavClick}
-...
+              className={cn(
+                "group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-white/5 text-white"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <item.icon className="mr-3 h-5 w-5" />
+              {item.name}
+            </Link>
+          )
+        })}
+      </nav>
 
       {/* Footer Actions */}
       <div className="border-t border-white/5 p-4 space-y-1">
