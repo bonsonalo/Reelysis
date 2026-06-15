@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 import { useDashboardGrowth } from '@/features/dashboard/hooks/useDashboardGrowth'
@@ -240,8 +241,6 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-import Link from 'next/link'
-...
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {videos?.data.map((video) => (
             <Link 
@@ -277,7 +276,6 @@ import Link from 'next/link'
               </div>
             </Link>
           ))}
-...
           {(!videos || videos.data.length === 0) && (
              [1,2,3,4,5,6].map(i => (
                 <div key={i} className="aspect-[9/16] rounded-xl border border-white/5 bg-[#09090b] animate-pulse" />
