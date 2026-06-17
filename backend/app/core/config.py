@@ -6,11 +6,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
-    META_APP_ID: str
-    META_APP_SECRET: str
-    META_REDIRECT_URI: str
+    IG_APP_ID: str
+    IG_APP_SECRET: str
+    IG_REDIRECT_URI: str
     TOKEN_ENCRYPTION_KEY: str
-    META_GRAPH_API_VERSION: str
     REDIS_URL: str
     GEMINI_API_KEY: str
     BRIGHT_DATA_API_KEY: str = ""
