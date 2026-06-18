@@ -56,13 +56,8 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
         
-        <div className="mx-auto max-w-7xl px-6 text-center">
-          <div className="mx-auto mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-sm">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest text-primary/80">Indexing & Analysis Engine</span>
-          </div>
-          
-          <h1 className="mx-auto mb-8 max-w-4xl text-5xl font-black tracking-tight sm:text-7xl lg:text-8xl">
+        <div className="mx-auto max-w-7xl px-6 text-center">          
+          <h1 className="mx-auto mb-8 max-w-4xl text-5xl font-black tracking-tight sm:text-7xl lg:text-8xl mt-4">
             Close the <br />
             <span className="text-primary italic">Reach-Gap.</span>
           </h1>
