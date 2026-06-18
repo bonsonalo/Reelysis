@@ -7,12 +7,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.database import engine
 from app.core.logger import logger
 from app.core.celery_app import celery_app
-from app.api.client.social_data import social_data_client
+from app.core.client.social_data import social_data_client
 from app.model.analysis_job import AnalysisJob
 from app.model.competitor_accounts import CompetitorAccount
 from app.model.competitor_media import CompetitorMedia
 from app.model.instagram_accounts import InstagramAccount
 from app.service.video_analysis_service import run_bulk_video_analysis_service
+
 
 # MVP Configuration Constants
 MAX_COMPETITORS_TO_STORE = 10
