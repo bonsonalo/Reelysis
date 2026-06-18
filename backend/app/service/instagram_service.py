@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 
 from app.core.config import settings
-from app.api.client.meta import meta_client
+from app.core.client.meta import meta_client
 from app.core.redis import redis_client
 from app.model.instagram_accounts import InstagramAccount
 from app.core.logger import logger
