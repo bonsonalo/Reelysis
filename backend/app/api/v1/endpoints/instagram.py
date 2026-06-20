@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from app.core.logger import logger
 from app.service.instagram_service import (
     get_oauth_url_service, 
@@ -20,9 +20,12 @@ router= APIRouter(
 @router.get("/oauth/start")
 async def start_oauth(current_user: user_authentication_dependency):
     user_id= current_user["id"]
+    logger.info("got the user_id")
     try:
         oauth_url= await get_oauth_url_service(user_id)
+        logger.info("Done with start endpoint")
         return {"oauth_url": oauth_url}
+
     except ValueError as e:
         logger.error(f"OAuth Validation Error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -33,6 +36,7 @@ async def start_oauth(current_user: user_authentication_dependency):
 @router.get("/oauth/callback")
 async def oauth_callback(code: str, state: str, db: db_dependency):
     try:
+        logger.info(f"CALLBACK HIT — full code param: {code}")
         await handle_oauth_callback_service(code, state, db)
         return RedirectResponse(url="http://localhost:3000/onboarding?connected=true", status_code=302)
     except ValueError as e:
