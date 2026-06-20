@@ -7,7 +7,13 @@ from app.core.config import settings
 celery_app = Celery(
     "worker",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=[
+        "app.service.instagram_service",
+        "app.service.competitor_service",
+        "app.service.video_analysis_service",
+        "app.service.report_service"
+    ]
 )
 
 
@@ -21,7 +27,3 @@ celery_app.conf.update(
     task_time_limit=3600,  # Max 1 hour per task
     worker_prefetch_multiplier=1, # One task at a time per worker for better progress tracking
 )
-
-
-# This allows us to keep task logic inside app/service/
-celery_app.autodiscover_tasks(["app.service"])
