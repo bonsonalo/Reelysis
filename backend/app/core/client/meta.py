@@ -11,10 +11,9 @@ class MetaClient:
         self.redirect_uri = settings.IG_REDIRECT_URI
 
     def get_oauth_url(self):
+        print("AUTHORIZE using redirect_uri:", repr(self.redirect_uri))
         state = secrets.token_urlsafe(32)
-        encoded_uri = quote(self.redirect_uri, safe='')
-        
-        # Scopes for Instagram Basic Display / Graph API
+
         scopes = [
             'instagram_business_basic',
             'instagram_business_manage_insights',
@@ -24,7 +23,7 @@ class MetaClient:
         url = (
             f'https://www.instagram.com/oauth/authorize?'
             f'client_id={self.app_id.strip()}&'
-            f'redirect_uri={encoded_uri}&'
+            f'redirect_uri={self.redirect_uri}&'
             f'state={state}&'
             f'response_type=code&'
             f'scope={scope_param}'
@@ -32,6 +31,8 @@ class MetaClient:
         return {'url': url, 'state': state}
 
     async def exchange_code_for_access_token(self, code: str):
+        print("RECEIVED CODE:", repr(code))
+        print("EXCHANGE using redirect_uri:", repr(self.redirect_uri))
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 'https://api.instagram.com/oauth/access_token',
@@ -43,6 +44,8 @@ class MetaClient:
                     'code': code,
                 },
             )
+            print("STATUS:", response.status_code)
+            print("BODY:", response.text)
             response.raise_for_status()
             return response.json()
 
