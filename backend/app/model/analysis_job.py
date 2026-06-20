@@ -45,10 +45,10 @@ class AnalysisJob(SQLModel, table= True):
             pg.JSONB,
         )
     )
-    error_message: str
-    retry_count: int
-    started_at: datetime
-    completed_at: datetime
+    error_message: str = Field(default="")
+    retry_count: int = Field(default=0)
+    started_at: datetime = Field(default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc))
+    completed_at: datetime = Field(default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc))
     created_at: datetime= Field(
         default_factory= lambda: datetime.now(timezone.utc)
     )
