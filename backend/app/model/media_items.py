@@ -36,8 +36,8 @@ class MediaItem(SQLModel, table= True):
     )
     permalink: str
     thumbnail_url: str
-    transcript_text: str
-    transcript_source: str
+    transcript_text: str = Field(default="")
+    transcript_source: str = Field(default="none")
     published_at: datetime
 
 
