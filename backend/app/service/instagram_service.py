@@ -26,13 +26,16 @@ fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
 async def get_oauth_url_service(user_id: UUID):
     try:
+        logger.info("getitng started with oauth_url_service")
         oauth_data = meta_client.get_oauth_url()
+        logger.info("Got the oauth_data in instagram service")
         
         if not meta_client.app_id or meta_client.app_id == "None":
              logger.error("Meta App ID is missing or invalid")
              raise ValueError("Meta API configuration is missing")
 
         await redis_client.setex(f"oauth_state:{oauth_data['state']}", 600, str(user_id))
+        logger.info("Got done with get_oauth_url in insta service")
         return oauth_data['url']
     except redis.exceptions.ConnectionError as e:
         logger.error(f"Redis connection failed: {e}")
@@ -43,17 +46,21 @@ async def get_oauth_url_service(user_id: UUID):
 
 async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession):
     try:
+        logger.info("Getting started with instagram call back service")
         user_id_raw = await redis_client.get(f"oauth_state:{state}")
         if not user_id_raw:
             raise ValueError("Invalid or expired state parameter")
         
         user_id = UUID(user_id_raw.decode() if isinstance(user_id_raw, bytes) else user_id_raw)
         await redis_client.delete(f"oauth_state:{state}")
-        
+        logger.info("getting started with exchange code for access token in instagram service")
         token_data = await meta_client.exchange_code_for_access_token(code)
+        logger.info("Got the exchange")
         short_lived_token = token_data.get("access_token")
         if not short_lived_token:
             raise ValueError("Failed to obtain access token")
+        logger.info("Done with exchange_code_for_access_token function in instagram service")
+        logger.info("getting started with exchange_for_long_lived_token in instagram service")
             
         long_lived_token_data = await meta_client.exchange_for_long_lived_token(short_lived_token)
         long_lived_token = long_lived_token_data.get("access_token")
