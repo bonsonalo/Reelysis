@@ -51,9 +51,9 @@ class CompetitorMedia(SQLModel, table= True):
     )
     permalink: str
     thumbnail_url: str
-    audio_url: str
-    transcript_text: str
-    transcript_source: str
+    audio_url: str = Field(default="")
+    transcript_text: str = Field(default="")
+    transcript_source: str = Field(default="none")
     metrics: dict[str, Any]= Field(
         default= {},
         sa_column= Column(
