@@ -52,6 +52,7 @@ function OnboardingContent() {
   
   // Manual Gate States
   const [hasApprovedSync, setHasApprovedSync] = useState(false)
+  const [hasTriggeredSync, setHasTriggeredSync] = useState(false)
   const [hasApprovedCompetitors, setHasApprovedCompetitors] = useState(false)
 
   // 1. Data Fetching
@@ -136,11 +137,10 @@ function OnboardingContent() {
 
     if (!isConnected) {
       setStep('CONNECT')
-    } else if ((!account.last_synced_at || isJustConnected) && !hasApprovedSync) {
-      setStep('ANALYZING') 
-    } else if (isSyncing || syncJob?.status === 'running' || syncJob?.status === 'queued' || (hasApprovedSync && !account.niche_detected)) {
+    } else if (!account.last_synced_at || isSyncing || syncJob?.status === 'running' || syncJob?.status === 'queued' || !account.niche_detected) {
       setStep('ANALYZING')
-      if (hasApprovedSync && !account.last_synced_at && !isSyncing && !syncJob) {
+      if (!account.last_synced_at && !isSyncing && !syncJob && !hasTriggeredSync) {
+        setHasTriggeredSync(true)
         triggerSync()
       }
     } else if (!account.niche_confirmed) {
@@ -157,7 +157,7 @@ function OnboardingContent() {
     } else {
       setStep('COMPETITORS')
     }
-  }, [isConnected, account, isSyncing, syncJob, discoveryJob, roadmapJob, competitors, isLoadingAccounts, triggerSync, hasApprovedSync, hasApprovedCompetitors, isJustConnected])
+  }, [isConnected, account, isSyncing, syncJob, discoveryJob, roadmapJob, competitors, isLoadingAccounts, triggerSync, hasApprovedCompetitors, isJustConnected, hasTriggeredSync])
 
   // 4. Handlers
   const handleConnect = async () => {
