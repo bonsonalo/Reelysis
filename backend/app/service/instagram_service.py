@@ -14,13 +14,12 @@ from app.model.analysis_job import AnalysisJob
 from app.model.media_items import MediaItem
 from app.model.media_metrics import MediaMetric
 from app.core.celery_app import celery_app
-from app.core.database import engine
-from app.service.ai_service import detect_niche_service
+from app.core.database import sync_engine
+from app.service.ai_service import detect_niche_service_sync
 from app.service.competitor_service import discover_competitors_service
 
 from cryptography.fernet import Fernet
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+from sqlmodel import Session, select
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
@@ -183,42 +182,42 @@ async def confirm_instagram_niche_service(user_id: UUID, niche: str, db: AsyncSe
 @celery_app.task(name="app.service.instagram_service.sync_instagram_data_task")
 def sync_instagram_data_task(job_id: str, user_id: str):
     """
-    Background task to sync Instagram data.
+    Background task to sync Instagram data using synchronous database session.
     """
-    return asyncio.run(_sync_instagram_data_internal(job_id, user_id))
+    return _sync_instagram_data_internal(job_id, user_id)
 
-async def _sync_instagram_data_internal(job_id: str, user_id: str):
-    async with AsyncSession(engine) as db:
+def _sync_instagram_data_internal(job_id: str, user_id: str):
+    with Session(sync_engine) as db:
         try:
-            job = await db.get(AnalysisJob, UUID(job_id))
+            job = db.get(AnalysisJob, UUID(job_id))
             if not job:
                 return
             job.status = "running"
             job.started_at = datetime.now(timezone.utc)
-            await db.commit()
+            db.commit()
 
             token_stmt = select(ExternalToken).where(ExternalToken.user_id == UUID(user_id))
-            token_record = (await db.exec(token_stmt)).first()
+            token_record = db.exec(token_stmt).first()
             if not token_record:
                 raise ValueError("Token not found")
 
             decrypted_token = fernet.decrypt(token_record.encrypted_access_token.encode()).decode()
 
             acc_stmt = select(InstagramAccount).where(InstagramAccount.user_id == UUID(user_id))
-            account = (await db.exec(acc_stmt)).first()
+            account = db.exec(acc_stmt).first()
             ig_user_id = account.instagram_user_id
 
-            media_data = await meta_client.get_user_media(ig_user_id, decrypted_token)
+            media_data = asyncio.run(meta_client.get_user_media(ig_user_id, decrypted_token))
             items = media_data.get("data", [])
             total_items = len(items)
             
             all_captions = []
 
             for index, item in enumerate(items):
-                insights = await meta_client.get_media_insights(item["id"], decrypted_token)
+                insights = asyncio.run(meta_client.get_media_insights(item["id"], decrypted_token))
                 
                 existing_media_stmt = select(MediaItem).where(MediaItem.external_media_id == item["id"])
-                media_item = (await db.exec(existing_media_stmt)).first()
+                media_item = db.exec(existing_media_stmt).first()
 
                 caption = item.get("caption", "")
                 all_captions.append(caption)
@@ -234,14 +233,14 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
                         published_at=datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00")),
                     )
                     db.add(media_item)
-                    await db.commit()
-                    await db.refresh(media_item)
+                    db.commit()
+                    db.refresh(media_item)
                 
                 metric_data = {m["name"]: m["values"][0]["value"] for m in insights.get("data", [])}
                 
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
-                    view=metric_data.get("plays", 0),
+                    view=metric_data.get("views", 0),
                     reach=metric_data.get("reach", 0),
                     likes=metric_data.get("total_interactions", 0),
                     comments="0",
@@ -254,27 +253,25 @@ async def _sync_instagram_data_internal(job_id: str, user_id: str):
                 db.add(media_metric)
                 
                 job.progress = int(((index + 1) / total_items) * 95)
-                await db.commit()
+                db.commit()
 
             logger.info(f"Starting niche detection for user {user_id}")
-            detected_niche = await detect_niche_service(account.biography or "", all_captions)
+            detected_niche = detect_niche_service_sync(account.biography or "", all_captions)
             
             account.niche_detected = detected_niche
-            db.add(account)
+            account.last_synced_at = datetime.now(timezone.utc)
             
             job.progress = 100
             job.status = "succeeded"
             job.completed_at = datetime.now(timezone.utc)
-            await db.commit()
-
-            # Trigger Bulk Video Analysis immediately after sync so hooks/pillars are ready for the roadmap
-            from app.service.video_analysis_service import run_bulk_video_analysis_service
-            await run_bulk_video_analysis_service(UUID(user_id), db)
-            logger.info(f"Video analysis queued for user {user_id}")
+            db.commit()
+            db.refresh(account)
+            
+            logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
 
         except Exception as e:
             logger.error(f"Error in sync task: {e}")
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                await db.commit()
+                db.commit()
