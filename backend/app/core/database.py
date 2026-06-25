@@ -1,21 +1,27 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import create_engine
+from sqlmodel import Session
 from app.core.config import settings
 
 
-#engine
+# Async engine for FastAPI
+engine = create_async_engine(settings.DB_URL)
 
-engine= create_async_engine(settings.DB_URL)
+# Sync engine for Celery tasks
+sync_engine = create_engine(settings.DB_URL.replace("sqlite://", "sqlite:///").replace("postgresql://", "postgresql+psycopg2://"))
 
-#Session
-
-AsyncSessionLocal= async_sessionmaker(
+# Async Session for FastAPI
+AsyncSessionLocal = async_sessionmaker(
     bind= engine,
     class_= AsyncSession,
     expire_on_commit= False,
     autoflush= False,
     autocommit= False
 )
+
+# Sync Session for Celery tasks
+SyncSessionLocal = Session(bind=sync_engine)
 
 
 #get_db()
