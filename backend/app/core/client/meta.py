@@ -98,7 +98,7 @@ class MetaClient:
 
     async def get_media_insights(self, ig_media_id: str, access_token: str):
         async with httpx.AsyncClient() as client:
-            metrics = 'reach,plays,saved,shares,total_interactions'
+            metrics = 'reach,views,saved,shares,total_interactions'
             response = await client.get(
                 f'https://graph.instagram.com/{ig_media_id}/insights',
                 params={
