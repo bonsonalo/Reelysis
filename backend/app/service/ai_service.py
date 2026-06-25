@@ -3,6 +3,7 @@ from app.core.config import settings
 from app.core.logger import logger
 from app.schema.ai_schema import VideoAnalysisResponse, StrategicReportResponse
 import json
+import os
 
 def get_genai_client():
     """Initializes and returns the Gemini API client."""
@@ -10,12 +11,33 @@ def get_genai_client():
         return None
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
-async def detect_niche_service(biography: str, captions: list[str]):
+def detect_niche_service_sync(biography: str, captions: list[str]):
     """
+    Synchronous version of niche detection for Celery tasks.
     Uses Gemini 1.5 Flash to detect the Instagram account's niche
     based on the biography and recent video captions.
     """
-    if settings.AI_SIMULATION_MODE:
+    # Check environment variable at runtime for Celery worker
+    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    
+    if ai_simulation:
+        logger.info("AI Simulation Mode: Mocking niche detection")
+        return "Lifestyle & Productivity"
+
+    if not settings.GEMINI_API_KEY:
+        logger.warning("No Gemini API key provided. Falling back to default niche.")
+        return "Uncategorized"
+
+async def detect_niche_service(biography: str, captions: list[str]):
+    """
+    Async version of niche detection for non-Celery contexts.
+    Uses Gemini 1.5 Flash to detect the Instagram account's niche
+    based on the biography and recent video captions.
+    """
+    # Check environment variable at runtime for Celery worker
+    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    
+    if ai_simulation:
         logger.info("AI Simulation Mode: Mocking niche detection")
         return "Lifestyle & Productivity"
 
@@ -119,7 +141,10 @@ async def generate_strategic_report_service(user_data: dict, competitor_data: li
     Acting as a Senior Social Media Strategist, this function compares the user's content 
     against competitors and generates a comprehensive growth roadmap.
     """
-    if settings.AI_SIMULATION_MODE:
+    # Check environment variable at runtime for Celery worker
+    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    
+    if ai_simulation:
         logger.info("AI Simulation Mode: Mocking strategic report")
         return StrategicReportResponse(
             summary="This is a mock strategy report summary.",
