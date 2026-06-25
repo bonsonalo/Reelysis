@@ -7,6 +7,8 @@ import { useDashboardGrowth } from '@/features/dashboard/hooks/useDashboardGrowt
 import { useContentPillars } from '@/features/dashboard/hooks/useContentPillars'
 import { useDashboardVideos } from '@/features/dashboard/hooks/useDashboardVideos'
 import { useCompetitors } from '@/features/competitors/hooks/useCompetitors'
+import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
+import { useAnalysisJob } from '@/features/instagram/hooks/useAnalysisJob'
 import { 
   Eye, 
   Users, 
@@ -24,15 +26,44 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { GrowthChart } from '@/features/dashboard/components/GrowthChart'
+import { useEffect, useState } from 'react'
 
 export default function DashboardPage() {
-  const { data: accounts } = useInstagramAccounts()
-  const { data: stats, isLoading } = useDashboardStats()
-  const { data: growth } = useDashboardGrowth()
-  const { data: pillars } = useContentPillars()
-  const { data: videos } = useDashboardVideos()
+  const { data: accounts, refetch: refetchAccounts } = useInstagramAccounts()
+  const { data: stats, isLoading, refetch: refetchStats } = useDashboardStats()
+  const { data: growth, refetch: refetchGrowth } = useDashboardGrowth()
+  const { data: pillars, refetch: refetchPillars } = useContentPillars()
+  const { data: videos, refetch: refetchVideos } = useDashboardVideos()
   const { data: competitors } = useCompetitors()
+  const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
+  const { data: syncJob } = useAnalysisJob('instagram_sync', { refetchInterval: false })
+  const [isPolling, setIsPolling] = useState(false)
   const account = accounts?.[0]
+
+  const handleSync = () => {
+    triggerSync(undefined, {
+      onSuccess: () => {
+        setIsPolling(true)
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (!isPolling) return
+
+    const interval = setInterval(() => {
+      if (syncJob?.status === 'succeeded' || syncJob?.status === 'failed') {
+        setIsPolling(false)
+        refetchAccounts()
+        refetchStats()
+        refetchGrowth()
+        refetchPillars()
+        refetchVideos()
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [isPolling, syncJob, refetchAccounts, refetchStats, refetchGrowth, refetchPillars, refetchVideos])
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
@@ -79,8 +110,17 @@ export default function DashboardPage() {
             Here is what's happening with your Reels this week.
           </p>
         </div>
-        <Button className="h-11 px-6 font-bold shadow-lg shadow-primary/20 flex items-center transition-colors hover:bg-primary/20">
-          <Plus className="mr-2 h-5 w-5" /> <div>New Analysis </div>
+        <Button 
+          onClick={handleSync}
+          disabled={isSyncing || isPolling}
+          className="h-11 px-6 font-bold shadow-lg shadow-primary/20 flex items-center transition-colors"
+        >
+          {(isSyncing || isPolling) ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-5 w-5" />
+          )}
+          <div>{(isSyncing || isPolling) ? 'Syncing...' : 'New Analysis'}</div>
         </Button>
       </div>
 
@@ -94,7 +134,7 @@ export default function DashboardPage() {
           metricCards.map((stat) => (
             <div 
               key={stat.name}
-              className="group relative overflow-hidden rounded-2xl border border-white/5 bg-[#09090b] p-6 transition-all hover:border-primary/20 hover:bg-[#0c0c0e]"
+              className="group relative overflow-hidden rounded-2xl border border-white/5 bg-[#09090b] p-6 transition-all hover:border-primary/20 hover:bg-[#0c0c0e] cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="rounded-xl bg-white/5 p-2.5 transition-colors group-hover:bg-primary/10">
@@ -252,6 +292,8 @@ export default function DashboardPage() {
                 src={video.thumbnail_url} 
                 alt={video.caption} 
                 className="h-full w-full object-cover opacity-60 transition-transform duration-500 group-hover:scale-110 group-hover:opacity-100" 
+                width={400}
+                height={700}
               />
               
               {/* Stats Overlay */}
