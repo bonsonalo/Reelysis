@@ -66,18 +66,28 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
 
 async def get_growth_chart_service(user_id: UUID, db: AsyncSession):
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    stmt = select(
-        func.date_trunc('day', MediaMetric.captured_at).label("day"),
-        func.sum(MediaMetric.view).label("total_views"),
-        func.sum(MediaMetric.reach).label("total_reach")
-    ).join(MediaItem).where(
+    
+    # Get all metrics from the last 30 days
+    stmt = select(MediaMetric, MediaItem).join(MediaItem).where(
         MediaItem.user_id == user_id,
         MediaMetric.captured_at >= thirty_days_ago
-    ).group_by(col("day")).order_by(col("day"))
+    ).order_by(MediaMetric.captured_at)
     
     result = await db.exec(stmt)
     rows = result.all()
-    return {"data": [{"date": r.day.strftime("%b %d"), "views": int(r.total_views), "reach": int(r.total_reach)} for r in rows]}
+    
+    # Group by date in Python (database-agnostic)
+    daily_data = {}
+    for metric, item in rows:
+        date_key = metric.captured_at.strftime("%Y-%m-%d")
+        if date_key not in daily_data:
+            daily_data[date_key] = {"views": 0, "reach": 0}
+        daily_data[date_key]["views"] += metric.view
+        daily_data[date_key]["reach"] += metric.reach
+    
+    # Convert to sorted list
+    sorted_data = sorted(daily_data.items())
+    return {"data": [{"date": datetime.strptime(date, "%Y-%m-%d").strftime("%b %d"), "views": int(data["views"]), "reach": int(data["reach"])} for date, data in sorted_data]}
 
 async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
     """
