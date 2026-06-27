@@ -80,7 +80,10 @@ async def analyze_video_service(caption: str, transcript: str, hashtags: list[st
     Uses Gemini 1.5 Flash to analyze an individual video's creative and strategic elements.
     Returns a structured VideoAnalysisResponse object.
     """
-    if settings.AI_SIMULATION_MODE:
+    # Check environment variable at runtime for Celery worker
+    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    
+    if ai_simulation:
         logger.info("AI Simulation Mode: Mocking video analysis")
         return VideoAnalysisResponse(
             topic="Mock Topic",
