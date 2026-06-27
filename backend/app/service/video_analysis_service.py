@@ -1,11 +1,11 @@
 import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
-from sqlmodel import select, col
+from sqlmodel import select, col, Session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException
 
-from app.core.database import engine
+from app.core.database import engine, sync_engine
 from app.core.logger import logger
 from app.core.celery_app import celery_app
 from app.model.media_items import MediaItem
@@ -37,28 +37,37 @@ async def run_bulk_video_analysis_service(user_id: UUID, db: AsyncSession):
 
 @celery_app.task(name="app.service.video_analysis_service.run_video_analysis_task")
 def run_video_analysis_task(job_id: str, user_id: str):
-    return asyncio.run(_run_analysis_internal(job_id, user_id))
+    return _run_analysis_internal(job_id, user_id)
 
-async def _run_analysis_internal(job_id: str, user_id: str):
-    async with AsyncSession(engine) as db:
+def _run_analysis_internal(job_id: str, user_id: str):
+    try:
+        job_uuid = UUID(job_id)
+        user_uuid = UUID(user_id)
+    except Exception as e:
+        logger.error(f"Invalid UUID arguments in video analysis task: job_id={job_id}, user_id={user_id}, error={e}")
+        return
+
+    with Session(sync_engine) as db:
         try:
-            job = await db.get(AnalysisJob, UUID(job_id))
-            if not job: return
+            job = db.get(AnalysisJob, job_uuid)
+            if not job:
+                logger.error(f"Video analysis task could not find job {job_uuid}")
+                return
             
             job.status = "running"
             job.started_at = datetime.now(timezone.utc)
-            await db.commit()
+            db.commit()
 
             # 1. Find all unanalyzed videos
-            own_media = await _get_unanalyzed_own_media(db, UUID(user_id))
-            comp_media = await _get_unanalyzed_competitor_media(db, UUID(user_id))
+            own_media = _get_unanalyzed_own_media(db, UUID(user_id))
+            comp_media = _get_unanalyzed_competitor_media(db, UUID(user_id))
             
             total_videos = len(own_media) + len(comp_media)
             if total_videos == 0:
                 job.status = "succeeded"
                 job.progress = 100
                 job.completed_at = datetime.now(timezone.utc)
-                await db.commit()
+                db.commit()
                 return
 
             processed_count = 0
@@ -66,23 +75,23 @@ async def _run_analysis_internal(job_id: str, user_id: str):
             # 2. Analyze own media
             for item in own_media:
                 m_stmt = select(MediaMetric).where(MediaMetric.media_item_id == item.id).order_by(col(MediaMetric.captured_at).desc()).limit(1)
-                latest_m = (await db.exec(m_stmt)).first()
+                latest_m = db.exec(m_stmt).first()
                 
                 score = 0
                 if latest_m:
                     score = _calculate_engagement_score(latest_m.total_interactions, latest_m.view)
 
-                analysis_data = await analyze_video_service(
+                analysis_data = asyncio.run(analyze_video_service(
                     caption=item.caption,
                     transcript=getattr(item, "transcript_text", ""),
                     hashtags=item.hashtag.get("names", []) if isinstance(item.hashtag, dict) else []
-                )
+                ))
                 if analysis_data:
-                    await _save_analysis(db, UUID(user_id), MediaSource.OWN, analysis_data, engagement_score=score, media_item_id=item.id)
+                    _save_analysis(db, UUID(user_id), MediaSource.OWN, analysis_data, engagement_score=score, media_item_id=item.id)
                 
                 processed_count += 1
                 job.progress = int((processed_count / total_videos) * 100)
-                await db.commit()
+                db.commit()
 
             # 3. Analyze competitor media
             for item in comp_media:
@@ -93,28 +102,28 @@ async def _run_analysis_internal(job_id: str, user_id: str):
                 
                 score = _calculate_engagement_score(likes + comments, views)
 
-                analysis_data = await analyze_video_service(
+                analysis_data = asyncio.run(analyze_video_service(
                     caption=item.caption,
                     transcript=item.transcript_text,
                     hashtags=item.hashtags.get("names", []) if isinstance(item.hashtags, dict) else []
-                )
+                ))
                 if analysis_data:
-                    await _save_analysis(db, UUID(user_id), MediaSource.COMPETITOR, analysis_data, engagement_score=score, competitor_media_id=item.id)
+                    _save_analysis(db, UUID(user_id), MediaSource.COMPETITOR, analysis_data, engagement_score=score, competitor_media_id=item.id)
                 
                 processed_count += 1
                 job.progress = int((processed_count / total_videos) * 100)
-                await db.commit()
+                db.commit()
 
             job.status = "succeeded"
             job.completed_at = datetime.now(timezone.utc)
-            await db.commit()
+            db.commit()
 
         except Exception as e:
             logger.error(f"Error in bulk analysis task: {e}")
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                await db.commit()
+                db.commit()
 
 async def get_video_analysis_service(video_id: UUID, user_id: UUID, db: AsyncSession):
     """
@@ -145,7 +154,7 @@ def _calculate_engagement_score(interactions: int, views: int) -> int:
     score = int((interactions / views) * 100)
     return min(score, 100)
 
-async def _get_unanalyzed_own_media(db: AsyncSession, user_id: UUID):
+def _get_unanalyzed_own_media(db: Session, user_id: UUID):
     stmt = select(MediaItem).where(
         MediaItem.user_id == user_id
     ).join(
@@ -153,10 +162,10 @@ async def _get_unanalyzed_own_media(db: AsyncSession, user_id: UUID):
     ).where(
         VideoAnalysis.id == None
     )
-    result = await db.exec(stmt)
+    result = db.exec(stmt)
     return result.all()
 
-async def _get_unanalyzed_competitor_media(db: AsyncSession, user_id: UUID):
+def _get_unanalyzed_competitor_media(db: Session, user_id: UUID):
     stmt = select(CompetitorMedia).where(
         CompetitorMedia.user_id == user_id
     ).join(
@@ -164,10 +173,10 @@ async def _get_unanalyzed_competitor_media(db: AsyncSession, user_id: UUID):
     ).where(
         VideoAnalysis.id == None
     )
-    result = await db.exec(stmt)
+    result = db.exec(stmt)
     return result.all()
 
-async def _save_analysis(db: AsyncSession, user_id: UUID, source: MediaSource, data, engagement_score: int, media_item_id=None, competitor_media_id=None):
+def _save_analysis(db: Session, user_id: UUID, source: MediaSource, data, engagement_score: int, media_item_id=None, competitor_media_id=None):
     analysis = VideoAnalysis(
         user_id=user_id,
         media_source=source,
@@ -183,4 +192,4 @@ async def _save_analysis(db: AsyncSession, user_id: UUID, source: MediaSource, d
         created_at=datetime.now(timezone.utc)
     )
     db.add(analysis)
-    await db.commit()
+    db.commit()
