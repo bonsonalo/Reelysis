@@ -20,6 +20,7 @@ from app.service.competitor_service import discover_competitors_service
 
 from cryptography.fernet import Fernet
 from sqlmodel import Session, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
@@ -268,6 +269,26 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             db.refresh(account)
             
             logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
+            
+            # Trigger video analysis via Celery
+            from app.core.celery_app import celery_app
+            from app.model.analysis_job import AnalysisJob
+            
+            video_job = AnalysisJob(
+                user_id=UUID(user_id),
+                job_type="video_analysis",
+                status="queued",
+                progress=0
+            )
+            db.add(video_job)
+            db.commit()
+            db.refresh(video_job)
+            
+            celery_app.send_task(
+                "app.service.video_analysis_service.run_video_analysis_task",
+                args=[str(video_job.id), str(user_id)]
+            )
+            logger.info(f"Video analysis triggered for user {user_id}")
 
         except Exception as e:
             logger.error(f"Error in sync task: {e}")
