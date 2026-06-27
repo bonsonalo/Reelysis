@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const { data: accounts, refetch: refetchAccounts } = useInstagramAccounts()
   const { data: stats, isLoading, refetch: refetchStats } = useDashboardStats()
   const { data: growth, refetch: refetchGrowth } = useDashboardGrowth()
-  const { data: pillars, refetch: refetchPillars } = useContentPillars()
+  const { data: pillars, isLoading: isLoadingPillars, refetch: refetchPillars } = useContentPillars()
   const { data: videos, refetch: refetchVideos } = useDashboardVideos()
   const { data: competitors } = useCompetitors()
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
@@ -244,25 +244,32 @@ export default function DashboardPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pillars?.data.map((item, i) => (
-              <div key={i} className="group rounded-2xl border border-white/5 bg-[#09090b] p-6 hover:border-primary/20 transition-all hover:bg-[#0c0c0e]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Pillar {i+1}</span>
-                  <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">
-                    <Zap className="h-3 w-3 fill-current" />
-                    {item.avg_engagement}% Eng.
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2 capitalize">{item.pillar}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Analyzed in {item.count} of your recent Reels.
-                </p>
-              </div>
-            ))}
-            {(!pillars || pillars.data.length === 0) && (
+            {isLoadingPillars ? (
               [1,2,3].map(i => (
                 <div key={i} className="h-32 rounded-2xl border border-white/5 bg-[#09090b] animate-pulse" />
               ))
+            ) : pillars?.data?.length ? (
+              pillars.data.map((item, i) => (
+                <div key={i} className="group rounded-2xl border border-white/5 bg-[#09090b] p-6 hover:border-primary/20 transition-all hover:bg-[#0c0c0e]">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Pillar {i+1}</span>
+                    <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">
+                      <Zap className="h-3 w-3 fill-current" />
+                      {item.avg_engagement}% Eng.
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2 capitalize">{item.pillar}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Analyzed in {item.count} of your recent Reels.
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full rounded-2xl border border-white/5 bg-[#09090b] p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No content pillars available yet. Publish more Reels or wait for the analysis pipeline to complete.
+                </p>
+              </div>
             )}
           </div>
       </div>
