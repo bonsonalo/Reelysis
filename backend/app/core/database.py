@@ -9,7 +9,15 @@ from app.core.config import settings
 engine = create_async_engine(settings.DB_URL)
 
 # Sync engine for Celery tasks
-sync_engine = create_engine(settings.DB_URL.replace("sqlite://", "sqlite:///").replace("postgresql://", "postgresql+psycopg2://"))
+sync_db_url = settings.DB_URL
+if sync_db_url.startswith("postgresql+asyncpg://"):
+    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+elif sync_db_url.startswith("postgresql+psycopg2://"):
+    sync_db_url = sync_db_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+elif sync_db_url.startswith("sqlite://") and not sync_db_url.startswith("sqlite:///"):
+    sync_db_url = sync_db_url.replace("sqlite://", "sqlite:///", 1)
+
+sync_engine = create_engine(sync_db_url)
 
 # Async Session for FastAPI
 AsyncSessionLocal = async_sessionmaker(
