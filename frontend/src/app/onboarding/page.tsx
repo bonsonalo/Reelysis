@@ -62,11 +62,7 @@ function OnboardingContent() {
     refetch: refetchAccounts 
   } = useInstagramAccounts({
     enabled: true,
-    refetchInterval: (query) => {
-      const data = query.state.data
-      const account = data?.[0]
-      return (account && !account.niche_detected) ? 3000 : false
-    }
+    refetchInterval: step === 'ANALYZING' ? 2000 : false
   })
 
   useEffect(() => {
@@ -135,6 +131,11 @@ function OnboardingContent() {
   useEffect(() => {
     if (isLoadingAccounts) return
 
+    // Don't reset step if already on COMPETITORS or beyond
+    if (step === 'COMPETITORS' || step === 'GENERATING_ROADMAP' || step === 'COMPLETED') {
+      return
+    }
+
     if (!isConnected) {
       setStep('CONNECT')
     } else if (!account.last_synced_at || isSyncing || syncJob?.status === 'running' || syncJob?.status === 'queued' || !account.niche_detected) {
@@ -187,6 +188,7 @@ function OnboardingContent() {
   }
 
   // 5. Render
+  console.log('Rendering step:', step)
   switch (step) {
     case 'CONNECT':
       return <ConnectStep onConnect={handleConnect} isConnecting={isConnecting} />
@@ -228,16 +230,19 @@ function OnboardingContent() {
       const isDiscoveryDone = discoveryJob?.status === 'succeeded'
       return (
         <AnalyzingStep 
-          title={isDiscoveryDone && !hasApprovedCompetitors ? "Indexing Complete" : "Market Discovery"} 
-          description={isDiscoveryDone && !hasApprovedCompetitors
+          title={isDiscoveryDone ? "Indexing Complete" : "Market Discovery"} 
+          description={isDiscoveryDone
             ? "Competitor dataset ready for review and selection." 
             : "Scanning the niche for top-performing creator benchmarks."
           }
           tasks={discoveryTasks}
         >
-          {isDiscoveryDone && !hasApprovedCompetitors && (
+          {isDiscoveryDone && (
             <Button 
-              onClick={() => setHasApprovedCompetitors(true)}
+              onClick={() => {
+                setHasApprovedCompetitors(true)
+                setStep('COMPETITORS')
+              }}
               className="mt-8 h-12 px-8 text-lg font-bold flex items-center gap-2"
             >
               <Check className="h-5 w-5" />
@@ -248,6 +253,7 @@ function OnboardingContent() {
       )
     
     case 'COMPETITORS':
+      console.log('COMPETITORS step rendering:', { competitors, competitorsCount: competitors?.length })
       return (
         <CompetitorStep 
           competitors={competitors || []} 
@@ -258,12 +264,36 @@ function OnboardingContent() {
       )
     
     case 'GENERATING_ROADMAP':
+      const isRoadmapFailed = roadmapJob?.status === 'failed'
       return (
         <AnalyzingStep 
-          title="Strategy Synthesis" 
-          description="Compiling market trends and profile data into a final roadmap." 
+          title={isRoadmapFailed ? "Strategy Generation Failed" : "Strategy Synthesis"} 
+          description={isRoadmapFailed 
+            ? "AI report generation encountered an error. You can retry or skip this step." 
+            : "Compiling market trends and profile data into a final roadmap." 
+          }
           tasks={roadmapTasks}
-        />
+        >
+          {isRoadmapFailed && (
+            <div className="flex gap-4 mt-8">
+              <Button 
+                onClick={() => generateRoadmap(undefined, {
+                  onSuccess: () => setStep('GENERATING_ROADMAP')
+                })}
+                className="h-12 px-8 text-lg font-bold"
+              >
+                Retry
+              </Button>
+              <Button 
+                onClick={() => setStep('COMPLETED')}
+                variant="outline"
+                className="h-12 px-8 text-lg font-bold"
+              >
+                Skip & Continue
+              </Button>
+            </div>
+          )}
+        </AnalyzingStep>
       )
     
     case 'COMPLETED':
