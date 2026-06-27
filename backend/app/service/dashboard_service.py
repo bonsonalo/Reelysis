@@ -93,23 +93,33 @@ async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
     """
     Returns aggregated stats for the user's content pillars.
     """
+    avg_engagement_expr = func.avg(VideoAnalysis.engagement_score).label("avg_engagement")
     stmt = select(
         VideoAnalysis.content_pillar,
         func.count(VideoAnalysis.id).label("count"),
-        func.avg(VideoAnalysis.engagement_score).label("avg_engagement")
+        avg_engagement_expr
     ).where(
         VideoAnalysis.user_id == user_id,
         VideoAnalysis.media_source == MediaSource.OWN
     ).group_by(
         VideoAnalysis.content_pillar
     ).order_by(
-        desc("avg_engagement")
+        desc(avg_engagement_expr)
     )
     
     result = await db.exec(stmt)
-    rows = result.all()
+    rows = result.all() or []
     
-    return {"data": [{"pillar": r.content_pillar, "count": r.count, "avg_engagement": round(float(r.avg_engagement), 1)} for r in rows]}
+    return {
+        "data": [
+            {
+                "pillar": r.content_pillar,
+                "count": r.count,
+                "avg_engagement": round(float(r.avg_engagement or 0), 1)
+            }
+            for r in rows
+        ]
+    }
 
 async def get_recent_videos_service(user_id: UUID, db: AsyncSession, limit: int = 6):
     """
