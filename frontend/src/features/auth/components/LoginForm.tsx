@@ -22,8 +22,17 @@ export default function LoginForm() {
     if (isLoadingAccounts) return
     if (!accounts) return
 
+    const account = accounts[0]
     const isConnected = accounts.length > 0
-    router.push(isConnected ? '/dashboard' : '/onboarding')
+    
+    // Check if onboarding is complete
+    const isOnboardingComplete = account?.niche_confirmed && account?.last_synced_at
+    
+    if (isConnected && isOnboardingComplete) {
+      router.push('/dashboard')
+    } else {
+      router.push('/onboarding')
+    }
   }, [status, accounts, isLoadingAccounts, router])
 
   const handleLogin = (e: React.FormEvent) => {
