@@ -20,7 +20,7 @@ import { useState } from 'react'
 export default function SettingsPage() {
   const { data: accounts } = useInstagramAccounts()
   const { mutate: disconnect, isPending: isDisconnecting } = useDisconnectInstagram()
-  const { user } = useAuth()
+  const { currentUser } = useAuth()
   const account = accounts?.[0]
   const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'security'>('profile')
 
@@ -63,10 +63,10 @@ export default function SettingsPage() {
                <div className="rounded-2xl border border-white/5 bg-[#09090b] p-8 space-y-8">
                   <div className="flex items-center gap-6">
                     <div className="h-20 w-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-3xl font-black text-primary uppercase">
-                       {user?.email?.[0] || 'U'}
+                       {currentUser?.email?.[0] || 'U'}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">{user?.email || 'User'}</h3>
+                      <h3 className="text-xl font-bold text-white">{currentUser?.email || 'User'}</h3>
                       <p className="text-sm text-zinc-500">Free Tier Account</p>
                     </div>
                   </div>
@@ -77,7 +77,7 @@ export default function SettingsPage() {
                           <Mail className="h-3 w-3" /> Email Address
                        </label>
                        <div className="w-full h-12 rounded-xl bg-black border border-white/10 flex items-center px-4 text-zinc-400 font-medium">
-                          {user?.email}
+                          {currentUser?.email}
                        </div>
                     </div>
                   </div>
