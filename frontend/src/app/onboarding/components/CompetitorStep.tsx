@@ -2,7 +2,7 @@
 
 import { Users2, X, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { CompetitorAccount } from '../api'
+import { CompetitorAccount } from '@/features/competitors/api'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
