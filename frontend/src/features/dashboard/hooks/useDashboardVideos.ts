@@ -8,6 +8,6 @@ export const useDashboardVideos = (limit: number = 6) => {
       const response = await getDashboardVideos(limit);
       return response.data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always refetch to show latest data
   });
 };
