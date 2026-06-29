@@ -19,7 +19,8 @@ import {
   Loader2,
   Users2,
   Sparkles,
-  Video,
+  // Video,
+  Target,
   Play,
   ArrowRight
 } from 'lucide-react'
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   const { data: growth, refetch: refetchGrowth } = useDashboardGrowth()
   const { data: pillars, isLoading: isLoadingPillars, refetch: refetchPillars } = useContentPillars()
   const { data: videos, refetch: refetchVideos } = useDashboardVideos()
-  const { data: competitors } = useCompetitors()
+  const { data: competitors, isLoading: isLoadingCompetitors, isError: isCompetitorsError } = useCompetitors()
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
   const { data: syncJob } = useAnalysisJob('instagram_sync', { refetchInterval: false })
   const [isPolling, setIsPolling] = useState(false)
@@ -94,7 +95,7 @@ export default function DashboardPage() {
       name: 'Top Hook Score', 
       value: stats ? `${stats.top_hook_score}/100` : '0/100', 
       change: stats?.hook_change || '+0', 
-      icon: Zap 
+      icon: Target 
     },
   ]
 
@@ -206,40 +207,68 @@ export default function DashboardPage() {
             </div>
             
             <div className="space-y-4">
-              {competitors?.map((comp) => (
-                <div key={comp.id} className="flex items-center gap-3 group">
-                  <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
-                    {comp.profile_picture_url ? (
-                      <img src={comp.profile_picture_url} alt={comp.handle} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-xs font-bold text-muted-foreground">
-                        {comp.handle[0].toUpperCase()}
-                      </div>
-                    )}
+              {isLoadingCompetitors ? (
+                [1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-24 rounded bg-white/10 animate-pulse" />
+                      <div className="h-3 w-16 rounded bg-white/10 animate-pulse" />
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">@{comp.handle}</p>
-                    <p className="text-xs text-muted-foreground">{formatNumber(comp.followers_count)} followers</p>
-                  </div>
+                ))
+              ) : isCompetitorsError ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
+                  We couldn’t load your tracked competitors right now.
                 </div>
-              ))}
-              {(!competitors || competitors.length === 0) && (
-                <div className="text-center py-8">
-                  <p className="text-sm text-muted-foreground italic">No competitors tracked yet.</p>
+              ) : (competitors || []).length > 0 ? (
+                <>
+                  {(competitors || []).slice(0, 5).map((comp) => {
+                    const displayHandle = comp.handle || comp.display_name || 'Competitor'
+                    const initials = displayHandle.charAt(0).toUpperCase()
+
+                    return (
+                      <div key={comp.id} className="flex items-center gap-3 group">
+                        <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
+                          {comp.profile_picture_url ? (
+                            <img src={comp.profile_picture_url} alt={displayHandle} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-xs font-bold text-muted-foreground">
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">@{displayHandle}</p>
+                          <p className="text-xs text-muted-foreground">{formatNumber(comp.followers_count || 0)} followers</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {(competitors || []).length > 5 && (
+                    <p className="text-xs text-muted-foreground">+{(competitors || []).length - 5} more tracked</p>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {account ? 'No competitors discovered yet. Complete analysis to build your watchlist.' : 'Connect your account to discover competitors.'}
+                  </p>
                 </div>
               )}
             </div>
             
-            <Button variant="outline" className="w-full border-white/10 hover:bg-white/5 text-xs font-bold h-10">
-              Manage Competitors
-            </Button>
+            <Link href="/competitors" className="block">
+              <Button variant="outline" className="w-full border-white/10 hover:bg-white/5 text-xs font-bold h-10">
+                Manage Competitors
+              </Button>
+            </Link>
         </div>
       </div>
 
       {/* Content Pillars Section */}
       <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <Sparkles className="h-6 w-6 text-primary" />
             <h2 className="text-2xl font-bold text-white">High-Performing Content Pillars</h2>
           </div>
           
@@ -254,7 +283,6 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Pillar {i+1}</span>
                     <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">
-                      <Zap className="h-3 w-3 fill-current" />
                       {item.avg_engagement}% Eng.
                     </div>
                   </div>
@@ -278,12 +306,12 @@ export default function DashboardPage() {
       <div className="space-y-6 pb-20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Video className="h-6 w-6 text-primary" />
+            {/* <Video className="h-6 w-6 text-primary" /> */}
             <h2 className="text-2xl font-bold text-white">Recent Reel Performance</h2>
           </div>
           <Link href="/videos">
-            <Button variant="ghost" className="text-primary font-bold hover:bg-primary/10">
-              View All Reels <ArrowRight className="ml-2 h-4 w-4" />
+            <Button variant="ghost" className="text-primary font-bold hover:bg-primary/10 flex items-center gap-2">
+              <div>View All Reels</div> <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
         </div>
