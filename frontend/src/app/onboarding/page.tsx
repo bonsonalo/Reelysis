@@ -72,28 +72,28 @@ function OnboardingContent() {
   }, [isJustConnected, refetchAccounts])
 
   const { data: competitors } = useCompetitors({
-    refetchInterval: (query) => {
+    refetchInterval: (query: { state: { data?: Array<unknown> } }) => {
        const data = query.state.data
        return (step === 'FINDING_COMPETITORS' && (!data || data.length === 0)) ? 3000 : false
     }
   })
 
   const { data: discoveryJob } = useAnalysisJob('competitor_discovery', {
-    refetchInterval: (query) => {
+    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
   })
 
   const { data: syncJob } = useAnalysisJob('instagram_sync', {
-    refetchInterval: (query) => {
+    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
   })
 
   const { data: roadmapJob } = useAnalysisJob('report_generation', {
-    refetchInterval: (query) => {
+    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
