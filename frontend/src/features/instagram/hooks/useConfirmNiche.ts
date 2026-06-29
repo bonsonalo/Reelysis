@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react-query'
 import { confirmNiche } from '../api'
 
-export const useConfirmNiche = (options?: UseMutationOptions<any, Error, string>) => {
+export const useConfirmNiche = (options?: UseMutationOptions<any, Error, string, unknown>) => {
   const queryClient = useQueryClient()
 
   return useMutation({
