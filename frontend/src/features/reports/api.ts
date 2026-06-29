@@ -25,3 +25,7 @@ export const getLatestReport = () => {
 export const getRoadmap = () => {
   return api.get<Recommendation[]>('/api/v1/analysis/report/roadmap');
 };
+
+export const updateRecommendationStatus = (id: string) => {
+  return api.patch<{ id: string; status: string }>(`/api/v1/analysis/report/roadmap/${id}`);
+};
