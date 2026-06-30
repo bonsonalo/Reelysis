@@ -17,6 +17,7 @@ from app.core.celery_app import celery_app
 from app.core.database import sync_engine
 from app.service.ai_service import detect_niche_service_sync
 from app.service.competitor_service import discover_competitors_service
+from app.utils.caption import parse_hashtags_from_caption, top_frequent_hashtags
 
 from cryptography.fernet import Fernet
 from sqlmodel import Session, select
@@ -189,6 +190,7 @@ def sync_instagram_data_task(job_id: str, user_id: str):
 
 def _sync_instagram_data_internal(job_id: str, user_id: str):
     with Session(sync_engine) as db:
+        job = None
         try:
             job = db.get(AnalysisJob, UUID(job_id))
             if not job:
@@ -208,20 +210,31 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             account = db.exec(acc_stmt).first()
             ig_user_id = account.instagram_user_id
 
+            profile_data = asyncio.run(meta_client.get_instagram_account(decrypted_token))
+            account.biography = profile_data.get("biography") or account.biography
+            account.followers_count = profile_data.get("followers_count", account.followers_count)
+            account.media_count = profile_data.get("media_count", account.media_count)
+            account.profile_picture_url = profile_data.get("profile_picture_url") or account.profile_picture_url
+            db.add(account)
+            db.commit()
+
             media_data = asyncio.run(meta_client.get_user_media(ig_user_id, decrypted_token))
             items = media_data.get("data", [])
             total_items = len(items)
-            
-            all_captions = []
+
+            all_captions: List[str] = []
 
             for index, item in enumerate(items):
                 insights = asyncio.run(meta_client.get_media_insights(item["id"], decrypted_token))
-                
+
                 existing_media_stmt = select(MediaItem).where(MediaItem.external_media_id == item["id"])
                 media_item = db.exec(existing_media_stmt).first()
 
-                caption = item.get("caption", "")
+                caption = item.get("caption", "") or ""
                 all_captions.append(caption)
+                hashtag_payload = {"names": parse_hashtags_from_caption(caption)}
+                thumbnail_url = item.get("thumbnail_url") or item.get("media_url") or ""
+                published_at = datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00"))
 
                 if not media_item:
                     media_item = MediaItem(
@@ -229,35 +242,53 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                         external_media_id=item["id"],
                         media_type=item["media_type"],
                         caption=caption,
+                        hashtag=hashtag_payload,
                         permalink=item["permalink"],
-                        thumbnail_url=item.get("thumbnail_url") or item.get("media_url"),
-                        published_at=datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00")),
+                        thumbnail_url=thumbnail_url,
+                        published_at=published_at,
                     )
                     db.add(media_item)
                     db.commit()
                     db.refresh(media_item)
-                
+                else:
+                    media_item.caption = caption
+                    media_item.hashtag = hashtag_payload
+                    media_item.media_type = item["media_type"]
+                    media_item.permalink = item["permalink"]
+                    media_item.thumbnail_url = thumbnail_url or media_item.thumbnail_url
+                    media_item.published_at = published_at
+                    db.add(media_item)
+                    db.commit()
+
                 metric_data = {m["name"]: m["values"][0]["value"] for m in insights.get("data", [])}
-                
+
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
-                    view=metric_data.get("views", 0),
-                    reach=metric_data.get("reach", 0),
-                    likes=metric_data.get("total_interactions", 0),
-                    comments="0",
-                    saves=metric_data.get("saved", 0),
-                    shares=metric_data.get("shares", 0),
-                    total_interactions=metric_data.get("total_interactions", 0),
+                    view=int(metric_data.get("views", 0) or 0),
+                    reach=int(metric_data.get("reach", 0) or 0),
+                    likes=int(metric_data.get("likes", 0) or 0),
+                    comments=str(int(metric_data.get("comments", 0) or 0)),
+                    saves=int(metric_data.get("saved", 0) or 0),
+                    shares=int(metric_data.get("shares", 0) or 0),
+                    total_interactions=int(metric_data.get("total_interactions", 0) or 0),
                     raw_metrics=metric_data,
-                    captured_at=datetime.now(timezone.utc)
+                    captured_at=datetime.now(timezone.utc),
                 )
                 db.add(media_metric)
-                
-                job.progress = int(((index + 1) / total_items) * 95)
+
+                if total_items:
+                    job.progress = int(((index + 1) / total_items) * 95)
+                else:
+                    job.progress = 95
                 db.commit()
 
+            top_hashtags = top_frequent_hashtags(all_captions)
             logger.info(f"Starting niche detection for user {user_id}")
-            detected_niche = detect_niche_service_sync(account.biography or "", all_captions)
+            detected_niche = detect_niche_service_sync(
+                account.biography or "",
+                all_captions,
+                top_hashtags,
+            )
             
             account.niche_detected = detected_niche
             account.last_synced_at = datetime.now(timezone.utc)
@@ -271,9 +302,6 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
             
             # Trigger video analysis via Celery
-            from app.core.celery_app import celery_app
-            from app.model.analysis_job import AnalysisJob
-            
             video_job = AnalysisJob(
                 user_id=UUID(user_id),
                 job_type="video_analysis",
