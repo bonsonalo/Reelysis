@@ -154,6 +154,40 @@ async def get_roadmap(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.patch("/report/roadmap/{recommendation_id}")
+async def update_recommendation_status(
+    recommendation_id: UUID,
+    db: db_dependency,
+    current_user: user_authentication_dependency
+):
+    """
+    Updates the status of a specific recommendation (e.g., mark as completed).
+    """
+    try:
+        from sqlmodel import select
+        stmt = select(Recommendation).where(
+            Recommendation.id == recommendation_id,
+            Recommendation.user_id == current_user["id"]
+        )
+        recommendation = (await db.exec(stmt)).first()
+        
+        if not recommendation:
+            raise HTTPException(status_code=404, detail="Recommendation not found")
+        
+        # Toggle between 'pending' and 'completed'
+        recommendation.status = "completed" if recommendation.status == "pending" else "pending"
+        db.add(recommendation)
+        await db.commit()
+        
+        return {
+            "id": str(recommendation.id),
+            "status": recommendation.status
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/jobs/{job_id}")
 async def get_job_status(
     job_id: UUID,
