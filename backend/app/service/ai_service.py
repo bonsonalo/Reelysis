@@ -11,33 +11,41 @@ def get_genai_client():
         return None
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
-def detect_niche_service_sync(biography: str, captions: list[str]):
+
+def _build_niche_detection_prompt(
+    biography: str,
+    captions: list[str],
+    hashtags: list[str] | None = None,
+) -> str:
+    captions_text = "\n- ".join(captions[:20]) if captions else "None"
+    hashtags_text = ", ".join(hashtags[:20]) if hashtags else "None"
+    return f"""
+        Analyze the following Instagram account information and determine its specific niche.
+
+        Biography:
+        {biography or "None"}
+
+        Recent Video Captions:
+        - {captions_text}
+
+        Most Frequent Hashtags:
+        {hashtags_text}
+
+        Return ONLY a short, descriptive name for the niche (e.g., "Fitness & Nutrition", "Tech Education", "Sustainable Fashion").
+        """
+
+
+def detect_niche_service_sync(
+    biography: str,
+    captions: list[str],
+    hashtags: list[str] | None = None,
+):
     """
     Synchronous version of niche detection for Celery tasks.
-    Uses Gemini 1.5 Flash to detect the Instagram account's niche
-    based on the biography and recent video captions.
+    Uses Gemini Flash to detect the Instagram account's niche
+    based on biography, captions, and hashtags.
     """
-    # Check environment variable at runtime for Celery worker
-    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
-    
-    if ai_simulation:
-        logger.info("AI Simulation Mode: Mocking niche detection")
-        return "Lifestyle & Productivity"
-
-    if not settings.GEMINI_API_KEY:
-        logger.warning("No Gemini API key provided. Falling back to default niche.")
-        return "Uncategorized"
-
-async def detect_niche_service(biography: str, captions: list[str]):
-    """
-    Async version of niche detection for non-Celery contexts.
-    Uses Gemini 1.5 Flash to detect the Instagram account's niche
-    based on the biography and recent video captions.
-    """
-    # Check environment variable at runtime for Celery worker
-    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
-    
-    if ai_simulation:
+    if settings.AI_SIMULATION_MODE:
         logger.info("AI Simulation Mode: Mocking niche detection")
         return "Lifestyle & Productivity"
 
@@ -47,41 +55,60 @@ async def detect_niche_service(biography: str, captions: list[str]):
 
     try:
         client = get_genai_client()
-        
-        # Prepare the prompt
-        captions_text = "\n- ".join(captions[:20]) # Use top 20 captions for context
-        prompt = f"""
-        Analyze the following Instagram account information and determine its specific niche.
-        
-        Biography:
-        {biography}
-        
-        Recent Video Captions:
-        - {captions_text}
-        
-        Return ONLY a short, descriptive name for the niche (e.g., "Fitness & Nutrition", "Tech Education", "Sustainable Fashion").
-        """
-        
+        prompt = _build_niche_detection_prompt(biography, captions, hashtags)
         response = client.models.generate_content(
             model=settings.AI_MODEL_FLASH,
-            contents=prompt
+            contents=prompt,
         )
-        niche = response.text.strip()
-        
+        niche = (response.text or "").strip()
+        if not niche:
+            raise ValueError("Empty niche response from Gemini")
         logger.info(f"AI Niche Detection Result: {niche}")
         return niche
-
     except Exception as e:
         logger.error(f"Error in Gemini niche detection: {e}")
-        return "Lifestyle" # Fallback
+        return "Lifestyle"
+
+
+async def detect_niche_service(
+    biography: str,
+    captions: list[str],
+    hashtags: list[str] | None = None,
+):
+    """
+    Async version of niche detection for non-Celery contexts.
+    """
+    if settings.AI_SIMULATION_MODE:
+        logger.info("AI Simulation Mode: Mocking niche detection")
+        return "Lifestyle & Productivity"
+
+    if not settings.GEMINI_API_KEY:
+        logger.warning("No Gemini API key provided. Falling back to default niche.")
+        return "Uncategorized"
+
+    try:
+        client = get_genai_client()
+        prompt = _build_niche_detection_prompt(biography, captions, hashtags)
+        response = client.models.generate_content(
+            model=settings.AI_MODEL_FLASH,
+            contents=prompt,
+        )
+        niche = (response.text or "").strip()
+        if not niche:
+            raise ValueError("Empty niche response from Gemini")
+        logger.info(f"AI Niche Detection Result: {niche}")
+        return niche
+    except Exception as e:
+        logger.error(f"Error in Gemini niche detection: {e}")
+        return "Lifestyle"
 
 async def analyze_video_service(caption: str, transcript: str, hashtags: list[str] = None):
     """
     Uses Gemini 1.5 Flash to analyze an individual video's creative and strategic elements.
     Returns a structured VideoAnalysisResponse object.
     """
-    # Check environment variable at runtime for Celery worker
-    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    # Check settings for AI simulation mode (works in both FastAPI and Celery contexts)
+    ai_simulation = settings.AI_SIMULATION_MODE
     
     if ai_simulation:
         logger.info("AI Simulation Mode: Mocking video analysis")
@@ -144,8 +171,8 @@ async def generate_strategic_report_service(user_data: dict, competitor_data: li
     Acting as a Senior Social Media Strategist, this function compares the user's content 
     against competitors and generates a comprehensive growth roadmap.
     """
-    # Check environment variable at runtime for Celery worker
-    ai_simulation = os.getenv('AI_SIMULATION_MODE', 'false').lower() == 'true'
+    # Check settings for AI simulation mode (works in both FastAPI and Celery contexts)
+    ai_simulation = settings.AI_SIMULATION_MODE
     
     if ai_simulation:
         logger.info("AI Simulation Mode: Mocking strategic report")
