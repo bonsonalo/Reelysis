@@ -25,6 +25,24 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
+
+def _parse_insight_metrics(insights: dict) -> dict:
+    metric_data: dict = {}
+    for metric in insights.get("data", []):
+        name = metric.get("name")
+        values = metric.get("values") or []
+        if not name or not values:
+            continue
+        metric_data[name] = values[0].get("value", 0)
+    return metric_data
+
+
+def _parse_media_timestamp(item: dict) -> datetime:
+    timestamp = item.get("timestamp")
+    if not timestamp:
+        return datetime.now(timezone.utc)
+    return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
 async def get_oauth_url_service(user_id: UUID):
     try:
         logger.info("getitng started with oauth_url_service")
@@ -208,6 +226,8 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
 
             acc_stmt = select(InstagramAccount).where(InstagramAccount.user_id == UUID(user_id))
             account = db.exec(acc_stmt).first()
+            if not account:
+                raise ValueError("Instagram account not found")
             ig_user_id = account.instagram_user_id
 
             profile_data = asyncio.run(meta_client.get_instagram_account(decrypted_token))
@@ -234,7 +254,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                 all_captions.append(caption)
                 hashtag_payload = {"names": parse_hashtags_from_caption(caption)}
                 thumbnail_url = item.get("thumbnail_url") or item.get("media_url") or ""
-                published_at = datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00"))
+                published_at = _parse_media_timestamp(item)
 
                 if not media_item:
                     media_item = MediaItem(
@@ -243,7 +263,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                         media_type=item["media_type"],
                         caption=caption,
                         hashtag=hashtag_payload,
-                        permalink=item["permalink"],
+                        permalink=item.get("permalink", ""),
                         thumbnail_url=thumbnail_url,
                         published_at=published_at,
                     )
@@ -254,13 +274,13 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                     media_item.caption = caption
                     media_item.hashtag = hashtag_payload
                     media_item.media_type = item["media_type"]
-                    media_item.permalink = item["permalink"]
+                    media_item.permalink = item.get("permalink", media_item.permalink)
                     media_item.thumbnail_url = thumbnail_url or media_item.thumbnail_url
                     media_item.published_at = published_at
                     db.add(media_item)
                     db.commit()
 
-                metric_data = {m["name"]: m["values"][0]["value"] for m in insights.get("data", [])}
+                metric_data = _parse_insight_metrics(insights)
 
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
@@ -319,8 +339,9 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             logger.info(f"Video analysis triggered for user {user_id}")
 
         except Exception as e:
-            logger.error(f"Error in sync task: {e}")
+            logger.exception(f"Error in sync task: {e}")
             if job:
                 job.status = "failed"
-                job.error_message = str(e)
+                job.error_message = str(e) or repr(e)
+                job.completed_at = datetime.now(timezone.utc)
                 db.commit()
