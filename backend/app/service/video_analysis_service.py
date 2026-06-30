@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
-from sqlmodel import select, col, Session
+from sqlmodel import select, col, desc, Session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException
 
