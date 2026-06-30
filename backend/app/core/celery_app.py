@@ -11,6 +11,7 @@ celery_app = Celery(
     include=[
         "app.service.instagram_service",
         "app.service.competitor_service",
+        "app.service.transcript_service",
         "app.service.video_analysis_service",
         "app.service.report_service"
     ]
