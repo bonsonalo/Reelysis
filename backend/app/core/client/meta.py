@@ -4,11 +4,17 @@ import secrets
 import httpx
 from urllib.parse import quote
 
+META_HTTP_TIMEOUT = 30.0
+
+
 class MetaClient:
     def __init__(self):
         self.app_id = settings.IG_APP_ID
         self.app_secret = settings.IG_APP_SECRET
         self.redirect_uri = settings.IG_REDIRECT_URI
+
+    def _http_client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(timeout=META_HTTP_TIMEOUT)
 
     def get_oauth_url(self):
         print("AUTHORIZE using redirect_uri:", repr(self.redirect_uri))
@@ -33,7 +39,7 @@ class MetaClient:
     async def exchange_code_for_access_token(self, code: str):
         print("RECEIVED CODE:", repr(code))
         print("EXCHANGE using redirect_uri:", repr(self.redirect_uri))
-        async with httpx.AsyncClient() as client:
+        async with self._http_client() as client:
             response = await client.post(
                 'https://api.instagram.com/oauth/access_token',
                 data={
@@ -50,7 +56,7 @@ class MetaClient:
             return response.json()
 
     async def exchange_for_long_lived_token(self, short_lived_token: str):
-        async with httpx.AsyncClient() as client:
+        async with self._http_client() as client:
             response = await client.get(
                 f'https://graph.instagram.com/access_token',
                 params={
@@ -64,7 +70,7 @@ class MetaClient:
             return response.json()
 
     async def get_instagram_account(self, access_token: str):
-        async with httpx.AsyncClient() as client:
+        async with self._http_client() as client:
             response = await client.get(
                 'https://graph.instagram.com/me',
                 params={
@@ -85,7 +91,7 @@ class MetaClient:
             }
 
     async def get_user_media(self, ig_user_id: str, access_token: str):
-        async with httpx.AsyncClient() as client:
+        async with self._http_client() as client:
             response = await client.get(
                 'https://graph.instagram.com/me/media',
                 params={
@@ -97,8 +103,8 @@ class MetaClient:
             return response.json()
 
     async def get_media_insights(self, ig_media_id: str, access_token: str):
-        async with httpx.AsyncClient() as client:
-            metrics = 'reach,views,saved,shares,total_interactions'
+        async with self._http_client() as client:
+            metrics = 'reach,views,likes,comments,saved,shares,total_interactions'
             response = await client.get(
                 f'https://graph.instagram.com/{ig_media_id}/insights',
                 params={
