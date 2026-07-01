@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class VideoAnalysisResponse(BaseModel):
@@ -6,12 +6,20 @@ class VideoAnalysisResponse(BaseModel):
     category: str
     content_pillar: str
     hook: str
-    hook_score: int
+    hook_score: int = Field(
+        ge=0,
+        le=100,
+        description="Hook strength from 0-100 (80+ strong, 50-79 average, below 50 weak).",
+    )
     pacing: str
     visual_style: str
     strengths: List[str]
     weaknesses: List[str]
-    confidence: int
+    confidence: int = Field(
+        ge=0,
+        le=100,
+        description="Confidence in this assessment from 0-100 (lower if no transcript).",
+    )
 
 class RecommendationItem(BaseModel):
     title: str
