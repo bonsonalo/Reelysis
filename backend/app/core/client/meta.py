@@ -109,12 +109,25 @@ class MetaClient:
                 f'https://graph.instagram.com/{ig_media_id}/insights',
                 params={
                     'metric': metrics,
-                    'access_token': access_token
+                    'period': 'lifetime',
+                    'access_token': access_token,
                 }
             )
             if response.status_code != 200:
-                logger.warning(f"Failed to fetch insights for media {ig_media_id}: {response.text}")
+                logger.warning(
+                    "Failed to fetch insights for media %s (%s): %s",
+                    ig_media_id,
+                    response.status_code,
+                    response.text,
+                )
                 return {}
-            return response.json()
+            payload = response.json()
+            if not payload.get("data"):
+                logger.warning(
+                    "Insights returned empty data for media %s: %s",
+                    ig_media_id,
+                    response.text[:500],
+                )
+            return payload
 
 meta_client = MetaClient()
