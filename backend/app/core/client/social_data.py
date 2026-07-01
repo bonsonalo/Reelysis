@@ -2,128 +2,400 @@ import httpx
 from app.core.config import settings
 from app.core.logger import logger
 
+# Bright Data Instagram Scraper API dataset IDs (official docs)
+PROFILE_DATASET_ID = "gd_l1vikfch901nx3by4"
+POSTS_DATASET_ID = "gd_lk5ns7kz21pck8jpis"
+REELS_DATASET_ID = "gd_lyclm20il4r5helnj"
+
+
+def _coerce_int(value) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return 0
+    multiplier = 1
+    lower = text.lower()
+    if lower.endswith("k"):
+        multiplier = 1_000
+        text = text[:-1]
+    elif lower.endswith("m"):
+        multiplier = 1_000_000
+        text = text[:-1]
+    elif lower.endswith("b"):
+        multiplier = 1_000_000_000
+        text = text[:-1]
+    try:
+        return int(float(text) * multiplier)
+    except ValueError:
+        return 0
+
+
+def _is_normalized_profile(entry: dict) -> bool:
+    return bool(entry.get("handle")) and "followers_count" in entry and not entry.get("account")
+
+
+def _is_profile_record(entry: dict) -> bool:
+    if entry.get("description") or entry.get("video_url") or entry.get("caption"):
+        return False
+    return bool(
+        entry.get("account")
+        or entry.get("user_name")
+        or entry.get("profile_url")
+        or entry.get("profile_name")
+    )
+
+
+def normalize_competitor_profiles(raw_results: list) -> list[dict]:
+    """
+    Convert Bright Data profile or post records into a consistent competitor shape.
+    """
+    if not raw_results:
+        return []
+
+    if _is_normalized_profile(raw_results[0]):
+        return raw_results
+
+    normalized: list[dict] = []
+
+    # Profile records (discover by username)
+    if any(_is_profile_record(item) for item in raw_results):
+        for entry in raw_results:
+            handle = (
+                entry.get("account")
+                or entry.get("user_name")
+                or entry.get("profile_name")
+                or entry.get("handle")
+                or ""
+            ).strip().lstrip("@")
+            if not handle and entry.get("profile_url"):
+                url = str(entry.get("profile_url", "")).rstrip("/")
+                handle = url.split("/")[-1] if url else ""
+            if not handle:
+                continue
+            normalized.append(
+                {
+                    "handle": handle,
+                    "display_name": (
+                        entry.get("full_name")
+                        or entry.get("display_name")
+                        or entry.get("profile_name")
+                        or handle
+                    ),
+                    "profile_picture_url": (
+                        entry.get("profile_image_link")
+                        or entry.get("profile_picture_url")
+                        or entry.get("profile_pic_url")
+                    ),
+                    "followers_count": _coerce_int(
+                        entry.get("followers")
+                        or entry.get("followers_count")
+                        or entry.get("follower_count")
+                        or entry.get("subscribers")
+                    ),
+                    "media_count": _coerce_int(
+                        entry.get("posts_count")
+                        or entry.get("media_count")
+                        or entry.get("post_count")
+                    ),
+                    "engagement_rate": float(
+                        entry.get("avg_engagement") or entry.get("engagement_rate") or 0
+                    ),
+                }
+            )
+        return normalized
+
+    # Post / reel records — aggregate by creator
+    by_handle: dict[str, dict] = {}
+    for entry in raw_results:
+        handle = (
+            entry.get("user_posted")
+            or entry.get("username")
+            or entry.get("account")
+            or entry.get("handle")
+            or ""
+        ).strip().lstrip("@")
+        if not handle:
+            continue
+
+        likes = _coerce_int(entry.get("likes") or entry.get("like_count"))
+        comments = _coerce_int(entry.get("num_comments") or entry.get("comment_count"))
+        views = _coerce_int(entry.get("views") or entry.get("view_count"))
+        engagement_score = likes + comments + views
+
+        existing = by_handle.get(handle)
+        if not existing or engagement_score > existing["_engagement_score"]:
+            by_handle[handle] = {
+                "handle": handle,
+                "display_name": entry.get("full_name") or entry.get("display_name") or handle,
+                "profile_picture_url": (
+                    entry.get("profile_image_link")
+                    or entry.get("profile_picture_url")
+                    or entry.get("thumbnail_url")
+                ),
+                "followers_count": _coerce_int(
+                    entry.get("followers")
+                    or entry.get("followers_count")
+                    or entry.get("follower_count")
+                ),
+                "media_count": _coerce_int(entry.get("posts_count") or entry.get("media_count")),
+                "engagement_rate": float(entry.get("avg_engagement") or entry.get("engagement_rate") or 0),
+                "_engagement_score": engagement_score,
+            }
+        elif existing:
+            existing["media_count"] = int(existing.get("media_count", 0)) + 1
+            followers = _coerce_int(
+                entry.get("followers")
+                or entry.get("followers_count")
+                or entry.get("follower_count")
+            )
+            if followers > int(existing.get("followers_count", 0)):
+                existing["followers_count"] = followers
+
+    ranked = sorted(by_handle.values(), key=lambda item: item["_engagement_score"], reverse=True)
+    for item in ranked:
+        item.pop("_engagement_score", None)
+    return ranked
+
+
+def normalize_competitor_media(raw_results: list) -> list[dict]:
+    """Map Bright Data reel/post records into competitor media rows."""
+    normalized = []
+    for entry in raw_results[:10]:
+        caption = entry.get("caption") or entry.get("description") or ""
+        hashtags = entry.get("hashtags") or []
+        if isinstance(hashtags, str):
+            hashtags = [tag.strip("#") for tag in hashtags.split() if tag.startswith("#")]
+
+        metrics = {
+            "views": int(entry.get("views") or entry.get("view_count") or entry.get("video_view_count") or 0),
+            "likes": int(entry.get("likes") or entry.get("like_count") or 0),
+            "comments": int(entry.get("num_comments") or entry.get("comment_count") or 0),
+        }
+
+        normalized.append(
+            {
+                "id": entry.get("id") or entry.get("shortcode"),
+                "caption": caption,
+                "media_type": entry.get("content_type") or entry.get("media_type") or "VIDEO",
+                "permalink": entry.get("url") or entry.get("post_url") or entry.get("permalink") or "",
+                "thumbnail_url": entry.get("thumbnail_url") or entry.get("image_url") or "",
+                "audio_url": entry.get("video_url") or entry.get("media_url") or entry.get("audio_url") or "",
+                "hashtags": hashtags if isinstance(hashtags, list) else [],
+                "transcript_text": entry.get("transcript_text") or entry.get("transcript") or "",
+                "metrics": metrics,
+            }
+        )
+    return normalized
+
+
 class SocialDataClient:
     def __init__(self):
         self.api_key = settings.BRIGHT_DATA_API_KEY
         self.base_url = "https://api.brightdata.com/datasets/v3"
-        # Verified Template ID for Instagram Hashtag & Profile Discovery
-        self.discovery_dataset_id = "gd_l1villgoiiidt09ci" 
-        # Verified Template ID for Instagram Profile Posts/Reels
-        self.posts_dataset_id = "gd_l1viktl72bvl7bjuj0"
 
-    async def search_creators_by_niche(self, niche: str):
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+    async def _trigger(self, dataset_id: str, payload: list, extra_params: str = "") -> str | None:
+        url = f"{self.base_url}/trigger?dataset_id={dataset_id}&format=json{extra_params}"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, headers=self._headers(), json=payload)
+            if response.status_code >= 400:
+                logger.error(
+                    "Bright Data trigger failed (%s): %s",
+                    response.status_code,
+                    response.text,
+                )
+                response.raise_for_status()
+            snapshot_id = response.json().get("snapshot_id")
+            logger.info("Bright Data job triggered. snapshot_id=%s dataset=%s", snapshot_id, dataset_id)
+            return snapshot_id
+
+    async def search_creators_by_niche(
+        self,
+        niche: str,
+        exclude_handle: str | None = None,
+        max_handles: int = 10,
+        fallback_handles: list[str] | None = None,
+        account_context: dict | None = None,
+    ) -> tuple[str | None, str | None]:
         """
-        PHASE 1: THE TRIGGER (Discovery)
-        Sends the niche to Bright Data to find top creators via hashtag search.
-        Returns the 'Tracking Number' (snapshot_id).
+        Discover creators by asking Gemini for handles, then enriching profiles via Bright Data.
+        Returns (snapshot_id, error_message).
         """
         if settings.AI_SIMULATION_MODE or not self.api_key:
             logger.info(f"Simulation Mode: Mocking creator search for niche: {niche}")
+            return ("mock_snapshot_id_123", None)
+
+        from app.service.ai_service import suggest_competitor_handles_sync
+
+        handles, gemini_error = suggest_competitor_handles_sync(
+            niche,
+            exclude_handle=exclude_handle,
+            max_handles=max_handles,
+            account_context=account_context,
+        )
+        if not handles and fallback_handles:
+            handles = [
+                h.strip().lstrip("@")
+                for h in fallback_handles
+                if h and h.strip().lstrip("@").lower() != (exclude_handle or "").lower()
+            ][:max_handles]
+            if handles:
+                logger.info(
+                    "Gemini unavailable; refreshing %d existing competitor handle(s) via Bright Data",
+                    len(handles),
+                )
+
+        if not handles:
+            logger.error("No competitor handles for niche: %s", niche)
+            return (None, gemini_error or "No competitor handles available for this niche.")
+
+        payload = [{"user_name": handle} for handle in handles]
+        extra_params = "&type=discover_new&discover_by=user_name"
+
+        try:
+            snapshot_id = await self._trigger(
+                PROFILE_DATASET_ID,
+                payload,
+                extra_params=extra_params,
+            )
+            return (snapshot_id, None)
+        except Exception as e:
+            logger.error(f"Error triggering Bright Data profile discovery: {e}")
+            return (None, "Failed to trigger competitor profile fetch with Bright Data.")
+
+    async def fetch_profile_snapshot(self, handle: str) -> str | None:
+        """Fetch a single Instagram profile by username (followers, posts, avatar)."""
+        if settings.AI_SIMULATION_MODE or not self.api_key:
             return "mock_snapshot_id_123"
 
-        url = f"{self.base_url}/trigger?dataset_id={self.discovery_dataset_id}&format=json"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        clean_niche = niche.replace(" ", "").lower()
-        payload = [{"hashtag": clean_niche}]
-
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                snapshot_id = data.get("snapshot_id")
-                logger.info(f"Bright Data discovery search triggered. Tracking ID: {snapshot_id}")
-                return snapshot_id
-            except Exception as e:
-                logger.error(f"Error hiring investigator (Bright Data Discovery): {e}")
-                return None
+        clean_handle = handle.strip().lstrip("@")
+        try:
+            return await self._trigger(
+                PROFILE_DATASET_ID,
+                [{"user_name": clean_handle}],
+                extra_params="&type=discover_new&discover_by=user_name",
+            )
+        except Exception as e:
+            logger.error("Error triggering Bright Data profile fetch for %s: %s", handle, e)
+            return None
 
     async def get_creator_media(self, handle: str):
         """
-        NEW: Fetches recent reels/posts for a specific competitor profile.
-        Returns a snapshot_id for polling.
+        Fetch recent reels for a competitor profile.
         """
         if settings.AI_SIMULATION_MODE or not self.api_key:
             logger.info(f"Simulation Mode: Mocking media fetch for handle: {handle}")
             return f"mock_media_snapshot_{handle}"
 
-        url = f"{self.base_url}/trigger?dataset_id={self.posts_dataset_id}&format=json"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        # Bright Data expects the full profile URL for this dataset
-        payload = [{"url": f"https://www.instagram.com/{handle}/"}]
+        clean_handle = handle.strip().lstrip("@")
+        profile_url = f"https://www.instagram.com/{clean_handle}/"
+        extra_params = "&type=discover_new&discover_by=url"
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                snapshot_id = response.json().get("snapshot_id")
-                logger.info(f"Bright Data media fetch triggered for {handle}. Snapshot ID: {snapshot_id}")
-                return snapshot_id
-            except Exception as e:
-                logger.error(f"Error triggering Bright Data media fetch for {handle}: {e}")
-                return None
+        try:
+            return await self._trigger(
+                REELS_DATASET_ID,
+                [
+                    {
+                        "url": profile_url,
+                        "num_of_posts": 5,
+                    }
+                ],
+                extra_params=extra_params,
+            )
+        except Exception as e:
+            logger.error(f"Error triggering Bright Data media fetch for {handle}: {e}")
+            return None
 
     async def get_snapshot_results(self, snapshot_id: str):
         """
-        PHASE 3: THE PICKUP
-        Checks if a search (discovery or media) is finished and returns the structured data.
+        Poll snapshot until ready and return normalized-friendly raw JSON.
         """
-        # Simulation Fallback for Discovery Results
         if snapshot_id == "mock_snapshot_id_123":
             return [
-                {"handle": "fitness_expert_pro", "display_name": "Fitness Pro", "followers_count": 150000, "engagement_rate": 0.045},
-                {"handle": "gym_daily_tips", "display_name": "Gym Daily", "followers_count": 85000, "engagement_rate": 0.062},
-                {"handle": "wellness_coach_anna", "display_name": "Anna Wellness", "followers_count": 42000, "engagement_rate": 0.081}
+                {
+                    "account": "fitness_expert_pro",
+                    "full_name": "Fitness Pro",
+                    "followers": 150000,
+                    "posts_count": 420,
+                    "avg_engagement": 0.045,
+                },
+                {
+                    "account": "gym_daily_tips",
+                    "full_name": "Gym Daily",
+                    "followers": 85000,
+                    "posts_count": 310,
+                    "avg_engagement": 0.062,
+                },
+                {
+                    "account": "wellness_coach_anna",
+                    "full_name": "Anna Wellness",
+                    "followers": 42000,
+                    "posts_count": 180,
+                    "avg_engagement": 0.081,
+                },
             ]
-        
-        # Simulation Fallback for Media Results
+
         if snapshot_id.startswith("mock_media_snapshot_"):
             handle = snapshot_id.replace("mock_media_snapshot_", "")
             return [
                 {
                     "id": f"vid_{handle}_1",
-                    "caption": f"Secrets of {handle} revealed! #growth",
+                    "user_posted": handle,
+                    "description": f"Secrets of {handle} revealed! #growth",
                     "media_type": "VIDEO",
-                    "permalink": "https://www.instagram.com/reels/mock/",
-                    "thumbnail_url": "https://placehold.co/400",
+                    "url": "https://www.instagram.com/reels/mock/",
+                    "image_url": "https://placehold.co/400",
+                    "video_url": "https://example.com/mock-audio-1.mp4",
                     "view_count": 10000,
                     "like_count": 500,
-                    "comment_count": 20
+                    "comment_count": 20,
+                    "followers": 250000,
+                    "posts_count": 890,
                 },
                 {
                     "id": f"vid_{handle}_2",
-                    "caption": f"Top tips from {handle} #lifestyle",
+                    "user_posted": handle,
+                    "description": f"Top tips from {handle} #lifestyle",
                     "media_type": "VIDEO",
-                    "permalink": "https://www.instagram.com/reels/mock2/",
-                    "thumbnail_url": "https://placehold.co/400",
+                    "url": "https://www.instagram.com/reels/mock2/",
+                    "image_url": "https://placehold.co/400",
+                    "video_url": "https://example.com/mock-audio-2.mp4",
                     "view_count": 120000,
                     "like_count": 8000,
-                    "comment_count": 120
-                }
+                    "comment_count": 120,
+                    "followers": 250000,
+                    "posts_count": 890,
+                },
             ]
 
         url = f"{self.base_url}/snapshot/{snapshot_id}?format=json"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             try:
-                response = await client.get(url, headers=headers)
-                
-                # 202 status means it is still processing
+                response = await client.get(url, headers=self._headers())
                 if response.status_code == 202:
                     return None
-                
-                response.raise_for_status()
-                return response.json()
+                if response.status_code >= 400:
+                    logger.error(
+                        "Bright Data snapshot failed (%s): %s",
+                        response.status_code,
+                        response.text,
+                    )
+                    response.raise_for_status()
+                data = response.json()
+                if not isinstance(data, list):
+                    return data
+                return data or []
             except Exception as e:
                 logger.error(f"Error picking up results for snapshot {snapshot_id}: {e}")
                 return None
+
 
 social_data_client = SocialDataClient()
