@@ -7,6 +7,7 @@ class DashboardStats(BaseModel):
     avg_reach: int
     avg_engagement: float
     top_hook_score: float
+    top_analysis_confidence: float
     views_change: str
     reach_change: str
     engagement_change: str
