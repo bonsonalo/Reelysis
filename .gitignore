@@ -16,9 +16,12 @@ env/
 ENV/
 instaenv/
 
-*md
-!README.md
+# Markdown docs (local specs / notes — do not push)
+*.md
 
+# Redis local dumps
+dump.rdb
+*.rdb
 
 # pip
 pip-log.txt
