@@ -71,7 +71,8 @@ async def trigger_sync(current_user: user_authentication_dependency, db: db_depe
         job = await trigger_instagram_sync_service(current_user["id"], db)
         return {
             "message": "Sync job triggered",
-            "job_id": job.id
+            "job_id": job.id,
+            "status": job.status,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
