@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from uuid import UUID
+from fastapi.responses import Response
 from app.api.dep import db_dependency, user_authentication_dependency
 from app.model.competitor_accounts import CompetitorAccount
 from app.schema.competitor_schema import AddCompetitorRequest
@@ -8,6 +9,7 @@ from app.service.competitor_service import (
     add_competitor_by_handle_service,
     rediscover_competitors_service,
 )
+from app.utils.cdn_image import fetch_cdn_image
 from sqlmodel import select
 
 router = APIRouter(
@@ -69,6 +71,24 @@ async def discover_competitors(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{competitor_id}/avatar")
+async def get_competitor_avatar(
+    competitor_id: UUID,
+    db: db_dependency,
+    current_user: user_authentication_dependency,
+):
+    """Proxy Instagram profile images (CDN blocks direct browser hotlinking)."""
+    stmt = select(CompetitorAccount).where(
+        CompetitorAccount.id == competitor_id,
+        CompetitorAccount.user_id == current_user["id"],
+    )
+    competitor = (await db.exec(stmt)).first()
+    if not competitor or not competitor.profile_picture_url:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+
+    content, media_type = await fetch_cdn_image(competitor.profile_picture_url)
+    return Response(content=content, media_type=media_type)
 
 @router.get("/{competitor_id}", response_model=CompetitorAccount)
 async def get_competitor(
