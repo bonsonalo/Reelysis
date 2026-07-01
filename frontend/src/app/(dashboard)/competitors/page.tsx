@@ -1,6 +1,10 @@
 'use client'
 
-import { useCompetitors, useRemoveCompetitor } from '@/features/competitors/hooks/useCompetitors'
+import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
+import { useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
+import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
+import { CompetitorAvatar } from '@/features/competitors/components/CompetitorAvatar'
+import { competitorEngagementBarWidth, formatCompetitorEngagement } from '@/features/competitors/utils'
 import { 
   Users2, 
   Trash2, 
@@ -8,18 +12,58 @@ import {
   Zap, 
   ExternalLink,
   Search,
-  AlertCircle
+  AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function CompetitorsPage() {
-  const { data: competitors, isLoading } = useCompetitors()
+  const queryClient = useQueryClient()
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null)
+  const completedJobIdRef = useRef<string | null>(null)
+
+  const pollWhileActive = (query: { state: { data?: { status?: string } | null } }) => {
+    const status = query.state.data?.status
+    return status === 'queued' || status === 'running' ? 3000 : false
+  }
+
+  const { data: pendingJob } = useAnalysisJobById(pendingJobId, {
+    refetchInterval: pollWhileActive,
+  })
+  const discoveryInProgress =
+    !!pendingJobId &&
+    (!pendingJob || pendingJob.status === 'queued' || pendingJob.status === 'running')
+
+  const { data: competitors, isLoading, refetch: refetchCompetitors } = useCompetitors({
+    refetchInterval: discoveryInProgress ? 5000 : false,
+  })
   const { mutate: removeCompetitor, isPending: isRemoving } = useRemoveCompetitor()
+  const { mutate: rediscover, isPending: isRediscovering } = useRediscoverCompetitors()
   
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    if (!pendingJobId || !pendingJob) return
+    const isDone = pendingJob.status === 'succeeded' || pendingJob.status === 'failed'
+    if (!isDone || completedJobIdRef.current === pendingJobId) return
+    completedJobIdRef.current = pendingJobId
+    queryClient.invalidateQueries({ queryKey: ['competitors'] })
+    queryClient.invalidateQueries({ queryKey: ['analysis-job', 'competitor_discovery'] })
+    refetchCompetitors()
+    setPendingJobId(null)
+  }, [pendingJobId, pendingJob, queryClient, refetchCompetitors])
+
+  const handleRediscover = () => {
+    if (discoveryInProgress || isRediscovering) return
+    rediscover(undefined, {
+      onSuccess: (data) => {
+        if (data?.job_id) setPendingJobId(String(data.job_id))
+      },
+    })
+  }
 
   const filteredCompetitors = competitors?.filter(c => 
     c.handle.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -50,8 +94,13 @@ export default function CompetitorsPage() {
             Market Intelligence
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Tracking {competitors?.length || 0} top-performing accounts in your niche.
+            {discoveryInProgress
+              ? 'Finding competitor accounts for your niche…'
+              : `Tracking ${competitors?.length || 0} top-performing accounts in your niche.`}
           </p>
+          {pendingJob?.status === 'failed' && pendingJob.error_message && (
+            <p className="mt-2 text-sm text-red-400">{pendingJob.error_message}</p>
+          )}
         </div>
         
         <div className="relative w-full md:w-80 group">
@@ -66,6 +115,28 @@ export default function CompetitorsPage() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Add a competitor</h2>
+            <p className="text-sm text-zinc-500">Track any public Instagram account by handle (max 10).</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleRediscover}
+            disabled={discoveryInProgress || isRediscovering}
+            className="border-white/10 shrink-0"
+          >
+            {discoveryInProgress || isRediscovering ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Re-run auto discovery'
+            )}
+          </Button>
+        </div>
+        <AddCompetitorForm />
+      </div>
+
       {/* Competitors Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCompetitors?.map((comp) => (
@@ -75,12 +146,14 @@ export default function CompetitorsPage() {
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center overflow-hidden">
-                  {comp.profile_picture_url ? (
-                    <img src={comp.profile_picture_url} alt={comp.handle} className="h-full w-full object-cover" />
-                  ) : (
-                    <Users2 className="h-8 w-8 text-zinc-600" />
-                  )}
+                <div className="h-16 w-16 rounded-2xl border border-white/10 overflow-hidden">
+                  <CompetitorAvatar
+                    competitorId={comp.id}
+                    handle={comp.handle}
+                    profilePictureUrl={comp.profile_picture_url}
+                    className="h-full w-full"
+                    iconClassName="h-8 w-8"
+                  />
                 </div>
                 <div>
                    <h3 className="text-xl font-bold text-white truncate max-w-[150px]">@{comp.handle}</h3>
@@ -113,13 +186,15 @@ export default function CompetitorsPage() {
 
             <div className="space-y-3 pt-2">
                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-500">
-                  <span>Engagement Strength</span>
-                  <span className="text-primary">{comp.engagement_rank}%</span>
+                  <span>Avg. engagement</span>
+                  <span className="text-primary">
+                    {comp.engagement_rank ? `${formatCompetitorEngagement(comp.engagement_rank)}%` : '—'}
+                  </span>
                </div>
                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-1000" 
-                    style={{ width: `${comp.engagement_rank}%` }} 
+                    style={{ width: `${competitorEngagementBarWidth(comp.engagement_rank)}%` }} 
                   />
                </div>
             </div>
@@ -138,8 +213,8 @@ export default function CompetitorsPage() {
         {(!filteredCompetitors || filteredCompetitors.length === 0) && !isLoading && (
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
             <AlertCircle className="h-12 w-12 text-zinc-600 mb-4" />
-            <h3 className="text-xl font-bold text-white">No competitors found</h3>
-            <p className="text-zinc-500 mt-2">Try adjusting your search or connect your account.</p>
+            <h3 className="text-xl font-bold text-white">No competitors tracked yet</h3>
+            <p className="text-zinc-500 mt-2">Add a handle above or re-run auto discovery for your niche.</p>
           </div>
         )}
       </div>
