@@ -1,4 +1,7 @@
 from fastapi import APIRouter, HTTPException
+from uuid import UUID
+from fastapi.responses import Response
+from sqlmodel import select
 from app.core.logger import logger
 from app.service.instagram_service import (
     get_oauth_url_service, 
@@ -6,11 +9,15 @@ from app.service.instagram_service import (
     get_connected_accounts_service,
     disconnect_instagram_service,
     trigger_instagram_sync_service,
-    confirm_instagram_niche_service
+    confirm_instagram_niche_service,
+    update_instagram_niche_service,
+    detect_instagram_niche_service,
 )
 from app.api.dep import db_dependency, user_authentication_dependency
 from fastapi.responses import RedirectResponse
-from app.schema.instagram_schema import NicheConfirmRequest
+from app.schema.instagram_schema import NicheConfirmRequest, NicheUpdateRequest
+from app.model.media_items import MediaItem
+from app.utils.cdn_image import fetch_cdn_image
 
 router= APIRouter(
     prefix="/api/v1/instagram", 
@@ -83,7 +90,7 @@ async def trigger_sync(current_user: user_authentication_dependency, db: db_depe
 @router.patch("/niche/confirm")
 async def confirm_niche(request: NicheConfirmRequest, current_user: user_authentication_dependency, db: db_dependency):
     """
-    Confirms or manually sets the Instagram account's niche.
+    Confirms niche during onboarding and triggers competitor discovery.
     """
     try:
         account = await confirm_instagram_niche_service(current_user["id"], request.niche, db)
@@ -93,3 +100,61 @@ async def confirm_niche(request: NicheConfirmRequest, current_user: user_authent
     except Exception as e:
         logger.error(f"Error confirming niche: {e}")
         raise HTTPException(status_code=500, detail="Failed to confirm niche")
+
+
+@router.patch("/niche")
+async def update_niche(request: NicheUpdateRequest, current_user: user_authentication_dependency, db: db_dependency):
+    """
+    Update the confirmed niche from settings (optionally re-run competitor discovery).
+    """
+    try:
+        account = await update_instagram_niche_service(
+            current_user["id"],
+            request.niche,
+            db,
+            trigger_discovery=request.trigger_discovery,
+        )
+        return {
+            "message": "Niche updated",
+            "niche_confirmed": account.niche_confirmed,
+            "niche_detected": account.niche_detected,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating niche: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update niche")
+
+
+@router.post("/niche/detect")
+async def detect_niche(current_user: user_authentication_dependency, db: db_dependency):
+    """
+    Re-run AI niche detection from synced bio, captions, and hashtags.
+    """
+    try:
+        result = await detect_instagram_niche_service(current_user["id"], db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error detecting niche: {e}")
+        raise HTTPException(status_code=500, detail="Failed to detect niche")
+
+
+@router.get("/media/{media_id}/thumbnail")
+async def get_media_thumbnail(
+    media_id: UUID,
+    current_user: user_authentication_dependency,
+    db: db_dependency,
+):
+    """Proxy Instagram Reel thumbnails (CDN blocks direct browser hotlinking)."""
+    stmt = select(MediaItem).where(
+        MediaItem.id == media_id,
+        MediaItem.user_id == current_user["id"],
+    )
+    media = (await db.exec(stmt)).first()
+    if not media or not media.thumbnail_url:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    content, media_type = await fetch_cdn_image(media.thumbnail_url)
+    return Response(content=content, media_type=media_type)
