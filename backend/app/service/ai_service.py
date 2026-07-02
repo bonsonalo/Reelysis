@@ -205,7 +205,7 @@ def suggest_competitor_handles_sync(
         Requirements — every suggested account MUST:
         1. Post primarily in the SAME specific niche as the creator above (not generic unrelated lifestyle/fashion unless that is the niche)
         2. Be a real, active, public Instagram account that posts Reels regularly
-        3. Have at least 100,000 Instagram followers — we verify follower counts after your response, so do NOT guess. Prefer established creators whose Instagram audience is large (e.g. traversymedia, codewithharry, mkbhd if tech fits — only if they truly have 100k+ on Instagram, not just on YouTube/Twitter)
+        3. Have at least 10,000 Instagram followers — we verify follower counts after your response, so do NOT guess. Prefer active Reels creators in this niche (e.g. traversymedia, codewithharry — only if they truly have 10k+ on Instagram, not just on YouTube/Twitter)
         4. Use the exact current Instagram username (no typos, no alternate spellings like fireship.io unless that is the real handle)
         5. Be a realistic peer or aspirational competitor (similar audience, not unrelated mega-celebrities)
 
