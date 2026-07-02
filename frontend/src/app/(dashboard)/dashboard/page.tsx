@@ -7,8 +7,9 @@ import { useDashboardGrowth } from '@/features/dashboard/hooks/useDashboardGrowt
 import { useContentPillars } from '@/features/dashboard/hooks/useContentPillars'
 import { useDashboardVideos } from '@/features/dashboard/hooks/useDashboardVideos'
 import { useCompetitors } from '@/features/competitors/hooks/useCompetitors'
+import { CompetitorAvatar } from '@/features/competitors/components/CompetitorAvatar'
 import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
-import { useAnalysisJob } from '@/features/instagram/hooks/useAnalysisJob'
+import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { 
   Eye, 
   Users, 
@@ -18,53 +19,125 @@ import {
   Plus,
   Loader2,
   Users2,
-  Sparkles,
+  Tag,
   // Video,
   Target,
   Play,
   ArrowRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn, formatLastSynced, formatSyncError, isLatestSyncAttemptFailed } from '@/lib/utils'
 import { GrowthChart } from '@/features/dashboard/components/GrowthChart'
-import { useEffect, useState } from 'react'
+import { ReelThumbnail } from '@/features/dashboard/components/ReelThumbnail'
+import { MetricLabel } from '@/components/shared/MetricInfoTip'
+import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+
+function getMetricChangeTone(change: string) {
+  if (change.startsWith('-')) return 'text-red-400'
+  if (change.startsWith('+')) return 'text-emerald-500'
+  return 'text-muted-foreground'
+}
+
+function formatHookPointChange(hookChange?: string, hasScore?: boolean) {
+  if (!hookChange || hookChange === '0') {
+    return hasScore ? '+0 pts' : '0 pts'
+  }
+  return `${hookChange} pts`
+}
 
 export default function DashboardPage() {
-  const { data: accounts, refetch: refetchAccounts } = useInstagramAccounts()
+  const queryClient = useQueryClient()
+  const [pendingSyncJobId, setPendingSyncJobId] = useState<string | null>(null)
+  const pollWhileActive = (query: { state: { data?: { status?: string } | null } }) => {
+    const status = query.state.data?.status
+    return status === 'queued' || status === 'running' ? 2000 : false
+  }
+
+  const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
   const { data: stats, isLoading, refetch: refetchStats } = useDashboardStats()
   const { data: growth, refetch: refetchGrowth } = useDashboardGrowth()
   const { data: pillars, isLoading: isLoadingPillars, refetch: refetchPillars } = useContentPillars()
-  const { data: videos, refetch: refetchVideos } = useDashboardVideos()
+  const { data: videos, isLoading: isLoadingVideos, refetch: refetchVideos } = useDashboardVideos()
   const { data: competitors, isLoading: isLoadingCompetitors, isError: isCompetitorsError } = useCompetitors()
-  const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
-  const { data: syncJob } = useAnalysisJob('instagram_sync', { refetchInterval: false })
-  const [isPolling, setIsPolling] = useState(false)
+  const { data: latestSyncJob } = useAnalysisJob('instagram_sync')
+  const { data: pendingSyncJob } = useAnalysisJobById(pendingSyncJobId, {
+    refetchInterval: pollWhileActive,
+  })
+  const syncJob = pendingSyncJobId ? pendingSyncJob : latestSyncJob
+  const syncInProgress =
+    isSyncing ||
+    (!!pendingSyncJobId &&
+      (!pendingSyncJob ||
+        pendingSyncJob.status === 'queued' ||
+        pendingSyncJob.status === 'running'))
+  const { data: accounts, refetch: refetchAccounts } = useInstagramAccounts({
+    refetchInterval: syncInProgress ? 3000 : false,
+  })
+  const completedJobIdRef = useRef<string | null>(null)
+  const pollStartedAtRef = useRef<number | null>(null)
+  const SYNC_POLL_TIMEOUT_MS = 5 * 60 * 1000
   const account = accounts?.[0]
+  const showSyncFailure =
+    isLatestSyncAttemptFailed(account?.last_synced_at, syncJob) && !!syncJob?.error_message
+
+  const refreshDashboardData = () => {
+    refetchAccounts()
+    refetchStats()
+    refetchGrowth()
+    refetchPillars()
+    refetchVideos()
+  }
 
   const handleSync = () => {
+    if (syncInProgress) return
+    pollStartedAtRef.current = Date.now()
     triggerSync(undefined, {
-      onSuccess: () => {
-        setIsPolling(true)
-      }
+      onSuccess: (data) => {
+        setPendingSyncJobId(String(data.job_id))
+      },
     })
   }
 
   useEffect(() => {
-    if (!isPolling) return
+    if (!pendingSyncJobId) {
+      pollStartedAtRef.current = null
+      return
+    }
+    if (!pollStartedAtRef.current) {
+      pollStartedAtRef.current = Date.now()
+    }
+  }, [pendingSyncJobId])
 
-    const interval = setInterval(() => {
-      if (syncJob?.status === 'succeeded' || syncJob?.status === 'failed') {
-        setIsPolling(false)
-        refetchAccounts()
-        refetchStats()
-        refetchGrowth()
-        refetchPillars()
-        refetchVideos()
+  useEffect(() => {
+    if (!pendingSyncJobId || !pendingSyncJob) return
+
+    const isDone =
+      pendingSyncJob.status === 'succeeded' || pendingSyncJob.status === 'failed'
+    if (!isDone) {
+      if (
+        pollStartedAtRef.current &&
+        Date.now() - pollStartedAtRef.current > SYNC_POLL_TIMEOUT_MS
+      ) {
+        setPendingSyncJobId(null)
+        pollStartedAtRef.current = null
       }
-    }, 2000)
+      return
+    }
+    if (completedJobIdRef.current === pendingSyncJobId) return
 
-    return () => clearInterval(interval)
-  }, [isPolling, syncJob, refetchAccounts, refetchStats, refetchGrowth, refetchPillars, refetchVideos])
+    completedJobIdRef.current = pendingSyncJobId
+    queryClient.invalidateQueries({ queryKey: ['analysis-job', 'instagram_sync'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-growth'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-pillars'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-videos'] })
+    queryClient.invalidateQueries({ queryKey: ['instagram-accounts'] })
+    refreshDashboardData()
+    setPendingSyncJobId(null)
+    pollStartedAtRef.current = null
+  }, [pendingSyncJobId, pendingSyncJob, queryClient])
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
@@ -75,26 +148,34 @@ export default function DashboardPage() {
   const metricCards = [
     { 
       name: 'Total Views', 
+      help: METRIC_HELP.totalViews,
       value: stats ? formatNumber(stats.total_views) : '0', 
       change: stats?.views_change || '0%', 
       icon: Eye 
     },
     { 
       name: 'Average Reach', 
+      help: METRIC_HELP.averageReach,
       value: stats ? formatNumber(stats.avg_reach) : '0', 
       change: stats?.reach_change || '0%', 
       icon: Users 
     },
     { 
       name: 'Avg. Engagement', 
+      help: METRIC_HELP.avgEngagement,
       value: stats ? `${stats.avg_engagement}%` : '0%', 
       change: stats?.engagement_change || '0%', 
       icon: TrendingUp 
     },
     { 
       name: 'Top Hook Score', 
-      value: stats ? `${stats.top_hook_score}/100` : '0/100', 
-      change: stats?.hook_change || '+0', 
+      help: METRIC_HELP.topHookScore,
+      value: stats ? `${Math.round(stats.top_hook_score)}/100` : '0/100', 
+      subtitle: stats?.top_analysis_confidence
+        ? `AI confidence: ${Math.round(stats.top_analysis_confidence)}%`
+        : undefined,
+      confidenceHelp: METRIC_HELP.aiConfidence,
+      change: formatHookPointChange(stats?.hook_change, Boolean(stats?.top_hook_score)), 
       icon: Target 
     },
   ]
@@ -108,22 +189,57 @@ export default function DashboardPage() {
             Welcome back, <span className="text-primary">{account?.username || 'Creator'}</span>
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Here is what's happening with your Reels this week.
+            {syncInProgress
+              ? 'Syncing your Reels from Instagram...'
+              : account?.last_synced_at
+                ? `Last synced ${formatLastSynced(account.last_synced_at)}`
+                : 'No sync yet — run New Analysis to import your Reels.'}
           </p>
+          {showSyncFailure && syncJob?.error_message && (
+            <p className="mt-2 text-sm text-red-400">
+              Latest sync attempt failed: {formatSyncError(syncJob.error_message)}
+            </p>
+          )}
         </div>
         <Button 
           onClick={handleSync}
-          disabled={isSyncing || isPolling}
-          className="h-11 px-6 font-bold shadow-lg shadow-primary/20 flex items-center transition-colors"
+          disabled={syncInProgress}
+          className="h-11 px-6 font-bold shadow-lg shadow-primary/20 flex items-center transition-colors shrink-0"
         >
-          {(isSyncing || isPolling) ? (
+          {syncInProgress ? (
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           ) : (
             <Plus className="mr-2 h-5 w-5" />
           )}
-          <div>{(isSyncing || isPolling) ? 'Syncing...' : 'New Analysis'}</div>
+          <div>{syncInProgress ? 'Syncing...' : 'New Analysis'}</div>
         </Button>
       </div>
+
+      {account?.niche_confirmed && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.06] bg-[#09090b] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
+              <Tag className="h-4 w-4 text-zinc-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                Content niche
+              </p>
+              <p className="text-sm font-semibold text-white truncate" title={account.niche_confirmed}>
+                {account.niche_confirmed}
+              </p>
+              <p className="text-xs text-zinc-500 mt-0.5 hidden sm:block">
+                Used for competitor discovery and market benchmarks
+              </p>
+            </div>
+          </div>
+          <Link href="/settings?tab=account#content-niche" className="shrink-0">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto border-white/10 font-semibold">
+              Edit niche
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -135,15 +251,15 @@ export default function DashboardPage() {
           metricCards.map((stat) => (
             <div 
               key={stat.name}
-              className="group relative overflow-hidden rounded-2xl border border-white/5 bg-[#09090b] p-6 transition-all hover:border-primary/20 hover:bg-[#0c0c0e] cursor-pointer"
+              className="group relative rounded-2xl border border-white/[0.06] bg-[#09090b] p-6 transition-[border-color,background-color,box-shadow] duration-200 ease-out hover:border-orange-500/15 hover:bg-[#0b0b0d] hover:shadow-[0_0_0_1px_rgba(249,115,22,0.06),0_12px_32px_-16px_rgba(0,0,0,0.55)]"
             >
               <div className="flex items-center justify-between">
-                <div className="rounded-xl bg-white/5 p-2.5 transition-colors group-hover:bg-primary/10">
-                  <stat.icon className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                <div className="rounded-xl bg-white/[0.04] p-2.5 transition-colors duration-200 group-hover:bg-white/[0.06]">
+                  <stat.icon className="h-5 w-5 text-zinc-500 transition-colors duration-200 group-hover:text-zinc-300" />
                 </div>
                 <div className={cn(
                   "flex items-center gap-1 text-xs font-medium",
-                  stat.change.startsWith('+') ? "text-emerald-500" : "text-muted-foreground"
+                  getMetricChangeTone(stat.change)
                 )}>
                   {stat.change}
                   <ArrowUpRight className="h-3 w-3" />
@@ -151,11 +267,16 @@ export default function DashboardPage() {
               </div>
               
               <div className="mt-5">
-                <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
+                <div className="text-sm font-medium text-muted-foreground">
+                  <MetricLabel label={stat.name} help={stat.help} />
+                </div>
                 <h3 className="mt-1 text-3xl font-bold tracking-tight text-white">{stat.value}</h3>
+                {'subtitle' in stat && stat.subtitle && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    <MetricLabel label={stat.subtitle} help={'confidenceHelp' in stat ? stat.confidenceHelp : undefined} />
+                  </div>
+                )}
               </div>
-
-              <div className="absolute -bottom-px left-0 h-[2px] w-full bg-gradient-to-r from-transparent via-primary/0 to-transparent transition-all group-hover:via-primary/40" />
             </div>
           ))
         )}
@@ -164,30 +285,34 @@ export default function DashboardPage() {
       {/* Main Content Area */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Growth Chart Area */}
-        <div className="lg:col-span-2 rounded-2xl border border-white/5 bg-[#09090b] p-8 min-h-[400px]">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Views vs. Reach
-              </h3>
-              <div className="flex items-center gap-4 text-xs font-medium">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                  <span className="text-muted-foreground">Views</span>
+        <div className="lg:col-span-2 rounded-2xl border border-white/[0.06] bg-[#09090b] p-6 sm:p-8 min-h-[400px]">
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-white tracking-tight">
+                  Views vs. Reach
+                </h3>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Total views and reach per day — flat lines mean counts held steady between syncs
+                </p>
+              </div>
+              <div className="flex items-center gap-5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#f97316]" />
+                  <span className="text-zinc-400">Views</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">Reach</span>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-zinc-300" />
+                  <span className="text-zinc-400">Reach</span>
                 </div>
               </div>
             </div>
-            <div className="h-[300px] w-full">
+            <div className="h-[280px] w-full">
                 {growth?.data && growth.data.length > 0 ? (
                   <GrowthChart data={growth.data} />
                 ) : (
-                  <div className="h-full flex items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
-                    <p className="text-sm text-muted-foreground italic text-center px-10">
-                      Not enough data yet. Post more Reels to see your viral growth trends.
+                  <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-white/[0.06] bg-white/[0.02]">
+                    <p className="text-sm text-zinc-500 text-center px-8 max-w-sm">
+                      Sync again after posting more Reels to build a trend line here.
                     </p>
                   </div>
                 )}
@@ -225,18 +350,16 @@ export default function DashboardPage() {
                 <>
                   {(competitors || []).slice(0, 5).map((comp) => {
                     const displayHandle = comp.handle || comp.display_name || 'Competitor'
-                    const initials = displayHandle.charAt(0).toUpperCase()
 
                     return (
                       <div key={comp.id} className="flex items-center gap-3 group">
-                        <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
-                          {comp.profile_picture_url ? (
-                            <img src={comp.profile_picture_url} alt={displayHandle} className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-xs font-bold text-muted-foreground">
-                              {initials}
-                            </div>
-                          )}
+                        <div className="h-10 w-10 rounded-full border border-white/10 overflow-hidden flex-shrink-0">
+                          <CompetitorAvatar
+                            competitorId={comp.id}
+                            handle={displayHandle}
+                            className="h-full w-full"
+                            iconClassName="h-4 w-4"
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">@{displayHandle}</p>
@@ -279,11 +402,11 @@ export default function DashboardPage() {
               ))
             ) : pillars?.data?.length ? (
               pillars.data.map((item, i) => (
-                <div key={i} className="group rounded-2xl border border-white/5 bg-[#09090b] p-6 hover:border-primary/20 transition-all hover:bg-[#0c0c0e]">
+                <div key={i} className="rounded-2xl border border-white/[0.06] bg-[#09090b] p-6 transition-[border-color,background-color,box-shadow] duration-200 ease-out hover:border-orange-500/15 hover:bg-[#0b0b0d] hover:shadow-[0_0_0_1px_rgba(249,115,22,0.06),0_12px_32px_-16px_rgba(0,0,0,0.55)]">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Pillar {i+1}</span>
                     <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">
-                      {item.avg_engagement}% Eng.
+                      <MetricLabel label={`${item.avg_engagement}% Eng.`} help={METRIC_HELP.pillarEngagement} />
                     </div>
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2 capitalize">{item.pillar}</h3>
@@ -317,18 +440,21 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {videos?.data.map((video) => (
+          {isLoadingVideos ? (
+            [1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="aspect-[9/16] rounded-xl border border-white/5 bg-[#09090b] animate-pulse" />
+            ))
+          ) : videos?.data && videos.data.length > 0 ? (
+            videos.data.map((video) => (
             <Link 
               href={`/videos/${video.id}`} 
               key={video.id} 
               className="group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/5 bg-zinc-900 transition-all hover:border-primary/50 cursor-pointer"
             >
-               <img 
-                src={video.thumbnail_url} 
-                alt={video.caption} 
-                className="h-full w-full object-cover opacity-60 transition-transform duration-500 group-hover:scale-110 group-hover:opacity-100" 
-                width={400}
-                height={700}
+               <ReelThumbnail
+                thumbnailUrl={video.thumbnail_url}
+                alt={video.caption || 'Reel'}
+                className="h-full w-full opacity-60 transition-transform duration-500 group-hover:scale-110 group-hover:opacity-100"
               />
               
               {/* Stats Overlay */}
@@ -352,11 +478,13 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Link>
-          ))}
-          {(!videos || videos.data.length === 0) && (
-             [1,2,3,4,5,6].map(i => (
-                <div key={i} className="aspect-[9/16] rounded-xl border border-white/5 bg-[#09090b] animate-pulse" />
-              ))
+            ))
+          ) : (
+            <div className="col-span-full rounded-2xl border border-dashed border-white/10 bg-[#09090b] p-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                No Reels yet. Run New Analysis after connecting Instagram to import your content.
+              </p>
+            </div>
           )}
         </div>
       </div>
