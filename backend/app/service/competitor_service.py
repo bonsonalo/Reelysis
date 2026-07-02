@@ -14,7 +14,10 @@ from app.model.competitor_media import CompetitorMedia
 from app.model.instagram_accounts import InstagramAccount
 from app.model.media_items import MediaItem
 from app.service.transcript_service import run_bulk_transcription_service
-from app.utils.competitor_metrics import engagement_rate_to_rank
+from app.utils.competitor_metrics import (
+    engagement_rate_to_rank,
+    engagement_rank_from_media_metrics,
+)
 
 
 # MVP limits — store up to 10, deep-fetch reels for top 5 only (saves Bright Data + Gemini analysis credits)
@@ -25,14 +28,21 @@ MAX_VIDEOS_PER_COMPETITOR = 5
 # Guardrails for auto-discovery quality (Bright Data can return tiny accounts).
 MIN_COMPETITOR_FOLLOWERS = 100_000
 MIN_COMPETITOR_MEDIA_COUNT = 20
-# Ask Gemini for a few extra handles so enough survive the follower filter.
-GEMINI_HANDLES_TO_REQUEST = 12
+# If nothing passes the ideal bar, relax in steps (Gemini often suggests sub-100k dev accounts).
+DISCOVERY_FOLLOWER_TIERS = (100_000, 50_000, 25_000, 10_000)
+# Ask Gemini for extra handles — Bright Data often omits some; filtering shrinks the list further.
+GEMINI_HANDLES_TO_REQUEST = 15
 # Faster Bright Data polling (was 30s × 10 ≈ 5 min worst case).
 SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15]
 
 MEDIA_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15, 15, 15]
 STALE_QUEUED_DISCOVERY_SECONDS = 180
 STALE_RUNNING_DISCOVERY_SECONDS = 600
+
+# initial = first onboarding discover (may use cached Gemini handles)
+# refresh_suggestions = explicit rediscover (fresh Gemini + replace auto-discovered set)
+DISCOVERY_MODE_INITIAL = "initial"
+DISCOVERY_MODE_REFRESH = "refresh_suggestions"
 
 
 def _utc_now() -> datetime:
@@ -55,8 +65,11 @@ def _discovery_job_age_seconds(job: AnalysisJob, now: datetime | None = None) ->
 
 
 async def reconcile_competitor_discovery_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
-    """Fail or re-dispatch stale competitor_discovery jobs."""
-    if job.job_type != "competitor_discovery" or job.status not in ("queued", "running"):
+    """Fail or re-dispatch stale competitor discovery / resync jobs."""
+    if job.job_type not in ("competitor_discovery", "competitor_resync") or job.status not in (
+        "queued",
+        "running",
+    ):
         return job
 
     now = _utc_now()
@@ -86,12 +99,12 @@ async def reconcile_competitor_discovery_job(job: AnalysisJob, db: AsyncSession)
     return job
 
 
-async def _get_running_discovery_job(user_id: UUID, db: AsyncSession) -> AnalysisJob | None:
+async def _get_running_competitor_job(user_id: UUID, db: AsyncSession) -> AnalysisJob | None:
     stmt = (
         select(AnalysisJob)
         .where(
             AnalysisJob.user_id == user_id,
-            AnalysisJob.job_type == "competitor_discovery",
+            AnalysisJob.job_type.in_(("competitor_discovery", "competitor_resync")),
             AnalysisJob.status.in_(("queued", "running")),
         )
         .order_by(AnalysisJob.created_at.desc())
@@ -104,13 +117,29 @@ async def _get_running_discovery_job(user_id: UUID, db: AsyncSession) -> Analysi
     return None
 
 
+async def _get_running_discovery_job(user_id: UUID, db: AsyncSession) -> AnalysisJob | None:
+    return await _get_running_competitor_job(user_id, db)
+
+
 def _is_manual_competitor(competitor: CompetitorAccount) -> bool:
     meta = competitor.source_metadata or {}
     return meta.get("source") == "manual"
 
 
-def _passes_quality_bar(followers: int, media_count: int) -> bool:
-    return followers >= MIN_COMPETITOR_FOLLOWERS and media_count >= MIN_COMPETITOR_MEDIA_COUNT
+def _passes_quality_bar(
+    followers: int,
+    media_count: int,
+    min_followers: int = MIN_COMPETITOR_FOLLOWERS,
+) -> bool:
+    return followers >= min_followers and media_count >= MIN_COMPETITOR_MEDIA_COUNT
+
+
+def _strictest_follower_tier(followers: int) -> int | None:
+    """Index into DISCOVERY_FOLLOWER_TIERS for the strictest tier this account qualifies for."""
+    for index, tier in enumerate(DISCOVERY_FOLLOWER_TIERS):
+        if followers >= tier:
+            return index
+    return None
 
 
 async def _purge_auto_discovered_competitors(db: AsyncSession, user_id: UUID) -> None:
@@ -170,7 +199,7 @@ async def add_competitor_by_handle_service(user_id: UUID, handle: str, db: Async
 
 async def rediscover_competitors_service(user_id: UUID, db: AsyncSession):
     """
-    Re-run automatic competitor discovery using the confirmed niche.
+    Ask Gemini for fresh competitor handles and replace the auto-discovered set.
     """
     stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
     account = (await db.exec(stmt)).first()
@@ -179,16 +208,65 @@ async def rediscover_competitors_service(user_id: UUID, db: AsyncSession):
     if not account.niche_confirmed:
         raise ValueError("Confirm your niche before discovering competitors.")
 
-    running = await _get_running_discovery_job(user_id, db)
+    running = await _get_running_competitor_job(user_id, db)
     if running:
         logger.info(
-            "Competitor discovery already in progress for user %s (job %s); returning existing job",
+            "Competitor job already in progress for user %s (job %s); returning existing job",
             user_id,
             running.id,
         )
         return running
 
-    return await discover_competitors_service(user_id, account.niche_confirmed, db)
+    from app.service.ai_service import invalidate_competitor_handles_cache_sync
+
+    invalidate_competitor_handles_cache_sync(
+        account.niche_confirmed,
+        account.username,
+    )
+
+    return await discover_competitors_service(
+        user_id,
+        account.niche_confirmed,
+        db,
+        mode=DISCOVERY_MODE_REFRESH,
+    )
+
+
+async def resync_competitors_service(user_id: UUID, db: AsyncSession):
+    """
+    Re-scrape Bright Data profiles for already-tracked competitors (no Gemini, no purge).
+    """
+    running = await _get_running_competitor_job(user_id, db)
+    if running:
+        logger.info(
+            "Competitor job already in progress for user %s (job %s); returning existing job",
+            user_id,
+            running.id,
+        )
+        return running
+
+    stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
+    competitors = (await db.exec(stmt)).all()
+    if not competitors:
+        raise ValueError("No competitors to resync. Run discovery or add handles first.")
+
+    handles = [c.handle for c in competitors]
+    job = AnalysisJob(
+        user_id=user_id,
+        job_type="competitor_resync",
+        status="queued",
+        progress=0,
+        input_payload={"handles": handles},
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    celery_app.send_task(
+        "app.service.competitor_service.poll_competitor_results_task",
+        args=[str(job.id), str(user_id)],
+    )
+    return job
 
 
 @celery_app.task(name="app.service.competitor_service.fetch_competitor_media_task")
@@ -200,23 +278,35 @@ async def _fetch_competitor_media_internal(competitor_id: str, user_id: str):
     async with AsyncSessionLocal() as db:
         try:
             comp_uuid = UUID(competitor_id)
+            # Profile stats first so the UI is not stuck at 0 while reels scrape.
+            await _refresh_competitor_profiles(db, [comp_uuid], force=True)
             await _fetch_all_competitor_media(db, [comp_uuid], UUID(user_id))
-            await _refresh_competitor_profiles(db, [comp_uuid])
+            await _recompute_engagement_from_media(db, comp_uuid)
             await run_bulk_transcription_service(UUID(user_id), db)
         except Exception as e:
             logger.exception(f"Error fetching media for competitor {competitor_id}: {e}")
 
 
-async def discover_competitors_service(user_id: UUID, niche: str, db: AsyncSession):
+async def discover_competitors_service(
+    user_id: UUID,
+    niche: str,
+    db: AsyncSession,
+    mode: str = DISCOVERY_MODE_INITIAL,
+):
     """
     Queue competitor discovery. Returns immediately; Gemini + Bright Data run in Celery.
+    mode=initial allows cached Gemini handles; mode=refresh_suggestions forces fresh handles.
     """
+    running = await _get_running_competitor_job(user_id, db)
+    if running:
+        return running
+
     job = AnalysisJob(
         user_id=user_id,
         job_type="competitor_discovery",
         status="queued",
         progress=0,
-        input_payload={"niche": niche},
+        input_payload={"niche": niche, "mode": mode},
     )
     db.add(job)
     await db.commit()
@@ -262,7 +352,13 @@ async def _poll_results_internal(job_id: str, user_id: str):
             if not job:
                 return
 
+            if job.job_type == "competitor_resync":
+                await _resync_profiles_internal(job, user_id, db)
+                return
+
             niche = job.input_payload.get("niche", "")
+            discovery_mode = job.input_payload.get("mode", DISCOVERY_MODE_INITIAL)
+            force_refresh = discovery_mode == DISCOVERY_MODE_REFRESH
             user_uuid = UUID(user_id)
 
             job.status = "running"
@@ -292,6 +388,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
                 max_handles=GEMINI_HANDLES_TO_REQUEST,
                 fallback_handles=fallback_handles,
                 account_context=account_context,
+                force_refresh=force_refresh,
             )
             if not snapshot_id:
                 raise Exception(search_error or "Failed to trigger competitor search with provider.")
@@ -318,17 +415,22 @@ async def _poll_results_internal(job_id: str, user_id: str):
             if not results:
                 raise Exception("Timed out waiting for competitor discovery data from provider.")
 
-            # STAGE 3: Replace auto-discovered set; only keep accounts meeting quality bar.
+            # STAGE 3: Save best matches — 100k+ first, then fill remaining slots from lower tiers.
             competitor_ids = await _process_and_save_competitors(
                 db,
                 results,
                 user_uuid,
                 suggested_handles=suggested_handles,
             )
+
             if not competitor_ids:
+                from app.service.ai_service import invalidate_competitor_handles_cache_sync
+
+                invalidate_competitor_handles_cache_sync(niche, account_context.get("username"))
                 raise Exception(
-                    f"No competitors met quality bar (min {MIN_COMPETITOR_FOLLOWERS:,} followers, "
-                    f"min {MIN_COMPETITOR_MEDIA_COUNT} posts). Try adding handles manually."
+                    f"No competitors met quality bar (tried down to {DISCOVERY_FOLLOWER_TIERS[-1]:,} "
+                    f"followers, min {MIN_COMPETITOR_MEDIA_COUNT} posts). "
+                    "Try adding handles manually."
                 )
 
             job.status = "succeeded"
@@ -352,6 +454,113 @@ async def _poll_results_internal(job_id: str, user_id: str):
                 await db.commit()
 
 
+async def _resync_profiles_internal(job: AnalysisJob, user_id: str, db: AsyncSession):
+    """Re-scrape tracked competitor profiles via Bright Data without replacing the list."""
+    user_uuid = UUID(user_id)
+    try:
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        handles = list(job.input_payload.get("handles") or [])
+        if not handles:
+            stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_uuid)
+            handles = [c.handle for c in (await db.exec(stmt)).all()]
+
+        if not handles:
+            raise Exception("No competitors to resync.")
+
+        snapshot_id, resync_error = await social_data_client.fetch_profiles_for_handles(handles)
+        if not snapshot_id:
+            raise Exception(resync_error or "Failed to trigger competitor profile resync.")
+
+        job.input_payload = {**job.input_payload, "snapshot_id": snapshot_id}
+        job.progress = 20
+        await db.commit()
+
+        results = None
+        for attempt, delay in enumerate(SNAPSHOT_POLL_DELAYS_SECONDS):
+            if delay:
+                await asyncio.sleep(delay)
+            results = await social_data_client.get_snapshot_results(snapshot_id)
+            if results:
+                break
+            job.progress = min(90, 20 + (attempt + 1) * 8)
+            await db.commit()
+
+        if not results:
+            raise Exception("Timed out waiting for competitor profile resync from provider.")
+
+        updated_ids = await _update_existing_competitors_from_profiles(db, results, user_uuid)
+        if not updated_ids:
+            raise Exception("Could not refresh any tracked competitor profiles.")
+
+        job.status = "succeeded"
+        job.progress = 100
+        job.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        top_ids = [str(cid) for cid in updated_ids[:MAX_COMPETITORS_TO_ANALYZE]]
+        celery_app.send_task(
+            "app.service.competitor_service.fetch_competitor_media_batch_task",
+            args=[top_ids, user_id],
+        )
+    except Exception as e:
+        logger.error("Error in competitor resync task: %s", e)
+        job.status = "failed"
+        job.error_message = str(e)
+        job.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+
+async def _update_existing_competitors_from_profiles(
+    db: AsyncSession,
+    results: list,
+    user_id: UUID,
+) -> list[UUID]:
+    """Update stats for already-tracked competitors from Bright Data profile rows."""
+    from app.core.client.social_data import normalize_competitor_profiles
+
+    profiles = normalize_competitor_profiles(results) if results else []
+    if not profiles:
+        return []
+
+    existing_stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
+    existing_by_handle = {
+        c.handle.lower(): c for c in (await db.exec(existing_stmt)).all()
+    }
+
+    touched_ids: list[UUID] = []
+    for entry in profiles:
+        handle = (entry.get("handle") or "").strip().lstrip("@")
+        if not handle:
+            continue
+        competitor = existing_by_handle.get(handle.lower())
+        if not competitor:
+            logger.info("Resync skipping untracked profile @%s", handle)
+            continue
+
+        followers = int(entry.get("followers_count", 0) or 0)
+        media_count = int(entry.get("media_count", 0) or 0)
+        engagement_rank = engagement_rate_to_rank(entry.get("engagement_rate", 0))
+        competitor.display_name = entry.get("display_name") or competitor.display_name
+        if entry.get("profile_picture_url"):
+            competitor.profile_picture_url = entry.get("profile_picture_url")
+        if followers > 0:
+            competitor.followers_count = followers
+        if media_count > 0:
+            competitor.media_count = media_count
+        if engagement_rank > 0:
+            competitor.engagement_rank = engagement_rank
+        competitor.last_synced_at = datetime.now(timezone.utc)
+        db.add(competitor)
+        touched_ids.append(competitor.id)
+
+    await db.commit()
+    logger.info("Resynced %d tracked competitor profile(s)", len(touched_ids))
+    return touched_ids
+
+
 async def _process_and_save_competitors(
     db: AsyncSession,
     results: list,
@@ -359,8 +568,8 @@ async def _process_and_save_competitors(
     suggested_handles: list[str] | None = None,
 ):
     """
-    Replace auto-discovered competitors with Bright Data profiles that pass quality bar.
-    Returns UUIDs for saved competitors (all >= MIN_COMPETITOR_FOLLOWERS).
+    Replace auto-discovered competitors with Bright Data profiles.
+    Fills slots in tier order: 100k+ accounts first, then 50k+, 25k+, 10k+ for remaining slots.
     """
     from app.core.client.social_data import normalize_competitor_profiles
 
@@ -370,9 +579,24 @@ async def _process_and_save_competitors(
     if not profiles:
         return []
 
+    floor_tier = DISCOVERY_FOLLOWER_TIERS[-1]
     allowed_handles: set[str] | None = None
     if suggested_handles:
         allowed_handles = {h.strip().lstrip("@").lower() for h in suggested_handles if h}
+
+    if allowed_handles:
+        returned_handles = {
+            (e.get("handle") or "").strip().lstrip("@").lower()
+            for e in profiles
+            if e.get("handle")
+        }
+        missing = sorted(allowed_handles - returned_handles)
+        if missing:
+            logger.warning(
+                "Bright Data returned no profile for %d suggested handle(s): %s",
+                len(missing),
+                ", ".join(f"@{h}" for h in missing[:8]),
+            )
 
     existing_stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
     existing_by_handle = {
@@ -405,7 +629,7 @@ async def _process_and_save_competitors(
         existing.last_synced_at = datetime.now(timezone.utc)
         db.add(existing)
 
-    new_candidates: list[dict] = []
+    ranked_candidates: list[tuple[int, dict]] = []
     for entry in profiles:
         handle = (entry.get("handle") or "").strip().lstrip("@")
         if not handle or handle.lower() in existing_by_handle:
@@ -414,33 +638,36 @@ async def _process_and_save_competitors(
             continue
         followers = int(entry.get("followers_count", 0) or 0)
         media_count = int(entry.get("media_count", 0) or 0)
-        if not _passes_quality_bar(followers, media_count):
+        tier_index = _strictest_follower_tier(followers)
+        if tier_index is None or not _passes_quality_bar(followers, media_count, floor_tier):
             logger.info(
                 "Skipping @%s — %s followers, %s posts (min %s / %s)",
                 handle,
                 followers,
                 media_count,
-                MIN_COMPETITOR_FOLLOWERS,
+                floor_tier,
                 MIN_COMPETITOR_MEDIA_COUNT,
             )
             continue
-        new_candidates.append(entry)
+        ranked_candidates.append((tier_index, entry))
 
-    new_candidates.sort(
-        key=lambda e: (
-            int(e.get("followers_count", 0) or 0),
-            engagement_rate_to_rank(e.get("engagement_rate", 0)),
+    # Strictest tier first, then highest followers within that tier.
+    ranked_candidates.sort(
+        key=lambda item: (
+            item[0],
+            -int(item[1].get("followers_count", 0) or 0),
+            -engagement_rate_to_rank(item[1].get("engagement_rate", 0)),
         ),
-        reverse=True,
     )
 
     saved_ids: list[UUID] = []
     manual_count = len(existing_by_handle)
     slots = MAX_COMPETITORS_TO_STORE - manual_count
-    for entry in new_candidates[: max(0, slots)]:
+    for tier_index, entry in ranked_candidates[: max(0, slots)]:
         handle = (entry.get("handle") or "").strip().lstrip("@")
         followers = int(entry.get("followers_count", 0) or 0)
         media_count = int(entry.get("media_count", 0) or 0)
+        min_followers = DISCOVERY_FOLLOWER_TIERS[tier_index]
         engagement_rank = engagement_rate_to_rank(entry.get("engagement_rate", 0))
         competitor = CompetitorAccount(
             user_id=user_id,
@@ -451,7 +678,10 @@ async def _process_and_save_competitors(
             followers_count=followers,
             media_count=media_count,
             engagement_rank=engagement_rank,
-            source_metadata={"source": "auto_discovery"},
+            source_metadata={
+                "source": "auto_discovery",
+                "follower_tier": min_followers,
+            },
             last_synced_at=datetime.now(timezone.utc),
         )
         db.add(competitor)
@@ -460,10 +690,16 @@ async def _process_and_save_competitors(
         existing_by_handle[handle.lower()] = competitor
 
     await db.commit()
+    tier_counts: dict[int, int] = {}
+    for tier_index, entry in ranked_candidates[: len(saved_ids)]:
+        tier_counts[tier_index] = tier_counts.get(tier_index, 0) + 1
     logger.info(
-        "Saved %d auto-discovered competitors (min %s followers)",
+        "Saved %d auto-discovered competitors (tiers: %s)",
         len(saved_ids),
-        MIN_COMPETITOR_FOLLOWERS,
+        {
+            DISCOVERY_FOLLOWER_TIERS[i]: tier_counts.get(i, 0)
+            for i in sorted(tier_counts)
+        },
     )
     return saved_ids
 
@@ -503,32 +739,44 @@ async def _fetch_all_competitor_media(db: AsyncSession, competitor_ids: list[UUI
 async def _enrich_competitor_from_provider_entry(
     db: AsyncSession, competitor_id: UUID, entry: dict
 ) -> None:
-    """Fill in profile stats from Bright Data profile or reel rows when available."""
+    """Fill in profile stats from Bright Data profile rows (not reel/post rows)."""
     competitor = await db.get(CompetitorAccount, competitor_id)
     if not competitor or not entry:
         return
 
-    from app.core.client.social_data import _coerce_int
+    from app.core.client.social_data import _coerce_int, _is_profile_record
 
-    followers = _coerce_int(
-        entry.get("followers")
-        or entry.get("followers_count")
-        or entry.get("follower_count")
-        or entry.get("subscribers")
+    is_profile_row = _is_profile_record(entry) or (
+        "followers_count" in entry and not entry.get("video_url") and not entry.get("description")
     )
-    if followers > competitor.followers_count:
-        competitor.followers_count = followers
 
-    media_count = _coerce_int(entry.get("posts_count") or entry.get("media_count"))
-    if media_count > competitor.media_count:
-        competitor.media_count = media_count
+    if is_profile_row:
+        followers = _coerce_int(
+            entry.get("followers")
+            or entry.get("followers_count")
+            or entry.get("follower_count")
+            or entry.get("subscribers")
+        )
+        if followers > 0:
+            competitor.followers_count = followers
+
+        media_count = _coerce_int(entry.get("posts_count") or entry.get("media_count"))
+        if media_count > 0:
+            competitor.media_count = media_count
+
+        engagement_rank = engagement_rate_to_rank(
+            entry.get("engagement_rate") or entry.get("avg_engagement")
+        )
+        if engagement_rank > 0:
+            competitor.engagement_rank = engagement_rank
 
     picture = (
         entry.get("profile_image_link")
         or entry.get("profile_picture_url")
         or entry.get("profile_pic_url")
+        or entry.get("thumbnail_url")
     )
-    if picture:
+    if picture and (is_profile_row or not competitor.profile_picture_url):
         competitor.profile_picture_url = picture
 
     display_name = entry.get("full_name") or entry.get("display_name") or entry.get("profile_name")
@@ -536,6 +784,27 @@ async def _enrich_competitor_from_provider_entry(
         competitor.display_name = display_name
 
     db.add(competitor)
+
+
+async def _recompute_engagement_from_media(db: AsyncSession, competitor_id: UUID) -> None:
+    """Backfill engagement_rank from saved reel metrics when profile data lacks it."""
+    competitor = await db.get(CompetitorAccount, competitor_id)
+    if not competitor or competitor.engagement_rank > 0:
+        return
+
+    stmt = select(CompetitorMedia).where(CompetitorMedia.competitor_account_id == competitor_id)
+    media_rows = (await db.exec(stmt)).all()
+    if not media_rows:
+        return
+
+    rank = engagement_rank_from_media_metrics(
+        [m.metrics or {} for m in media_rows],
+        competitor.followers_count,
+    )
+    if rank > 0:
+        competitor.engagement_rank = rank
+        db.add(competitor)
+        await db.commit()
 
 
 async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id: UUID, results: list):
@@ -578,20 +847,30 @@ async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id:
     except Exception as e:
         await db.rollback()
         logger.warning("Could not save media for competitor %s: %s", competitor_id, e)
+        return
+
+    await _recompute_engagement_from_media(db, competitor_id)
 
 
-async def _refresh_competitor_profiles(db: AsyncSession, competitor_ids: list[UUID]) -> None:
-    """Fetch Bright Data profile snapshots to backfill follower counts when missing."""
+async def _refresh_competitor_profiles(
+    db: AsyncSession,
+    competitor_ids: list[UUID],
+    *,
+    force: bool = False,
+) -> None:
+    """Fetch Bright Data profile snapshots to backfill or refresh follower counts."""
     snapshots: list[tuple[UUID, str]] = []
     for comp_id in competitor_ids:
         competitor = await db.get(CompetitorAccount, comp_id)
-        if not competitor or competitor.followers_count > 0:
+        if not competitor:
+            continue
+        if not force and competitor.followers_count > 0:
             continue
         snapshot_id = await social_data_client.fetch_profile_snapshot(competitor.handle)
         if snapshot_id:
             snapshots.append((comp_id, snapshot_id))
 
-    for attempt, delay in enumerate(MEDIA_SNAPSHOT_POLL_DELAYS_SECONDS):
+    for attempt, delay in enumerate(SNAPSHOT_POLL_DELAYS_SECONDS):
         if delay and attempt > 0:
             await asyncio.sleep(delay)
         remaining: list[tuple[UUID, str]] = []
@@ -606,6 +885,8 @@ async def _refresh_competitor_profiles(db: AsyncSession, competitor_ids: list[UU
                 profiles = normalize_competitor_profiles(raw)
                 if profiles:
                     await _enrich_competitor_from_provider_entry(db, comp_id, profiles[0])
+                    competitor.last_synced_at = datetime.now(timezone.utc)
+                    db.add(competitor)
             else:
                 remaining.append((comp_id, snapshot_id))
         snapshots = remaining
