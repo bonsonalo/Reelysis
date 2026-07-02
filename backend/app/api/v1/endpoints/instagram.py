@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from uuid import UUID
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse
 from sqlmodel import select
 from app.core.logger import logger
 from app.service.instagram_service import (
@@ -17,7 +17,6 @@ from app.api.dep import db_dependency, user_authentication_dependency
 from fastapi.responses import RedirectResponse
 from app.schema.instagram_schema import NicheConfirmRequest, NicheUpdateRequest
 from app.model.media_items import MediaItem
-from app.utils.cdn_image import fetch_cdn_image
 
 router= APIRouter(
     prefix="/api/v1/instagram", 
@@ -147,7 +146,7 @@ async def get_media_thumbnail(
     current_user: user_authentication_dependency,
     db: db_dependency,
 ):
-    """Proxy Instagram Reel thumbnails (CDN blocks direct browser hotlinking)."""
+    """Redirect to the CDN thumbnail URL (browser loads it; server cannot always reach Instagram CDN)."""
     stmt = select(MediaItem).where(
         MediaItem.id == media_id,
         MediaItem.user_id == current_user["id"],
@@ -156,5 +155,4 @@ async def get_media_thumbnail(
     if not media or not media.thumbnail_url:
         raise HTTPException(status_code=404, detail="Thumbnail not found")
 
-    content, media_type = await fetch_cdn_image(media.thumbnail_url)
-    return Response(content=content, media_type=media_type)
+    return RedirectResponse(url=media.thumbnail_url, status_code=307)
