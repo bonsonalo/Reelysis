@@ -4,6 +4,8 @@ from fastapi import HTTPException
 from app.model.analysis_job import AnalysisJob
 from sqlmodel import select, desc
 from typing import Optional
+from app.service.instagram_service import reconcile_instagram_sync_job
+from app.service.competitor_service import reconcile_competitor_discovery_job
 
 async def get_job_status_service(job_id: UUID, user_id: UUID, db: AsyncSession):
 
@@ -17,6 +19,11 @@ async def get_job_status_service(job_id: UUID, user_id: UUID, db: AsyncSession):
         
     if job.user_id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view this job")
+
+    if job.job_type == "instagram_sync":
+        job = await reconcile_instagram_sync_job(job, db)
+    elif job.job_type == "competitor_discovery":
+        job = await reconcile_competitor_discovery_job(job, db)
         
     return job
 
