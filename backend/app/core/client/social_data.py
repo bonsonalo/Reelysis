@@ -224,14 +224,14 @@ class SocialDataClient:
         max_handles: int = 10,
         fallback_handles: list[str] | None = None,
         account_context: dict | None = None,
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str | None, str | None, list[str]]:
         """
         Discover creators by asking Gemini for handles, then enriching profiles via Bright Data.
-        Returns (snapshot_id, error_message).
+        Returns (snapshot_id, error_message, handles_sent_to_provider).
         """
         if settings.AI_SIMULATION_MODE or not self.api_key:
             logger.info(f"Simulation Mode: Mocking creator search for niche: {niche}")
-            return ("mock_snapshot_id_123", None)
+            return ("mock_snapshot_id_123", None, ["fitness_expert_pro", "gym_daily_tips"])
 
         from app.service.ai_service import suggest_competitor_handles_sync
 
@@ -255,7 +255,7 @@ class SocialDataClient:
 
         if not handles:
             logger.error("No competitor handles for niche: %s", niche)
-            return (None, gemini_error or "No competitor handles available for this niche.")
+            return (None, gemini_error or "No competitor handles available for this niche.", [])
 
         payload = [{"user_name": handle} for handle in handles]
         extra_params = "&type=discover_new&discover_by=user_name"
@@ -266,10 +266,10 @@ class SocialDataClient:
                 payload,
                 extra_params=extra_params,
             )
-            return (snapshot_id, None)
+            return (snapshot_id, None, handles)
         except Exception as e:
             logger.error(f"Error triggering Bright Data profile discovery: {e}")
-            return (None, "Failed to trigger competitor profile fetch with Bright Data.")
+            return (None, "Failed to trigger competitor profile fetch with Bright Data.", [])
 
     async def fetch_profile_snapshot(self, handle: str) -> str | None:
         """Fetch a single Instagram profile by username (followers, posts, avatar)."""
