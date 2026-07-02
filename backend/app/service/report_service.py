@@ -116,6 +116,36 @@ async def get_latest_report_service(user_id: UUID, db: AsyncSession):
         raise HTTPException(status_code=404, detail="No growth strategy found. Start onboarding or trigger a new generation.")
     return report
 
+
+async def list_reports_service(user_id: UUID, db: AsyncSession) -> list[AccountReport]:
+    stmt = (
+        select(AccountReport)
+        .where(AccountReport.user_id == user_id)
+        .order_by(desc(AccountReport.created_at))
+    )
+    return (await db.exec(stmt)).all()
+
+
+async def get_report_by_id_service(report_id: UUID, user_id: UUID, db: AsyncSession) -> AccountReport:
+    report = await db.get(AccountReport, report_id)
+    if not report or report.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+async def get_recommendations_for_report_service(
+    report_id: UUID,
+    user_id: UUID,
+    db: AsyncSession,
+) -> list[Recommendation]:
+    report = await get_report_by_id_service(report_id, user_id, db)
+    stmt = (
+        select(Recommendation)
+        .where(Recommendation.account_report_id == report.id)
+        .order_by(desc(Recommendation.priority))
+    )
+    return (await db.exec(stmt)).all()
+
 async def get_roadmap_service(user_id: UUID, db: AsyncSession):
     """
     Returns the individual actionable recommendations from the user's latest roadmap.
