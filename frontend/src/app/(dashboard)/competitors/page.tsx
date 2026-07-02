@@ -1,18 +1,18 @@
 'use client'
 
-import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
+import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors, useResyncCompetitors } from '@/features/competitors/hooks/useCompetitors'
 import { useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
 import { CompetitorAvatar } from '@/features/competitors/components/CompetitorAvatar'
-import { competitorEngagementBarWidth, formatCompetitorEngagement } from '@/features/competitors/utils'
+import { competitorEngagementBarWidth, formatCompetitorEngagement, shouldShowCompetitorEngagement } from '@/features/competitors/utils'
 import { 
   Users2, 
   Trash2, 
   TrendingUp, 
-  Zap, 
   ExternalLink,
   Search,
   AlertCircle,
+  RefreshCw,
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -41,9 +41,12 @@ export default function CompetitorsPage() {
     refetchInterval: discoveryInProgress ? 5000 : false,
   })
   const { mutate: removeCompetitor, isPending: isRemoving } = useRemoveCompetitor()
-  const { mutate: rediscover, isPending: isRediscovering } = useRediscoverCompetitors()
+  const { mutate: refreshSuggestions, isPending: isRefreshing } = useRediscoverCompetitors()
+  const { mutate: resyncProfiles, isPending: isResyncing } = useResyncCompetitors()
   
   const [searchQuery, setSearchQuery] = useState('')
+  const jobInProgress = discoveryInProgress || isRefreshing || isResyncing
+  const isResyncJob = pendingJob?.job_type === 'competitor_resync'
 
   useEffect(() => {
     if (!pendingJobId || !pendingJob) return
@@ -56,13 +59,18 @@ export default function CompetitorsPage() {
     setPendingJobId(null)
   }, [pendingJobId, pendingJob, queryClient, refetchCompetitors])
 
-  const handleRediscover = () => {
-    if (discoveryInProgress || isRediscovering) return
-    rediscover(undefined, {
-      onSuccess: (data) => {
-        if (data?.job_id) setPendingJobId(String(data.job_id))
-      },
-    })
+  const startJob = (jobId?: string) => {
+    if (jobId) setPendingJobId(String(jobId))
+  }
+
+  const handleRefreshSuggestions = () => {
+    if (jobInProgress) return
+    refreshSuggestions(undefined, { onSuccess: (data) => startJob(data?.job_id) })
+  }
+
+  const handleResyncProfiles = () => {
+    if (jobInProgress || !competitors?.length) return
+    resyncProfiles(undefined, { onSuccess: (data) => startJob(data?.job_id) })
   }
 
   const filteredCompetitors = competitors?.filter(c => 
@@ -95,7 +103,9 @@ export default function CompetitorsPage() {
           </h1>
           <p className="mt-1 text-muted-foreground">
             {discoveryInProgress
-              ? 'Finding competitor accounts for your niche…'
+              ? isResyncJob
+                ? 'Refreshing follower counts and profile stats…'
+                : 'Finding new competitor accounts for your niche…'
               : `Tracking ${competitors?.length || 0} top-performing accounts in your niche.`}
           </p>
           {pendingJob?.status === 'failed' && pendingJob.error_message && (
@@ -121,18 +131,37 @@ export default function CompetitorsPage() {
             <h2 className="text-lg font-bold text-white">Add a competitor</h2>
             <p className="text-sm text-zinc-500">Track any public Instagram account by handle (max 10).</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={handleRediscover}
-            disabled={discoveryInProgress || isRediscovering}
-            className="border-white/10 shrink-0"
-          >
-            {discoveryInProgress || isRediscovering ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              'Re-run auto discovery'
-            )}
-          </Button>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={handleRefreshSuggestions}
+              disabled={jobInProgress}
+              className="border-white/10"
+              title="Ask Gemini for a new list of competitor handles"
+            >
+              {jobInProgress && !isResyncJob ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh suggestions
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleResyncProfiles}
+              disabled={jobInProgress || !competitors?.length}
+              className="border-white/10"
+              title="Update follower counts for your current list (no new handles)"
+            >
+              {jobInProgress && isResyncJob ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Re-sync profiles'
+              )}
+            </Button>
+          </div>
         </div>
         <AddCompetitorForm />
       </div>
@@ -150,7 +179,6 @@ export default function CompetitorsPage() {
                   <CompetitorAvatar
                     competitorId={comp.id}
                     handle={comp.handle}
-                    profilePictureUrl={comp.profile_picture_url}
                     className="h-full w-full"
                     iconClassName="h-8 w-8"
                   />
@@ -188,15 +216,26 @@ export default function CompetitorsPage() {
                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-500">
                   <span>Avg. engagement</span>
                   <span className="text-primary">
-                    {comp.engagement_rank ? `${formatCompetitorEngagement(comp.engagement_rank)}%` : '—'}
+                    {shouldShowCompetitorEngagement(comp.followers_count, comp.engagement_rank)
+                      ? `${formatCompetitorEngagement(comp.engagement_rank)}%`
+                      : '—'}
                   </span>
                </div>
                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-1000" 
-                    style={{ width: `${competitorEngagementBarWidth(comp.engagement_rank)}%` }} 
+                    style={{
+                      width: `${shouldShowCompetitorEngagement(comp.followers_count, comp.engagement_rank)
+                        ? competitorEngagementBarWidth(comp.engagement_rank)
+                        : 0}%`,
+                    }} 
                   />
                </div>
+               {comp.followers_count > 0 && comp.followers_count < 10000 && (
+                 <p className="text-[10px] text-zinc-600 leading-snug">
+                   Engagement % is hidden below 10k followers — small accounts aren&apos;t comparable to large peers.
+                 </p>
+               )}
             </div>
 
             <a 
@@ -214,7 +253,7 @@ export default function CompetitorsPage() {
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
             <AlertCircle className="h-12 w-12 text-zinc-600 mb-4" />
             <h3 className="text-xl font-bold text-white">No competitors tracked yet</h3>
-            <p className="text-zinc-500 mt-2">Add a handle above or re-run auto discovery for your niche.</p>
+            <p className="text-zinc-500 mt-2">Add a handle above, refresh suggestions, or re-sync existing profiles.</p>
           </div>
         )}
       </div>
