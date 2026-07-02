@@ -20,20 +20,132 @@ from app.service.competitor_service import discover_competitors_service
 from app.utils.caption import parse_hashtags_from_caption, top_frequent_hashtags
 
 from cryptography.fernet import Fernet
-from sqlmodel import Session, select
+from sqlmodel import Session, select, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
+
+STALE_QUEUED_SYNC_SECONDS = 15
+STALE_QUEUED_ABANDON_SECONDS = 600
+STALE_RUNNING_SYNC_SECONDS = 120
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _seconds_since_timestamp(ts: datetime, now: datetime | None = None) -> float:
+    """Elapsed seconds since ts. Naive DB datetimes use local wall-clock comparison."""
+    reference = now or _utc_now()
+    if ts.tzinfo is None:
+        ref_naive = reference.astimezone().replace(tzinfo=None) if reference.tzinfo else reference
+        return max(0.0, (ref_naive - ts).total_seconds())
+    ref_utc = _as_utc(reference)
+    return max(0.0, (ref_utc - _as_utc(ts)).total_seconds())  # type: ignore[operator]
+
+
+def _seconds_between(later: datetime, earlier: datetime) -> float:
+    return _seconds_since_timestamp(earlier, later)
+
+
+def _dispatch_sync_celery(job_id: UUID, user_id: UUID) -> None:
+    logger.info("Dispatching instagram sync celery task for job %s user %s", job_id, user_id)
+    celery_app.send_task(
+        "app.service.instagram_service.sync_instagram_data_task",
+        args=[str(job_id), str(user_id)],
+    )
+
+
+def _sync_job_running_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
+    started = job.started_at
+    if started is None or started.year <= 1971:
+        return _seconds_since_timestamp(job.created_at, now)
+    return _seconds_since_timestamp(started, now)
+
+
+async def _has_newer_terminal_sync_job(job: AnalysisJob, db: AsyncSession) -> bool:
+    stmt = (
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.user_id == job.user_id,
+            AnalysisJob.job_type == "instagram_sync",
+            AnalysisJob.id != job.id,
+            AnalysisJob.status.in_(["succeeded", "failed"]),
+            AnalysisJob.created_at > job.created_at,
+        )
+        .limit(1)
+    )
+    return (await db.exec(stmt)).first() is not None
+
+
+async def reconcile_instagram_sync_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
+    """Recover or fail stale instagram_sync jobs during trigger/poll."""
+    if job.job_type != "instagram_sync" or job.status not in ("queued", "running"):
+        return job
+
+    now = _utc_now()
+
+    if job.status == "queued":
+        if await _has_newer_terminal_sync_job(job, db):
+            logger.warning("Failing superseded queued sync job %s", job.id)
+            job.status = "failed"
+            job.error_message = "Sync timed out before starting. Please try again."
+            job.completed_at = now
+            db.add(job)
+            await db.commit()
+            await db.refresh(job)
+            return job
+
+        age = _seconds_since_timestamp(job.created_at, now)
+        if age >= STALE_QUEUED_ABANDON_SECONDS:
+            logger.warning("Failing abandoned queued sync job %s (age %.0fs)", job.id, age)
+            job.status = "failed"
+            job.error_message = "Sync timed out before starting. Please try again."
+            job.completed_at = now
+            db.add(job)
+            await db.commit()
+            await db.refresh(job)
+            return job
+        if age >= STALE_QUEUED_SYNC_SECONDS:
+            logger.warning("Re-dispatching stale queued sync job %s (age %.0fs)", job.id, age)
+            _dispatch_sync_celery(job.id, job.user_id)
+        return job
+
+    running_age = _sync_job_running_age_seconds(job, now)
+    if running_age >= STALE_RUNNING_SYNC_SECONDS:
+        logger.warning("Failing stale running sync job %s (age %.0fs)", job.id, running_age)
+        job.status = "failed"
+        job.error_message = "Sync was interrupted. Please try again."
+        job.completed_at = now
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+    return job
 
 
 def _parse_insight_metrics(insights: dict) -> dict:
     metric_data: dict = {}
     for metric in insights.get("data", []):
         name = metric.get("name")
-        values = metric.get("values") or []
-        if not name or not values:
+        if not name:
             continue
-        metric_data[name] = values[0].get("value", 0)
+
+        total_value = metric.get("total_value")
+        if isinstance(total_value, dict) and total_value.get("value") is not None:
+            metric_data[name] = total_value.get("value", 0)
+            continue
+
+        values = metric.get("values") or []
+        if values:
+            metric_data[name] = values[0].get("value", 0)
     return metric_data
 
 
@@ -157,11 +269,70 @@ async def disconnect_instagram_service(user_id: UUID, db: AsyncSession):
     await db.commit()
     return True
 
+async def _fail_superseded_queued_sync_jobs(user_id: UUID, db: AsyncSession) -> int:
+    """Fail queued sync jobs that were overtaken by a newer completed job."""
+    latest_terminal_stmt = (
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.user_id == user_id,
+            AnalysisJob.job_type == "instagram_sync",
+            AnalysisJob.status.in_(["succeeded", "failed"]),
+        )
+        .order_by(desc(AnalysisJob.created_at))
+        .limit(1)
+    )
+    latest_terminal = (await db.exec(latest_terminal_stmt)).first()
+    if not latest_terminal:
+        return 0
+
+    stale_stmt = select(AnalysisJob).where(
+        AnalysisJob.user_id == user_id,
+        AnalysisJob.job_type == "instagram_sync",
+        AnalysisJob.status == "queued",
+        AnalysisJob.created_at < latest_terminal.created_at,
+    )
+    stale_jobs = (await db.exec(stale_stmt)).all()
+    if not stale_jobs:
+        return 0
+
+    now = _utc_now()
+    for stale_job in stale_jobs:
+        stale_job.status = "failed"
+        stale_job.error_message = "Sync timed out before starting. Please try again."
+        stale_job.completed_at = now
+        db.add(stale_job)
+
+    await db.commit()
+    logger.warning(
+        "Failed %s superseded queued sync jobs for user %s",
+        len(stale_jobs),
+        user_id,
+    )
+    return len(stale_jobs)
+
+
 async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
     stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
     account = (await db.exec(stmt)).first()
     if not account:
         raise ValueError("No Instagram account connected.")
+
+    await _fail_superseded_queued_sync_jobs(user_id, db)
+
+    latest_stmt = (
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.user_id == user_id,
+            AnalysisJob.job_type == "instagram_sync",
+        )
+        .order_by(desc(AnalysisJob.created_at))
+        .limit(1)
+    )
+    latest_job = (await db.exec(latest_stmt)).first()
+    if latest_job and latest_job.status in ("queued", "running"):
+        latest_job = await reconcile_instagram_sync_job(latest_job, db)
+        if latest_job.status in ("queued", "running"):
+            return latest_job
 
     new_job = AnalysisJob(
         user_id=user_id,
@@ -173,10 +344,7 @@ async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
     await db.commit()
     await db.refresh(new_job)
 
-    celery_app.send_task(
-        "app.service.instagram_service.sync_instagram_data_task",
-        args=[str(new_job.id), str(user_id)]
-    )
+    _dispatch_sync_celery(new_job.id, user_id)
 
     return new_job
 
@@ -188,16 +356,85 @@ async def confirm_instagram_niche_service(user_id: UUID, niche: str, db: AsyncSe
     account = (await db.exec(stmt)).first()
     if not account:
         raise ValueError("Instagram account not found.")
-    
-    account.niche_confirmed = niche
+
+    clean_niche = niche.strip()
+    if not clean_niche:
+        raise ValueError("Niche cannot be empty.")
+
+    account.niche_confirmed = clean_niche
+    account.niche_detected = clean_niche
     db.add(account)
     await db.commit()
     await db.refresh(account)
 
-    # Automatically trigger competitor discovery
-    await discover_competitors_service(user_id, niche, db)
-    
+    await discover_competitors_service(user_id, clean_niche, db)
+
     return account
+
+
+async def update_instagram_niche_service(
+    user_id: UUID,
+    niche: str,
+    db: AsyncSession,
+    trigger_discovery: bool = False,
+):
+    """Update confirmed niche from settings without forcing onboarding discovery."""
+    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
+    account = (await db.exec(stmt)).first()
+    if not account:
+        raise ValueError("Instagram account not found.")
+
+    clean_niche = niche.strip()
+    if not clean_niche:
+        raise ValueError("Niche cannot be empty.")
+
+    account.niche_confirmed = clean_niche
+    account.niche_detected = clean_niche
+    db.add(account)
+    await db.commit()
+    await db.refresh(account)
+
+    if trigger_discovery:
+        await discover_competitors_service(user_id, clean_niche, db)
+
+    return account
+
+
+async def detect_instagram_niche_service(user_id: UUID, db: AsyncSession):
+    """Re-run AI niche detection from the user's synced Instagram content."""
+    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
+    account = (await db.exec(stmt)).first()
+    if not account:
+        raise ValueError("Instagram account not found.")
+    if not account.last_synced_at:
+        raise ValueError("Sync your Instagram account first so we can analyze your content.")
+
+    media_stmt = select(MediaItem).where(MediaItem.user_id == user_id).limit(25)
+    media_items = (await db.exec(media_stmt)).all()
+    captions = [item.caption for item in media_items if item.caption]
+    hashtags = top_frequent_hashtags(captions)
+
+    detected = detect_niche_service_sync(
+        account.biography or "",
+        captions,
+        hashtags,
+    )
+    if not detected:
+        raise ValueError(
+            "AI niche detection failed (Gemini quota or API error). "
+            "Set your niche manually or try again later."
+        )
+    account.niche_detected = detected
+    db.add(account)
+    await db.commit()
+    await db.refresh(account)
+
+    return {
+        "niche_detected": detected,
+        "niche_confirmed": account.niche_confirmed,
+        "biography": account.biography,
+        "caption_count": len(captions),
+    }
 
 @celery_app.task(name="app.service.instagram_service.sync_instagram_data_task")
 def sync_instagram_data_task(job_id: str, user_id: str):
@@ -212,6 +449,9 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
         try:
             job = db.get(AnalysisJob, UUID(job_id))
             if not job:
+                return
+            if job.status in ("succeeded", "failed"):
+                logger.info("Sync job %s already %s, skipping", job_id, job.status)
                 return
             job.status = "running"
             job.started_at = datetime.now(timezone.utc)
@@ -254,6 +494,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                 all_captions.append(caption)
                 hashtag_payload = {"names": parse_hashtags_from_caption(caption)}
                 thumbnail_url = item.get("thumbnail_url") or item.get("media_url") or ""
+                audio_url = item.get("media_url") or ""
                 published_at = _parse_media_timestamp(item)
 
                 if not media_item:
@@ -265,6 +506,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                         hashtag=hashtag_payload,
                         permalink=item.get("permalink", ""),
                         thumbnail_url=thumbnail_url,
+                        audio_url=audio_url,
                         published_at=published_at,
                     )
                     db.add(media_item)
@@ -276,11 +518,21 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                     media_item.media_type = item["media_type"]
                     media_item.permalink = item.get("permalink", media_item.permalink)
                     media_item.thumbnail_url = thumbnail_url or media_item.thumbnail_url
+                    if audio_url:
+                        media_item.audio_url = audio_url
                     media_item.published_at = published_at
                     db.add(media_item)
                     db.commit()
 
                 metric_data = _parse_insight_metrics(insights)
+                if not metric_data:
+                    logger.warning(
+                        "No insight metrics parsed for media %s. Raw response keys: %s",
+                        item.get("id"),
+                        list(insights.keys()) if isinstance(insights, dict) else type(insights),
+                    )
+                else:
+                    logger.info("Parsed metrics for media %s: %s", item.get("id"), metric_data)
 
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
@@ -303,15 +555,30 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                 db.commit()
 
             top_hashtags = top_frequent_hashtags(all_captions)
-            logger.info(f"Starting niche detection for user {user_id}")
-            detected_niche = detect_niche_service_sync(
-                account.biography or "",
-                all_captions,
-                top_hashtags,
-            )
-            
-            account.niche_detected = detected_niche
+            if account.niche_confirmed:
+                detected_niche = account.niche_confirmed
+                logger.info(
+                    "Skipping niche detection for user %s (confirmed: %s)",
+                    user_id,
+                    detected_niche,
+                )
+            else:
+                logger.info("Starting niche detection for user %s", user_id)
+                detected_niche = detect_niche_service_sync(
+                    account.biography or "",
+                    all_captions,
+                    top_hashtags,
+                )
+                if detected_niche:
+                    account.niche_detected = detected_niche
+                elif not account.niche_detected:
+                    account.niche_detected = "Uncategorized"
+                    detected_niche = account.niche_detected
+                else:
+                    detected_niche = account.niche_detected
             account.last_synced_at = datetime.now(timezone.utc)
+            account.followers_count = profile_data.get("followers_count", account.followers_count)
+            account.media_count = profile_data.get("media_count", account.media_count)
             
             job.progress = 100
             job.status = "succeeded"
@@ -321,22 +588,11 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             
             logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
             
-            # Trigger video analysis via Celery
-            video_job = AnalysisJob(
-                user_id=UUID(user_id),
-                job_type="video_analysis",
-                status="queued",
-                progress=0
-            )
-            db.add(video_job)
-            db.commit()
-            db.refresh(video_job)
-            
-            celery_app.send_task(
-                "app.service.video_analysis_service.run_video_analysis_task",
-                args=[str(video_job.id), str(user_id)]
-            )
-            logger.info(f"Video analysis triggered for user {user_id}")
+            # Trigger transcription then video analysis via Celery
+            from app.service.transcript_service import enqueue_transcription_for_user
+
+            enqueue_transcription_for_user(db, UUID(user_id))
+            logger.info(f"Transcription triggered for user {user_id}")
 
         except Exception as e:
             logger.exception(f"Error in sync task: {e}")
