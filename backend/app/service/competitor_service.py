@@ -739,11 +739,9 @@ async def _enrich_competitor_from_provider_entry(
     if not competitor or not entry:
         return
 
-    from app.core.client.social_data import _coerce_int, _is_profile_record
+    from app.core.client.social_data import _coerce_int, _is_normalized_profile, _is_profile_record
 
-    is_profile_row = _is_profile_record(entry) or (
-        "followers_count" in entry and not entry.get("video_url") and not entry.get("description")
-    )
+    is_profile_row = _is_profile_record(entry) or _is_normalized_profile(entry)
 
     if is_profile_row:
         followers = _coerce_int(
@@ -755,7 +753,9 @@ async def _enrich_competitor_from_provider_entry(
         if followers > 0:
             competitor.followers_count = followers
 
-        media_count = _coerce_int(entry.get("posts_count") or entry.get("media_count"))
+        media_count = _coerce_int(
+            entry.get("posts_count") or entry.get("media_count") or entry.get("post_count")
+        )
         if media_count > 0:
             competitor.media_count = media_count
 
@@ -769,9 +769,10 @@ async def _enrich_competitor_from_provider_entry(
         entry.get("profile_image_link")
         or entry.get("profile_picture_url")
         or entry.get("profile_pic_url")
-        or entry.get("thumbnail_url")
     )
-    if picture and (is_profile_row or not competitor.profile_picture_url):
+    if not picture and not is_profile_row:
+        picture = entry.get("thumbnail_url")
+    if picture and is_profile_row:
         competitor.profile_picture_url = picture
 
     display_name = entry.get("full_name") or entry.get("display_name") or entry.get("profile_name")
