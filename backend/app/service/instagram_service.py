@@ -395,7 +395,14 @@ async def update_instagram_niche_service(
     await db.refresh(account)
 
     if trigger_discovery:
-        await discover_competitors_service(user_id, clean_niche, db)
+        from app.service.competitor_service import DISCOVERY_MODE_REFRESH
+
+        await discover_competitors_service(
+            user_id,
+            clean_niche,
+            db,
+            mode=DISCOVERY_MODE_REFRESH,
+        )
 
     return account
 
