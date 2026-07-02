@@ -16,7 +16,6 @@ from app.model.media_items import MediaItem
 from app.service.transcript_service import run_bulk_transcription_service
 from app.utils.competitor_metrics import (
     engagement_rate_to_rank,
-    engagement_rank_from_media_metrics,
 )
 
 
@@ -26,10 +25,9 @@ MAX_COMPETITORS_TO_ANALYZE = 5
 MAX_VIDEOS_PER_COMPETITOR = 5
 
 # Guardrails for auto-discovery quality (Bright Data can return tiny accounts).
-MIN_COMPETITOR_FOLLOWERS = 100_000
+MIN_COMPETITOR_FOLLOWERS = 10_000
 MIN_COMPETITOR_MEDIA_COUNT = 20
-# If nothing passes the ideal bar, relax in steps (Gemini often suggests sub-100k dev accounts).
-DISCOVERY_FOLLOWER_TIERS = (100_000, 50_000, 25_000, 10_000)
+DISCOVERY_FOLLOWER_TIERS = (10_000,)
 # Ask Gemini for extra handles — Bright Data often omits some; filtering shrinks the list further.
 GEMINI_HANDLES_TO_REQUEST = 15
 # Faster Bright Data polling (was 30s × 10 ≈ 5 min worst case).
@@ -281,7 +279,6 @@ async def _fetch_competitor_media_internal(competitor_id: str, user_id: str):
             # Profile stats first so the UI is not stuck at 0 while reels scrape.
             await _refresh_competitor_profiles(db, [comp_uuid], force=True)
             await _fetch_all_competitor_media(db, [comp_uuid], UUID(user_id))
-            await _recompute_engagement_from_media(db, comp_uuid)
             await run_bulk_transcription_service(UUID(user_id), db)
         except Exception as e:
             logger.exception(f"Error fetching media for competitor {competitor_id}: {e}")
@@ -415,7 +412,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
             if not results:
                 raise Exception("Timed out waiting for competitor discovery data from provider.")
 
-            # STAGE 3: Save best matches — 100k+ first, then fill remaining slots from lower tiers.
+            # STAGE 3: Save accounts that pass quality bar (min 10k followers, 20 posts).
             competitor_ids = await _process_and_save_competitors(
                 db,
                 results,
@@ -550,8 +547,7 @@ async def _update_existing_competitors_from_profiles(
             competitor.followers_count = followers
         if media_count > 0:
             competitor.media_count = media_count
-        if engagement_rank > 0:
-            competitor.engagement_rank = engagement_rank
+        competitor.engagement_rank = engagement_rank
         competitor.last_synced_at = datetime.now(timezone.utc)
         db.add(competitor)
         touched_ids.append(competitor.id)
@@ -568,8 +564,7 @@ async def _process_and_save_competitors(
     suggested_handles: list[str] | None = None,
 ):
     """
-    Replace auto-discovered competitors with Bright Data profiles.
-    Fills slots in tier order: 100k+ accounts first, then 50k+, 25k+, 10k+ for remaining slots.
+    Replace auto-discovered competitors with Bright Data profiles that pass the quality bar (10k+ followers).
     """
     from app.core.client.social_data import normalize_competitor_profiles
 
@@ -767,7 +762,7 @@ async def _enrich_competitor_from_provider_entry(
         engagement_rank = engagement_rate_to_rank(
             entry.get("engagement_rate") or entry.get("avg_engagement")
         )
-        if engagement_rank > 0:
+        if engagement_rank >= 0:
             competitor.engagement_rank = engagement_rank
 
     picture = (
@@ -784,27 +779,6 @@ async def _enrich_competitor_from_provider_entry(
         competitor.display_name = display_name
 
     db.add(competitor)
-
-
-async def _recompute_engagement_from_media(db: AsyncSession, competitor_id: UUID) -> None:
-    """Backfill engagement_rank from saved reel metrics when profile data lacks it."""
-    competitor = await db.get(CompetitorAccount, competitor_id)
-    if not competitor or competitor.engagement_rank > 0:
-        return
-
-    stmt = select(CompetitorMedia).where(CompetitorMedia.competitor_account_id == competitor_id)
-    media_rows = (await db.exec(stmt)).all()
-    if not media_rows:
-        return
-
-    rank = engagement_rank_from_media_metrics(
-        [m.metrics or {} for m in media_rows],
-        competitor.followers_count,
-    )
-    if rank > 0:
-        competitor.engagement_rank = rank
-        db.add(competitor)
-        await db.commit()
 
 
 async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id: UUID, results: list):
@@ -847,9 +821,6 @@ async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id:
     except Exception as e:
         await db.rollback()
         logger.warning("Could not save media for competitor %s: %s", competitor_id, e)
-        return
-
-    await _recompute_engagement_from_media(db, competitor_id)
 
 
 async def _refresh_competitor_profiles(
