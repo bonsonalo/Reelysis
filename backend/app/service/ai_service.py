@@ -137,15 +137,30 @@ def _cache_competitor_handles_sync(niche: str, handles: list[str]) -> None:
         logger.warning("Could not cache competitor handles: %s", e)
 
 
+def invalidate_competitor_handles_cache_sync(niche: str, username: str | None = None) -> None:
+    """Drop cached Gemini handle suggestions so the next discovery gets a fresh list."""
+    keys = [_niche_handles_cache_key(niche.strip().lower())]
+    if username:
+        keys.append(_niche_handles_cache_key(f"{niche.strip().lower()}:{username}"))
+    try:
+        redis = _get_sync_redis()
+        for key in keys:
+            redis.delete(key)
+        logger.info("Invalidated competitor handle cache for niche=%s", niche[:80])
+    except Exception as e:
+        logger.warning("Could not invalidate competitor handle cache: %s", e)
+
+
 def suggest_competitor_handles_sync(
     niche: str,
     exclude_handle: str | None = None,
     max_handles: int = 10,
     account_context: dict | None = None,
+    force_refresh: bool = False,
 ) -> tuple[list[str], str | None]:
     """
     Suggest public Instagram competitor handles for a niche using Gemini.
-    Returns (handles, error_message). Uses Redis cache to avoid repeat Gemini calls.
+    Returns (handles, error_message). Uses Redis cache unless force_refresh is True.
     """
     if settings.AI_SIMULATION_MODE:
         return (["nike", "adidas", "underarmour", "gymshark", "fitness"][:max_handles], None)
@@ -155,10 +170,11 @@ def suggest_competitor_handles_sync(
         cache_key_suffix = f":{account_context.get('username', '')}"
     cache_lookup_niche = f"{niche.strip().lower()}{cache_key_suffix}"
 
-    cached = get_cached_competitor_handles_sync(cache_lookup_niche, exclude_handle=exclude_handle)
-    if cached:
-        logger.info("Using cached competitor handles for niche: %s", niche)
-        return (cached[:max_handles], None)
+    if not force_refresh:
+        cached = get_cached_competitor_handles_sync(cache_lookup_niche, exclude_handle=exclude_handle)
+        if cached:
+            logger.info("Using cached competitor handles for niche: %s", niche)
+            return (cached[:max_handles], None)
 
     if not settings.GEMINI_API_KEY:
         return ([], "Gemini API key is not configured.")
@@ -189,8 +205,8 @@ def suggest_competitor_handles_sync(
         Requirements — every suggested account MUST:
         1. Post primarily in the SAME specific niche as the creator above (not generic unrelated lifestyle/fashion unless that is the niche)
         2. Be a real, active, public Instagram account that posts Reels regularly
-        3. Have at least 100,000 followers (never suggest accounts below this)
-        4. Be known for strong Reels engagement in this niche
+        3. Have at least 100,000 Instagram followers — we verify follower counts after your response, so do NOT guess. Prefer established creators whose Instagram audience is large (e.g. traversymedia, codewithharry, mkbhd if tech fits — only if they truly have 100k+ on Instagram, not just on YouTube/Twitter)
+        4. Use the exact current Instagram username (no typos, no alternate spellings like fireship.io unless that is the real handle)
         5. Be a realistic peer or aspirational competitor (similar audience, not unrelated mega-celebrities)
 
         {exclude_line}
