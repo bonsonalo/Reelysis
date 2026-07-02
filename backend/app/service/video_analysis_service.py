@@ -14,6 +14,7 @@ from app.model.media_metrics import MediaMetric
 from app.model.video_analysis import VideoAnalysis, MediaSource
 from app.model.analysis_job import AnalysisJob
 from app.service.ai_service import analyze_video_service
+from app.utils.scoring import normalize_score_0_100
 
 async def run_bulk_video_analysis_service(user_id: UUID, db: AsyncSession):
     """
@@ -83,10 +84,12 @@ def _run_analysis_internal(job_id: str, user_id: str):
 
                 analysis_data = asyncio.run(analyze_video_service(
                     caption=item.caption,
-                    transcript=getattr(item, "transcript_text", ""),
+                    transcript=item.transcript_text,
                     hashtags=item.hashtag.get("names", []) if isinstance(item.hashtag, dict) else []
                 ))
                 if analysis_data:
+                    if not (item.transcript_text or "").strip():
+                        analysis_data.confidence = min(analysis_data.confidence, 65)
                     _save_analysis(db, UUID(user_id), MediaSource.OWN, analysis_data, engagement_score=score, media_item_id=item.id)
                 
                 processed_count += 1
@@ -108,6 +111,8 @@ def _run_analysis_internal(job_id: str, user_id: str):
                     hashtags=item.hashtags.get("names", []) if isinstance(item.hashtags, dict) else []
                 ))
                 if analysis_data:
+                    if not (item.transcript_text or "").strip():
+                        analysis_data.confidence = min(analysis_data.confidence, 65)
                     _save_analysis(db, UUID(user_id), MediaSource.COMPETITOR, analysis_data, engagement_score=score, competitor_media_id=item.id)
                 
                 processed_count += 1
@@ -135,8 +140,16 @@ async def get_video_analysis_service(video_id: UUID, user_id: UUID, db: AsyncSes
         raise HTTPException(status_code=404, detail="Video not found")
         
     # 2. Fetch Latest Analysis
-    stmt = select(VideoAnalysis).where(VideoAnalysis.media_item_id == video_id)
+    stmt = (
+        select(VideoAnalysis)
+        .where(VideoAnalysis.media_item_id == video_id)
+        .order_by(desc(VideoAnalysis.created_at))
+        .limit(1)
+    )
     analysis = (await db.exec(stmt)).first()
+    if analysis:
+        analysis.hook_score = normalize_score_0_100(analysis.hook_score)
+        analysis.confidence = normalize_score_0_100(analysis.confidence)
     
     # 3. Fetch Latest Metrics
     m_stmt = select(MediaMetric).where(MediaMetric.media_item_id == video_id).order_by(desc(MediaMetric.captured_at)).limit(1)
@@ -150,9 +163,9 @@ async def get_video_analysis_service(video_id: UUID, user_id: UUID, db: AsyncSes
 
 def _calculate_engagement_score(interactions: int, views: int) -> int:
     """Returns a score from 0-100 representing engagement quality."""
-    if not views or views == 0: return 0
-    score = int((interactions / views) * 100)
-    return min(score, 100)
+    if not views or views == 0:
+        return 0
+    return min(round((interactions / views) * 100), 100)
 
 def _get_unanalyzed_own_media(db: Session, user_id: UUID):
     stmt = select(MediaItem).where(
@@ -177,6 +190,12 @@ def _get_unanalyzed_competitor_media(db: Session, user_id: UUID):
     return result.all()
 
 def _save_analysis(db: Session, user_id: UUID, source: MediaSource, data, engagement_score: int, media_item_id=None, competitor_media_id=None):
+    hook_score = normalize_score_0_100(data.hook_score)
+    confidence = normalize_score_0_100(data.confidence)
+    detail = data.model_dump()
+    detail["hook_score"] = hook_score
+    detail["confidence"] = confidence
+
     analysis = VideoAnalysis(
         user_id=user_id,
         media_source=source,
@@ -185,10 +204,10 @@ def _save_analysis(db: Session, user_id: UUID, source: MediaSource, data, engage
         topic=data.topic,
         category=data.category,
         content_pillar=data.content_pillar,
-        confidence=data.confidence,
-        hook_score=data.hook_score,
+        confidence=confidence,
+        hook_score=hook_score,
         engagement_score=engagement_score,
-        analysis_detail=data.model_dump(),
+        analysis_detail=detail,
         created_at=datetime.now(timezone.utc)
     )
     db.add(analysis)
