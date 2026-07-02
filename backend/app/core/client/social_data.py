@@ -217,6 +217,35 @@ class SocialDataClient:
             logger.info("Bright Data job triggered. snapshot_id=%s dataset=%s", snapshot_id, dataset_id)
             return snapshot_id
 
+    async def fetch_profiles_for_handles(
+        self,
+        handles: list[str],
+    ) -> tuple[str | None, str | None]:
+        """Bright Data profile scrape for a known handle list (no Gemini)."""
+        if settings.AI_SIMULATION_MODE or not self.api_key:
+            return ("mock_snapshot_id_123", None)
+
+        clean_handles = [
+            h.strip().lstrip("@")
+            for h in handles
+            if h and h.strip().lstrip("@")
+        ]
+        if not clean_handles:
+            return (None, "No handles provided for profile resync.")
+
+        payload = [{"user_name": handle} for handle in clean_handles]
+        extra_params = "&type=discover_new&discover_by=user_name"
+        try:
+            snapshot_id = await self._trigger(
+                PROFILE_DATASET_ID,
+                payload,
+                extra_params=extra_params,
+            )
+            return (snapshot_id, None)
+        except Exception as e:
+            logger.error("Error triggering Bright Data profile resync: %s", e)
+            return (None, "Failed to refresh competitor profiles with Bright Data.")
+
     async def search_creators_by_niche(
         self,
         niche: str,
@@ -224,6 +253,7 @@ class SocialDataClient:
         max_handles: int = 10,
         fallback_handles: list[str] | None = None,
         account_context: dict | None = None,
+        force_refresh: bool = False,
     ) -> tuple[str | None, str | None, list[str]]:
         """
         Discover creators by asking Gemini for handles, then enriching profiles via Bright Data.
@@ -240,6 +270,7 @@ class SocialDataClient:
             exclude_handle=exclude_handle,
             max_handles=max_handles,
             account_context=account_context,
+            force_refresh=force_refresh,
         )
         if not handles and fallback_handles:
             handles = [
