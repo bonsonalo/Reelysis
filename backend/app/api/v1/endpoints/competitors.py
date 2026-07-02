@@ -8,6 +8,7 @@ from app.schema.competitor_schema import AddCompetitorRequest
 from app.service.competitor_service import (
     add_competitor_by_handle_service,
     rediscover_competitors_service,
+    resync_competitors_service,
 )
 from sqlmodel import select
 
@@ -58,12 +59,32 @@ async def discover_competitors(
     current_user: user_authentication_dependency,
 ):
     """
-    Re-run automatic competitor discovery for the user's confirmed niche.
+    Ask Gemini for fresh competitor suggestions and replace auto-discovered accounts.
     """
     try:
         job = await rediscover_competitors_service(current_user["id"], db)
         return {
             "message": "Competitor discovery triggered",
+            "job_id": job.id,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/resync")
+async def resync_competitors(
+    db: db_dependency,
+    current_user: user_authentication_dependency,
+):
+    """
+    Re-scrape Instagram stats for already-tracked competitors (no new Gemini suggestions).
+    """
+    try:
+        job = await resync_competitors_service(current_user["id"], db)
+        return {
+            "message": "Competitor profile resync triggered",
             "job_id": job.id,
         }
     except ValueError as e:
