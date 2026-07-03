@@ -11,10 +11,13 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
+  ShieldCheck,
   Play,
   ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { MetricLabel } from '@/components/shared/MetricInfoTip'
+import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
 import { Loader2 } from 'lucide-react'
 
 export default function VideoDetailPage() {
@@ -73,7 +76,12 @@ export default function VideoDetailPage() {
         {/* Left: Video Preview & Primary Stats */}
         <div className="space-y-6">
           <div className="relative aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 bg-zinc-900 shadow-2xl group">
-             <img src={media.thumbnail_url} alt="Video Thumbnail" className="h-full w-full object-cover opacity-80" />
+             <img
+               src={media.thumbnail_url}
+               alt="Video Thumbnail"
+               className="h-full w-full object-cover opacity-80"
+               referrerPolicy="no-referrer"
+             />
              <div className="absolute inset-0 flex items-center justify-center">
                 <div className="h-16 w-16 rounded-full bg-primary/20 backdrop-blur-md border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                    <Play className="h-8 w-8 fill-current ml-1" />
@@ -83,11 +91,15 @@ export default function VideoDetailPage() {
 
           <div className="grid grid-cols-2 gap-4">
              <div className="rounded-2xl border border-white/5 bg-[#09090b] p-4 text-center">
-                <p className="text-[10px] uppercase font-bold text-zinc-500 mb-1">Total Views</p>
+                <div className="text-[10px] uppercase font-bold text-zinc-500 mb-1">
+                  <MetricLabel label="Total Views" help={METRIC_HELP.videoViews} className="justify-center" />
+                </div>
                 <p className="text-2xl font-black text-white">{metrics.view.toLocaleString()}</p>
              </div>
              <div className="rounded-2xl border border-white/5 bg-[#09090b] p-4 text-center">
-                <p className="text-[10px] uppercase font-bold text-zinc-500 mb-1">Engagement</p>
+                <div className="text-[10px] uppercase font-bold text-zinc-500 mb-1">
+                  <MetricLabel label="Engagement" help={METRIC_HELP.videoEngagement} className="justify-center" />
+                </div>
                 <p className="text-2xl font-black text-emerald-500">{analysis.engagement_score}%</p>
              </div>
           </div>
@@ -96,23 +108,38 @@ export default function VideoDetailPage() {
         {/* Right: AI Analysis Deep Dive */}
         <div className="lg:col-span-2 space-y-8">
           {/* Top Scorecard */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 relative overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 relative overflow-visible">
                <Zap className="absolute -top-2 -right-2 h-16 w-16 text-primary/10 -rotate-12" />
-               <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Hook Score</p>
+               <div className="text-xs font-bold text-primary uppercase tracking-widest mb-2">
+                 <MetricLabel label="Hook Score" help={METRIC_HELP.hookScore} />
+               </div>
                <h3 className="text-4xl font-black text-white">{analysis.hook_score}<span className="text-lg text-primary/40">/100</span></h3>
                <p className="text-xs text-zinc-400 mt-2 font-medium">"{detail.hook}"</p>
             </div>
+
+            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
+               <ShieldCheck className="h-5 w-5 text-primary mb-3" />
+               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                 <MetricLabel label="AI Confidence" help={METRIC_HELP.aiConfidence} />
+               </div>
+               <h3 className="text-4xl font-black text-white">{analysis.confidence}<span className="text-lg text-zinc-500">%</span></h3>
+               <p className="text-xs text-zinc-400 mt-2">How certain the model is in this assessment</p>
+            </div>
             
-            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6">
+            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
                <Target className="h-5 w-5 text-primary mb-3" />
-               <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Content Pillar</p>
+               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                 <MetricLabel label="Content Pillar" help={METRIC_HELP.contentPillar} />
+               </div>
                <h3 className="text-xl font-bold text-white capitalize">{analysis.content_pillar}</h3>
             </div>
 
-            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6">
+            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
                <BarChart3 className="h-5 w-5 text-primary mb-3" />
-               <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Pacing</p>
+               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                 <MetricLabel label="Pacing" help={METRIC_HELP.pacing} />
+               </div>
                <h3 className="text-xl font-bold text-white">{detail.pacing}</h3>
             </div>
           </div>
@@ -122,14 +149,26 @@ export default function VideoDetailPage() {
              <div className="rounded-2xl border border-white/5 bg-[#09090b] p-8">
                 <div className="flex items-center gap-3 mb-6">
                    <MessageSquareText className="h-5 w-5 text-primary" />
-                   <h3 className="text-lg font-bold text-white uppercase tracking-tighter">AI Transcript Analysis</h3>
+                   <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Caption &amp; Transcript</h3>
                 </div>
                 <div className="prose prose-invert max-w-none">
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Caption</p>
                    <p className="text-zinc-400 leading-relaxed italic border-l-2 border-primary/30 pl-4 py-1">
                       {media.caption || "No caption available."}
                    </p>
-                   <p className="mt-4 text-white leading-relaxed font-medium">
-                      {media.transcript_text || "Audio analysis pending..."}
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mt-6 mb-2">Transcript</p>
+                   {media.transcript_source && media.transcript_source !== 'none' && media.transcript_text && (
+                     <p className="text-[10px] text-zinc-600 mb-2">
+                       Source: {media.transcript_source}
+                     </p>
+                   )}
+                   {(!media.transcript_text || media.transcript_source === 'none') && (
+                     <p className="text-[10px] text-amber-500/80 mb-2">
+                       Metadata-only analysis — no spoken transcript available.
+                     </p>
+                   )}
+                   <p className="text-white leading-relaxed font-medium">
+                      {media.transcript_text || "Transcript not available — analysis used caption and metrics only."}
                    </p>
                 </div>
              </div>
