@@ -5,6 +5,7 @@ export interface DashboardStats {
   avg_reach: number;
   avg_engagement: number;
   top_hook_score: number;
+  top_analysis_confidence: number;
   views_change: string;
   reach_change: string;
   engagement_change: string;
