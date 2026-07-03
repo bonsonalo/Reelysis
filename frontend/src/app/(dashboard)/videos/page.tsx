@@ -57,6 +57,7 @@ export default function AllVideosPage() {
              <img 
               src={video.thumbnail_url} 
               alt={video.caption} 
+              referrerPolicy="no-referrer"
               className="h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110 group-hover:opacity-100" 
             />
             
