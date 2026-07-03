@@ -30,12 +30,12 @@ MIN_COMPETITOR_MEDIA_COUNT = 20
 DISCOVERY_FOLLOWER_TIERS = (10_000,)
 # Ask Gemini for extra handles — Bright Data often omits some; filtering shrinks the list further.
 GEMINI_HANDLES_TO_REQUEST = 15
-# Faster Bright Data polling (was 30s × 10 ≈ 5 min worst case).
-SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15]
+# Bright Data batch profile scrapes often need 5–10 min; 202 until all handles are ready.
+PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 15, 20, 25, 30] + [30] * 12 + [45] * 4
 
 MEDIA_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15, 15, 15]
 STALE_QUEUED_DISCOVERY_SECONDS = 180
-STALE_RUNNING_DISCOVERY_SECONDS = 600
+STALE_RUNNING_DISCOVERY_SECONDS = 720
 
 # initial = first onboarding discover (may use cached Gemini handles)
 # refresh_suggestions = explicit rediscover (fresh Gemini + replace auto-discovered set)
@@ -398,15 +398,21 @@ async def _poll_results_internal(job_id: str, user_id: str):
             job.progress = 10
             await db.commit()
 
-            # STAGE 2: Wait for profile snapshot (fast poll: 0s, 5s, 8s, ...)
+            # STAGE 2: Wait for profile snapshot (~4 min max)
             results = None
-            for attempt, delay in enumerate(SNAPSHOT_POLL_DELAYS_SECONDS):
+            for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
                 if delay:
                     await asyncio.sleep(delay)
                 results = await social_data_client.get_snapshot_results(snapshot_id)
-                if results:
+                if results is not None:
                     break
-                job.progress = min(90, 10 + (attempt + 1) * 8)
+                logger.info(
+                    "Bright Data profile snapshot %s not ready (attempt %d/%d)",
+                    snapshot_id,
+                    attempt + 1,
+                    len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS),
+                )
+                job.progress = min(90, 10 + (attempt + 1) * 7)
                 await db.commit()
 
             if not results:
@@ -476,17 +482,26 @@ async def _resync_profiles_internal(job: AnalysisJob, user_id: str, db: AsyncSes
         await db.commit()
 
         results = None
-        for attempt, delay in enumerate(SNAPSHOT_POLL_DELAYS_SECONDS):
+        for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
             if delay:
                 await asyncio.sleep(delay)
             results = await social_data_client.get_snapshot_results(snapshot_id)
-            if results:
+            if results is not None:
                 break
-            job.progress = min(90, 20 + (attempt + 1) * 8)
+            logger.info(
+                "Bright Data resync snapshot %s not ready (attempt %d/%d)",
+                snapshot_id,
+                attempt + 1,
+                len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS),
+            )
+            job.progress = min(90, 20 + (attempt + 1) * 7)
             await db.commit()
 
-        if not results:
-            raise Exception("Timed out waiting for competitor profile resync from provider.")
+        if results is None:
+            raise Exception(
+                "Timed out waiting for competitor profile resync from provider "
+                "(Bright Data can take up to a few minutes — try again)."
+            )
 
         updated_ids = await _update_existing_competitors_from_profiles(db, results, user_uuid)
         if not updated_ids:
@@ -842,7 +857,7 @@ async def _refresh_competitor_profiles(
         if snapshot_id:
             snapshots.append((comp_id, snapshot_id))
 
-    for attempt, delay in enumerate(SNAPSHOT_POLL_DELAYS_SECONDS):
+    for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
         if delay and attempt > 0:
             await asyncio.sleep(delay)
         remaining: list[tuple[UUID, str]] = []
