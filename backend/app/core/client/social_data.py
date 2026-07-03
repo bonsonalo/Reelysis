@@ -412,6 +412,7 @@ class SocialDataClient:
             try:
                 response = await client.get(url, headers=self._headers())
                 if response.status_code == 202:
+                    logger.debug("Bright Data snapshot %s still processing (202)", snapshot_id)
                     return None
                 if response.status_code >= 400:
                     logger.error(
