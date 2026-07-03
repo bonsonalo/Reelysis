@@ -1,28 +1,121 @@
 'use client'
 
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { useDisconnectInstagram } from '@/features/instagram/hooks/useDisconnectInstagram'
+import { useDetectNiche, useUpdateNiche } from '@/features/instagram/hooks/useNiche'
 import { useAuth } from '@/store/hook'
 import { 
   User, 
   Camera, 
   ShieldCheck, 
-  Trash2, 
   AlertCircle,
-  LogOut,
+  Loader2,
+  Sparkles,
   Mail,
   Lock,
-  Globe
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { formatLastSynced } from '@/lib/utils'
+
+type SettingsTab = 'profile' | 'account' | 'security'
+
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return value === 'profile' || value === 'account' || value === 'security'
+}
 
 export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-4xl mx-auto px-4 py-8 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
+  )
+}
+
+function SettingsContent() {
+  const searchParams = useSearchParams()
   const { data: accounts } = useInstagramAccounts()
   const { mutate: disconnect, isPending: isDisconnecting } = useDisconnectInstagram()
+  const { mutate: detectNiche, isPending: isDetectingNiche } = useDetectNiche()
+  const { mutate: updateNiche, isPending: isUpdatingNiche } = useUpdateNiche()
   const { currentUser } = useAuth()
   const account = accounts?.[0]
-  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'security'>('profile')
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
+  const [nicheDraft, setNicheDraft] = useState('')
+  const [nicheMessage, setNicheMessage] = useState<string | null>(null)
+  const [nicheError, setNicheError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (isSettingsTab(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'account') return
+    if (typeof window === 'undefined' || window.location.hash !== '#content-niche') return
+    const el = document.getElementById('content-niche')
+    if (el) {
+      window.requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }, [searchParams, activeTab])
+
+  useEffect(() => {
+    if (account) {
+      setNicheDraft(account.niche_confirmed || account.niche_detected || '')
+    }
+  }, [account?.niche_confirmed, account?.niche_detected])
+
+  const handleDetectNiche = () => {
+    setNicheError(null)
+    setNicheMessage(null)
+    detectNiche(undefined, {
+      onSuccess: (data) => {
+        setNicheDraft(data.niche_detected)
+        setNicheMessage(`AI detected: "${data.niche_detected}" from ${data.caption_count} synced caption(s). Save to apply.`)
+      },
+      onError: (err: unknown) => {
+        const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        setNicheError(typeof message === 'string' ? message : 'Could not detect niche. Try again later.')
+      },
+    })
+  }
+
+  const handleSaveNiche = (triggerDiscovery: boolean) => {
+    setNicheError(null)
+    setNicheMessage(null)
+    const trimmed = nicheDraft.trim()
+    if (!trimmed) {
+      setNicheError('Niche cannot be empty.')
+      return
+    }
+    updateNiche(
+      { niche: trimmed, trigger_discovery: triggerDiscovery },
+      {
+        onSuccess: () => {
+          setNicheMessage(
+            triggerDiscovery
+              ? 'Niche saved. Competitor discovery started in the background.'
+              : 'Niche saved. Re-run discovery on the Competitors page when ready.'
+          )
+        },
+        onError: (err: unknown) => {
+          const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          setNicheError(typeof message === 'string' ? message : 'Failed to save niche.')
+        },
+      },
+    )
+  }
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: User },
@@ -43,7 +136,7 @@ export default function SettingsPage() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                 activeTab === tab.id 
                   ? 'bg-primary text-black' 
@@ -100,11 +193,73 @@ export default function SettingsPage() {
                           <div>
                              <p className="font-bold text-white">@{account.username}</p>
                              <p className="text-xs text-zinc-500">Connected via Meta Business API</p>
+                             <p className="text-xs text-zinc-400 mt-1">
+                               Last synced: {formatLastSynced(account.last_synced_at)}
+                             </p>
                           </div>
                        </div>
                        <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
                           Active
                        </div>
+                    </div>
+
+                    <div
+                      id="content-niche"
+                      className="rounded-2xl border border-white/10 bg-black p-6 space-y-4 scroll-mt-24"
+                    >
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Content niche</h4>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Competitor discovery uses this niche. If you onboarded in mock mode, re-detect from your real Reels.
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        value={nicheDraft}
+                        onChange={(e) => setNicheDraft(e.target.value)}
+                        placeholder="e.g. Home Decor & DIY"
+                        className="w-full h-12 rounded-xl bg-[#09090b] border border-white/10 px-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary/50"
+                      />
+                      {account.niche_detected && account.niche_detected !== nicheDraft && (
+                        <p className="text-xs text-zinc-500">
+                          Last AI detection: <span className="text-zinc-300">{account.niche_detected}</span>
+                        </p>
+                      )}
+                      {nicheMessage && <p className="text-xs text-emerald-400">{nicheMessage}</p>}
+                      {nicheError && <p className="text-xs text-red-400">{nicheError}</p>}
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-white/10"
+                          onClick={handleDetectNiche}
+                          disabled={isDetectingNiche}
+                        >
+                          {isDetectingNiche ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4" />
+                              Re-detect with AI
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleSaveNiche(false)}
+                          disabled={isUpdatingNiche}
+                        >
+                          {isUpdatingNiche ? 'Saving…' : 'Save niche'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => handleSaveNiche(true)}
+                          disabled={isUpdatingNiche}
+                        >
+                          Save & re-discover
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 flex gap-3">
