@@ -1,8 +1,15 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/axios';
+import { generateReport } from '../api';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const useGenerateRoadmap = () => {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post('/api/v1/analysis/report/generate'),
+    mutationFn: () => generateReport(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['latest-report'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis-job', 'report_generation'] });
+    },
   });
 };
