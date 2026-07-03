@@ -112,17 +112,17 @@ export function GrowthChart({ data }: GrowthChartProps) {
 
         <Line
           dataKey="reach"
-          type="linear"
+          type="monotone"
           stroke="var(--color-reach)"
           strokeWidth={1.5}
           dot={
             showDots
-              ? { r: 3, fill: "#09090b", stroke: "var(--color-reach)", strokeWidth: 2 }
+              ? { r: 3, fill: "#0a0a0a", stroke: "var(--color-reach)", strokeWidth: 2 }
               : false
           }
           activeDot={{
             r: 4,
-            fill: "#09090b",
+            fill: "#0a0a0a",
             stroke: "var(--color-reach)",
             strokeWidth: 2,
           }}
@@ -143,18 +143,18 @@ export function GrowthChart({ data }: GrowthChartProps) {
 
         <Line
           dataKey="views"
-          type="linear"
+          type="monotone"
           stroke="var(--color-views)"
           strokeWidth={2}
           dot={
             showDots
-              ? { r: 3.5, fill: "#09090b", stroke: "var(--color-views)", strokeWidth: 2 }
+              ? { r: 3.5, fill: "#0a0a0a", stroke: "var(--color-views)", strokeWidth: 2 }
               : false
           }
           activeDot={{
             r: 5,
             fill: "#f97316",
-            stroke: "#09090b",
+            stroke: "#0a0a0a",
             strokeWidth: 2,
           }}
           isAnimationActive={false}
