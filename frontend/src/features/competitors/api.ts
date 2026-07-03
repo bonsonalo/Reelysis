@@ -17,3 +17,11 @@ export const getCompetitors = () => {
 export const removeCompetitor = (id: string) => {
   return api.delete(`/api/v1/competitors/${id}`)
 }
+
+export const addCompetitor = (handle: string) => {
+  return api.post<CompetitorAccount>('/api/v1/competitors/', { handle })
+}
+
+export const rediscoverCompetitors = () => {
+  return api.post<{ message: string; job_id: string }>('/api/v1/competitors/discover')
+}
