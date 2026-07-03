@@ -1,54 +1,177 @@
 "use client"
 
-import { CartesianGrid, XAxis, YAxis, Line, LineChart, ResponsiveContainer } from "recharts"
+import { useMemo } from "react"
+import { CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis } from "recharts"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import { GrowthDataPoint } from "@/features/dashboard/api"
+
+const chartConfig = {
+  views: {
+    label: "Views",
+    color: "#f97316",
+  },
+  reach: {
+    label: "Reach",
+    color: "#d4d4d8",
+  },
+} satisfies ChartConfig
+
+function formatAxisValue(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`
+  return `${value}`
+}
+
+function formatTooltipValue(value: number) {
+  return value.toLocaleString()
+}
+
+/** Drop leading days with no views when later days have real counts (stale sync rows). */
+function prepareChartData(data: GrowthDataPoint[]) {
+  if (data.length === 0) return []
+  const firstWithViews = data.findIndex((p) => p.views > 0)
+  if (firstWithViews > 0) return data.slice(firstWithViews)
+  return data
+}
+
+/** Round up to a clean axis max so 117 doesn't sit on the top edge. */
+function computeYMax(points: GrowthDataPoint[]) {
+  const peak = Math.max(...points.flatMap((d) => [d.views, d.reach]), 0)
+  if (peak === 0) return 100
+  const magnitude = 10 ** Math.floor(Math.log10(peak))
+  return Math.ceil((peak * 1.2) / magnitude) * magnitude
+}
 
 interface GrowthChartProps {
   data: GrowthDataPoint[]
 }
 
 export function GrowthChart({ data }: GrowthChartProps) {
+  const chartData = useMemo(() => prepareChartData(data), [data])
+  const yMax = useMemo(() => computeYMax(chartData), [chartData])
+  const showDots = chartData.length <= 14
+  const showEndLabels = chartData.length <= 8
+
+  if (chartData.length === 0) return null
+
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ChartContainer
+      config={chartConfig}
+      className="h-full w-full aspect-auto select-none [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_svg]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
+      onMouseDown={(e) => e.preventDefault()}
+    >
       <LineChart
-        data={data}
-        margin={{
-          left: 10,
-          right: 10,
-          top: 10,
-          bottom: 10
-        }}
+        data={chartData}
+        margin={{ top: 16, right: showEndLabels ? 36 : 8, left: 0, bottom: 0 }}
       >
-        <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.1} />
+        <CartesianGrid
+          vertical={false}
+          stroke="rgba(255,255,255,0.04)"
+          strokeWidth={1}
+        />
+
         <XAxis
           dataKey="date"
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
-          minTickGap={32}
-          tick={{ fill: '#888', fontSize: 12 }}
+          tickMargin={12}
+          minTickGap={24}
+          tick={{ fill: "#71717a", fontSize: 11 }}
         />
-        <YAxis 
+
+        <YAxis
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tick={{ fill: '#888', fontSize: 12 }}
+          width={48}
+          domain={[0, yMax]}
+          allowDataOverflow={false}
+          tick={{ fill: "#52525b", fontSize: 11 }}
+          tickFormatter={formatAxisValue}
         />
+
+        <ChartTooltip
+          cursor={{ stroke: "rgba(255,255,255,0.06)", strokeWidth: 1, strokeDasharray: "4 4" }}
+          content={
+            <ChartTooltipContent
+              className="border-white/10 bg-zinc-950 shadow-lg"
+              indicator="dot"
+              labelFormatter={(label) => label}
+              formatter={(value, name) => [
+                formatTooltipValue(Number(value)),
+                chartConfig[name as keyof typeof chartConfig]?.label ?? name,
+              ]}
+            />
+          }
+        />
+
         <Line
           dataKey="reach"
-          type="monotone"
-          stroke="#10b981"
-          strokeWidth={2}
-          dot={false}
-        />
+          type="linear"
+          stroke="var(--color-reach)"
+          strokeWidth={1.5}
+          dot={
+            showDots
+              ? { r: 3, fill: "#09090b", stroke: "var(--color-reach)", strokeWidth: 2 }
+              : false
+          }
+          activeDot={{
+            r: 4,
+            fill: "#09090b",
+            stroke: "var(--color-reach)",
+            strokeWidth: 2,
+          }}
+          isAnimationActive={false}
+        >
+          {showEndLabels && (
+            <LabelList
+              dataKey="reach"
+              position="right"
+              offset={8}
+              formatter={(value: number, _entry, index) =>
+                index === chartData.length - 1 ? formatAxisValue(Number(value)) : ""
+              }
+              className="fill-zinc-400 text-[10px] font-medium"
+            />
+          )}
+        </Line>
+
         <Line
           dataKey="views"
-          type="monotone"
-          stroke="#8b5cf6"
+          type="linear"
+          stroke="var(--color-views)"
           strokeWidth={2}
-          dot={false}
-        />
+          dot={
+            showDots
+              ? { r: 3.5, fill: "#09090b", stroke: "var(--color-views)", strokeWidth: 2 }
+              : false
+          }
+          activeDot={{
+            r: 5,
+            fill: "#f97316",
+            stroke: "#09090b",
+            strokeWidth: 2,
+          }}
+          isAnimationActive={false}
+        >
+          {showEndLabels && (
+            <LabelList
+              dataKey="views"
+              position="right"
+              offset={8}
+              formatter={(value: number, _entry, index) =>
+                index === chartData.length - 1 ? formatAxisValue(Number(value)) : ""
+              }
+              className="fill-[#f97316] text-[10px] font-semibold"
+            />
+          )}
+        </Line>
       </LineChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   )
 }
