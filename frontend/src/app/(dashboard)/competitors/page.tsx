@@ -104,8 +104,8 @@ export default function CompetitorsPage() {
           <p className="mt-1 text-muted-foreground">
             {discoveryInProgress
               ? isResyncJob
-                ? 'Refreshing follower counts and profile stats…'
-                : 'Finding new competitor accounts for your niche…'
+                ? 'Refreshing follower counts and profile stats — batch scrape can take up to ~10 minutes. You can stay on this page or come back.'
+                : 'Finding new competitor accounts for your niche — batch scrape can take up to ~10 minutes.'
               : `Tracking ${competitors?.length || 0} top-performing accounts in your niche.`}
           </p>
           {pendingJob?.status === 'failed' && pendingJob.error_message && (
@@ -153,7 +153,7 @@ export default function CompetitorsPage() {
               onClick={handleResyncProfiles}
               disabled={jobInProgress || !competitors?.length}
               className="border-white/10"
-              title="Update follower counts for your current list (no new handles)"
+              title="Update follower counts for your current list (one batch job; may take up to ~10 min)"
             >
               {jobInProgress && isResyncJob ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
