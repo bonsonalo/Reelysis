@@ -12,6 +12,7 @@ interface AnalyzingStepProps {
   title?: string
   description?: string
   tasks?: Task[]
+  progressPercent?: number
   children?: React.ReactNode
 }
 
@@ -24,8 +25,14 @@ export function AnalyzingStep({
     { label: "Transcribing audio content", status: "pending" },
     { label: "Detecting content pillars", status: "pending" },
   ],
+  progressPercent,
   children
 }: AnalyzingStepProps) {
+  const completedRatio =
+    progressPercent !== undefined
+      ? progressPercent
+      : (tasks.filter((t) => t.status === 'completed').length / tasks.length) * 100
+
   return (
     <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center px-4 animate-in fade-in duration-500">
       <div className="w-full max-w-md space-y-8">
@@ -67,9 +74,14 @@ export function AnalyzingStep({
           <div className="h-1 w-full bg-zinc-900">
              <div 
               className="h-full bg-primary transition-all duration-1000 ease-in-out" 
-              style={{ width: `${(tasks.filter(t => t.status === 'completed').length / tasks.length) * 100}%` }} 
+              style={{ width: `${completedRatio}%` }} 
              />
           </div>
+          {progressPercent !== undefined && (
+            <div className="px-6 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+              {Math.round(completedRatio)}%
+            </div>
+          )}
         </div>
 
         {children && (
