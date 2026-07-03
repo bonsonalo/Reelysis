@@ -9,8 +9,9 @@ import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAcc
 import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
 import { useConfirmNiche } from '@/features/instagram/hooks/useConfirmNiche'
 import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
-import { useAnalysisJob } from '@/features/instagram/hooks/useAnalysisJob'
+import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
+import { getReportGenerationUi } from '@/features/reports/utils/reportGenerationProgress'
 
 // Components
 import { ConnectStep } from './components/ConnectStep'
@@ -99,12 +100,24 @@ function OnboardingContent() {
     }
   })
 
-  const { data: roadmapJob } = useAnalysisJob('report_generation', {
+  const [pendingReportJobId, setPendingReportJobId] = useState<string | null>(null)
+
+  const { data: roadmapJobById } = useAnalysisJobById(pendingReportJobId, {
     refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
-    }
+    },
   })
+
+  const { data: roadmapJobLatest } = useAnalysisJob('report_generation', {
+    enabled: !pendingReportJobId,
+    refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
+      const data = query.state.data
+      return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
+    },
+  })
+
+  const roadmapJob = pendingReportJobId ? roadmapJobById : roadmapJobLatest
 
   // 2. Mutations
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
@@ -127,12 +140,6 @@ function OnboardingContent() {
     { label: "Querying Market Database", status: "completed" as any },
     { label: "Identifying High-Growth Profiles", status: discoveryJob?.status === "succeeded" ? "completed" : "running" as any },
     { label: "Calculating Engagement Strength", status: discoveryJob?.status === "succeeded" ? "completed" : "pending" as any },
-  ]
-
-  const roadmapTasks = [
-    { label: "Synthesizing Competitor Data", status: "completed" as any },
-    { label: "Drafting Actionable Recommendations", status: roadmapJob?.status === "succeeded" ? "completed" : "running" as any },
-    { label: "Finalizing Viral Roadmap", status: roadmapJob?.status === "succeeded" ? "completed" : "pending" as any },
   ]
 
   // 3. Flow Logic
@@ -197,9 +204,12 @@ function OnboardingContent() {
 
   const handleFinishOnboarding = () => {
     generateRoadmap(undefined, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        if (data?.job_id) {
+          setPendingReportJobId(String(data.job_id))
+        }
         setStep('GENERATING_ROADMAP')
-      }
+      },
     })
   }
 
@@ -312,22 +322,29 @@ function OnboardingContent() {
         />
       )
     
-    case 'GENERATING_ROADMAP':
+    case 'GENERATING_ROADMAP': {
       const isRoadmapFailed = roadmapJob?.status === 'failed'
+      const roadmapUi = getReportGenerationUi(roadmapJob?.progress ?? 0, roadmapJob?.status)
       return (
         <AnalyzingStep 
-          title={isRoadmapFailed ? "Strategy Generation Failed" : "Strategy Synthesis"} 
-          description={isRoadmapFailed 
-            ? "AI report generation encountered an error. You can retry or skip this step." 
-            : "Compiling market trends and profile data into a final roadmap." 
-          }
-          tasks={roadmapTasks}
+          title={isRoadmapFailed ? "Strategy Generation Failed" : "Building Your Strategy"} 
+          description={roadmapUi.description}
+          tasks={roadmapUi.tasks}
+          progressPercent={roadmapUi.progressPercent}
         >
+          {isRoadmapFailed && roadmapJob?.error_message && (
+            <p className="text-sm text-red-400 text-center max-w-md mb-4">{roadmapJob.error_message}</p>
+          )}
           {isRoadmapFailed && (
             <div className="flex gap-4 mt-8">
               <Button 
                 onClick={() => generateRoadmap(undefined, {
-                  onSuccess: () => setStep('GENERATING_ROADMAP')
+                  onSuccess: (data) => {
+                    if (data?.job_id) {
+                      setPendingReportJobId(String(data.job_id))
+                    }
+                    setStep('GENERATING_ROADMAP')
+                  },
                 })}
                 className="h-12 px-8 text-lg font-bold"
               >
@@ -344,6 +361,7 @@ function OnboardingContent() {
           )}
         </AnalyzingStep>
       )
+    }
     
     case 'COMPLETED':
       return (
