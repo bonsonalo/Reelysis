@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCompetitors, removeCompetitor } from '../api'
+import { getCompetitors, removeCompetitor, addCompetitor, rediscoverCompetitors } from '../api'
 
 export const useCompetitors = (options?: { refetchInterval?: number | false | ((query: any) => number | false | undefined) }) => {
   return useQuery({
@@ -19,5 +19,26 @@ export const useRemoveCompetitor = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['competitors'] })
     }
+  })
+}
+
+export const useAddCompetitor = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (handle: string) => addCompetitor(handle).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competitors'] })
+    },
+  })
+}
+
+export const useRediscoverCompetitors = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => rediscoverCompetitors().then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analysis-job', 'competitor_discovery'] })
+      queryClient.invalidateQueries({ queryKey: ['competitors'] })
+    },
   })
 }
