@@ -7,6 +7,9 @@ PROFILE_DATASET_ID = "gd_l1vikfch901nx3by4"
 POSTS_DATASET_ID = "gd_lk5ns7kz21pck8jpis"
 REELS_DATASET_ID = "gd_lyclm20il4r5helnj"
 
+# Known handles: scrape the profile URL directly (skip username discovery crawl).
+PROFILE_COLLECT_BY_URL_PARAMS = "&discover_by=url"
+
 
 def _coerce_int(value) -> int:
     if value is None:
@@ -191,10 +194,18 @@ def normalize_competitor_media(raw_results: list) -> list[dict]:
     return normalized
 
 
+def instagram_profile_url(handle: str) -> str:
+    clean = handle.strip().lstrip("@")
+    return f"https://www.instagram.com/{clean}/"
+
+
 class SocialDataClient:
     def __init__(self):
         self.api_key = settings.BRIGHT_DATA_API_KEY
         self.base_url = "https://api.brightdata.com/datasets/v3"
+
+    def _profile_urls_payload(self, handles: list[str]) -> list[dict]:
+        return [{"url": instagram_profile_url(handle)} for handle in handles]
 
     def _headers(self) -> dict:
         return {
@@ -233,17 +244,16 @@ class SocialDataClient:
         if not clean_handles:
             return (None, "No handles provided for profile resync.")
 
-        payload = [{"user_name": handle} for handle in clean_handles]
-        extra_params = "&type=discover_new&discover_by=user_name"
+        payload = self._profile_urls_payload(clean_handles)
         try:
             snapshot_id = await self._trigger(
                 PROFILE_DATASET_ID,
                 payload,
-                extra_params=extra_params,
+                extra_params=PROFILE_COLLECT_BY_URL_PARAMS,
             )
             return (snapshot_id, None)
         except Exception as e:
-            logger.error("Error triggering Bright Data profile resync: %s", e)
+            logger.error("Error triggering Bright Data profile batch: %s", e)
             return (None, "Failed to refresh competitor profiles with Bright Data.")
 
     async def search_creators_by_niche(
@@ -288,14 +298,13 @@ class SocialDataClient:
             logger.error("No competitor handles for niche: %s", niche)
             return (None, gemini_error or "No competitor handles available for this niche.", [])
 
-        payload = [{"user_name": handle} for handle in handles]
-        extra_params = "&type=discover_new&discover_by=user_name"
+        payload = self._profile_urls_payload(handles)
 
         try:
             snapshot_id = await self._trigger(
                 PROFILE_DATASET_ID,
                 payload,
-                extra_params=extra_params,
+                extra_params=PROFILE_COLLECT_BY_URL_PARAMS,
             )
             return (snapshot_id, None, handles)
         except Exception as e:
@@ -311,8 +320,8 @@ class SocialDataClient:
         try:
             return await self._trigger(
                 PROFILE_DATASET_ID,
-                [{"user_name": clean_handle}],
-                extra_params="&type=discover_new&discover_by=user_name",
+                [{"url": instagram_profile_url(clean_handle)}],
+                extra_params=PROFILE_COLLECT_BY_URL_PARAMS,
             )
         except Exception as e:
             logger.error("Error triggering Bright Data profile fetch for %s: %s", handle, e)
