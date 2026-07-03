@@ -8,7 +8,7 @@ import { api } from '@/lib/axios'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
 import { useConfirmNiche } from '@/features/instagram/hooks/useConfirmNiche'
-import { useCompetitors, useRemoveCompetitor } from '@/features/competitors/hooks/useCompetitors'
+import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
 import { useAnalysisJob } from '@/features/instagram/hooks/useAnalysisJob'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
 
@@ -17,6 +17,7 @@ import { ConnectStep } from './components/ConnectStep'
 import { AnalyzingStep } from './components/AnalyzingStep'
 import { NicheStep } from './components/NicheStep'
 import { CompetitorStep } from './components/CompetitorStep'
+import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
 import { Loader2, CheckCircle2, ArrowRight, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -71,29 +72,35 @@ function OnboardingContent() {
     }
   }, [isJustConnected, refetchAccounts])
 
-  const { data: competitors } = useCompetitors({
-    refetchInterval: (query: { state: { data?: Array<unknown> } }) => {
-       const data = query.state.data
-       return (step === 'FINDING_COMPETITORS' && (!data || data.length === 0)) ? 3000 : false
-    }
-  })
-
   const { data: discoveryJob } = useAnalysisJob('competitor_discovery', {
-    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
+    refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
   })
 
+  const { data: competitors } = useCompetitors({
+    refetchInterval: (query: { state: { data?: Array<unknown> } }) => {
+      const data = query.state.data
+      if (step !== 'FINDING_COMPETITORS' && step !== 'COMPETITORS') return false
+
+      // Keep polling competitor list only while discovery is actively running.
+      if (discoveryJob?.status === 'running' || discoveryJob?.status === 'queued') {
+        return (!data || data.length === 0) ? 3000 : false
+      }
+      return false
+    }
+  })
+
   const { data: syncJob } = useAnalysisJob('instagram_sync', {
-    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
+    refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
   })
 
   const { data: roadmapJob } = useAnalysisJob('report_generation', {
-    refetchInterval: (query: { state: { data?: { status?: string } } }) => {
+    refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
       const data = query.state.data
       return (data?.status === 'running' || data?.status === 'queued') ? 3000 : false
     }
@@ -103,6 +110,7 @@ function OnboardingContent() {
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
   const { mutate: confirmNiche, isPending: isConfirmingNiche } = useConfirmNiche()
   const { mutate: removeCompetitor } = useRemoveCompetitor()
+  const { mutate: rediscoverCompetitors, isPending: isRediscovering } = useRediscoverCompetitors()
   const { mutate: generateRoadmap } = useGenerateRoadmap()
 
   const account = accounts?.[0]
@@ -111,7 +119,7 @@ function OnboardingContent() {
   const syncTasks = [
     { label: "Establishing Meta Handshake", status: isJustConnected || isConnected ? "completed" : "running" as any },
     { label: "Indexing Reel Performance", status: syncJob?.status === "succeeded" ? "completed" : (syncJob ? "running" : "pending") as any },
-    { label: "Transcribing Audio & Visuals", status: syncJob?.status === "succeeded" ? "completed" : "pending" as any },
+    { label: "Parsing Captions & Hashtags", status: syncJob?.status === "succeeded" ? "completed" : "pending" as any },
     { label: "Profiling Content Pillars", status: account?.niche_detected ? "completed" : "pending" as any },
   ]
 
@@ -151,12 +159,20 @@ function OnboardingContent() {
       setStep('GENERATING_ROADMAP')
     } else if (roadmapJob?.status === 'succeeded') {
       setStep('COMPLETED')
-    } else if ((discoveryJob?.status === 'succeeded' || (competitors && competitors.length > 0)) && !hasApprovedCompetitors) {
-      setStep('FINDING_COMPETITORS') 
-    } else if (discoveryJob?.status === 'running' || discoveryJob?.status === 'queued' || !competitors || competitors.length === 0) {
-      setStep('FINDING_COMPETITORS')
-    } else {
+    } else if (hasApprovedCompetitors) {
       setStep('COMPETITORS')
+    } else if (discoveryJob?.status === 'running' || discoveryJob?.status === 'queued') {
+      setStep('FINDING_COMPETITORS')
+    } else if (discoveryJob?.status === 'succeeded' && competitors && competitors.length > 0) {
+      setStep('COMPETITORS')
+    } else if (discoveryJob?.status === 'succeeded') {
+      setStep('FINDING_COMPETITORS')
+    } else if (discoveryJob?.status === 'failed') {
+      setStep('FINDING_COMPETITORS')
+    } else if (competitors && competitors.length > 0) {
+      setStep('COMPETITORS')
+    } else {
+      setStep('FINDING_COMPETITORS')
     }
   }, [isConnected, account, isSyncing, syncJob, discoveryJob, roadmapJob, competitors, isLoadingAccounts, triggerSync, hasApprovedCompetitors, isJustConnected, hasTriggeredSync])
 
@@ -228,10 +244,13 @@ function OnboardingContent() {
     
     case 'FINDING_COMPETITORS':
       const isDiscoveryDone = discoveryJob?.status === 'succeeded'
+      const isDiscoveryFailed = discoveryJob?.status === 'failed'
       return (
         <AnalyzingStep 
-          title={isDiscoveryDone ? "Indexing Complete" : "Market Discovery"} 
-          description={isDiscoveryDone
+          title={isDiscoveryFailed ? "Discovery Unavailable" : isDiscoveryDone ? "Indexing Complete" : "Market Discovery"} 
+          description={isDiscoveryFailed
+            ? "Auto-discovery couldn't find accounts. Add competitors manually or retry."
+            : isDiscoveryDone
             ? "Competitor dataset ready for review and selection." 
             : "Scanning the niche for top-performing creator benchmarks."
           }
@@ -248,6 +267,36 @@ function OnboardingContent() {
               <Check className="h-5 w-5" />
               <span>View Market Data</span>
             </Button>
+          )}
+          {isDiscoveryFailed && (
+            <div className="flex flex-col items-center gap-4 mt-8 w-full max-w-md mx-auto">
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button
+                  onClick={() => rediscoverCompetitors()}
+                  disabled={isRediscovering}
+                  className="h-12 px-8 text-lg font-bold"
+                >
+                  {isRediscovering ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Retry discovery'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setHasApprovedCompetitors(true)
+                    setStep('COMPETITORS')
+                  }}
+                  className="h-12 px-8 text-lg font-bold border-white/10"
+                >
+                  Add manually
+                </Button>
+              </div>
+              <AddCompetitorForm
+                className="w-full"
+                onAdded={() => {
+                  setHasApprovedCompetitors(true)
+                  setStep('COMPETITORS')
+                }}
+              />
+            </div>
           )}
         </AnalyzingStep>
       )
