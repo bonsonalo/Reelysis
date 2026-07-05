@@ -1,8 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from uuid import UUID
 from fastapi.responses import RedirectResponse
 from sqlmodel import select
 from app.core.logger import logger
+from app.core.rate_limit import (
+    ai_trigger_limit,
+    get_user_key,
+    job_trigger_limit,
+    limiter,
+)
 from app.service.instagram_service import (
     get_oauth_url_service, 
     handle_oauth_callback_service,
@@ -60,15 +66,26 @@ async def get_accounts(current_user: user_authentication_dependency, db: db_depe
 
 @router.delete("/disconnect")
 async def disconnect_instagram(current_user: user_authentication_dependency, db: db_dependency):
+    """
+    Disconnect Instagram and permanently delete all synced data
+    (reels, competitors, reports, analyses, and background jobs).
+    """
     try:
         await disconnect_instagram_service(current_user["id"], db)
-        return {"message": "Instagram account disconnected successfully"}
+        return {"message": "Instagram disconnected and all synced data deleted."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error disconnecting account: {e}")
         raise HTTPException(status_code=500, detail="Failed to disconnect Instagram account")
 
 @router.post("/sync")
-async def trigger_sync(current_user: user_authentication_dependency, db: db_dependency):
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
+async def trigger_sync(
+    request: Request,
+    current_user: user_authentication_dependency,
+    db: db_dependency,
+):
     """
     Triggers a background sync of Instagram media and metrics.
     Returns the job_id for polling.
@@ -87,12 +104,18 @@ async def trigger_sync(current_user: user_authentication_dependency, db: db_depe
         raise HTTPException(status_code=500, detail="Failed to trigger sync")
 
 @router.patch("/niche/confirm")
-async def confirm_niche(request: NicheConfirmRequest, current_user: user_authentication_dependency, db: db_dependency):
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
+async def confirm_niche(
+    request: Request,
+    request_body: NicheConfirmRequest,
+    current_user: user_authentication_dependency,
+    db: db_dependency,
+):
     """
     Confirms niche during onboarding and triggers competitor discovery.
     """
     try:
-        account = await confirm_instagram_niche_service(current_user["id"], request.niche, db)
+        account = await confirm_instagram_niche_service(current_user["id"], request_body.niche, db)
         return {"message": "Niche confirmed", "niche": account.niche_confirmed}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -102,16 +125,22 @@ async def confirm_niche(request: NicheConfirmRequest, current_user: user_authent
 
 
 @router.patch("/niche")
-async def update_niche(request: NicheUpdateRequest, current_user: user_authentication_dependency, db: db_dependency):
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
+async def update_niche(
+    request: Request,
+    request_body: NicheUpdateRequest,
+    current_user: user_authentication_dependency,
+    db: db_dependency,
+):
     """
     Update the confirmed niche from settings (optionally re-run competitor discovery).
     """
     try:
         account = await update_instagram_niche_service(
             current_user["id"],
-            request.niche,
+            request_body.niche,
             db,
-            trigger_discovery=request.trigger_discovery,
+            trigger_discovery=request_body.trigger_discovery,
         )
         return {
             "message": "Niche updated",
@@ -126,7 +155,12 @@ async def update_niche(request: NicheUpdateRequest, current_user: user_authentic
 
 
 @router.post("/niche/detect")
-async def detect_niche(current_user: user_authentication_dependency, db: db_dependency):
+@limiter.limit(ai_trigger_limit, key_func=get_user_key)
+async def detect_niche(
+    request: Request,
+    current_user: user_authentication_dependency,
+    db: db_dependency,
+):
     """
     Re-run AI niche detection from synced bio, captions, and hashtags.
     """
