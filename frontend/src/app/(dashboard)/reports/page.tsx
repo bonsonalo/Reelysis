@@ -1,131 +1,139 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
 import { useReports } from '@/features/reports/hooks/useLatestReport'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
-import { useAnalysisJob } from '@/features/instagram/hooks/useAnalysisJob'
-import { FileText, Zap, Loader2, ChevronRight, AlertCircle } from 'lucide-react'
+import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
+import { getReportGenerationUi } from '@/features/reports/utils/reportGenerationProgress'
+import { ReportGenerationPanel } from '@/features/reports/components/ReportGenerationPanel'
+import { ReportGenerationError } from '@/features/reports/components/ReportGenerationError'
+import { ReportsList } from '@/features/reports/components/ReportsList'
+import { ReportsEmptyState } from '@/features/reports/components/ReportsEmptyState'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
+import { ReportsPageSkeleton } from '@/components/shared/PageSkeletons'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export default function ReportsPage() {
   const { data: reports, isLoading, refetch } = useReports()
-  const { mutate: generateReport } = useGenerateRoadmap()
-  const { data: reportJob, refetch: refetchJob } = useAnalysisJob('report_generation')
-  const [isGenerating, setIsGenerating] = useState(false)
+  const { mutate: generateReport, isPending: isStarting } = useGenerateRoadmap()
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null)
+  const completedJobIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (!isGenerating) return
-    const interval = setInterval(() => refetchJob(), 3000)
-    return () => clearInterval(interval)
-  }, [isGenerating, refetchJob])
-
-  useEffect(() => {
-    if (reportJob?.status === 'succeeded' || reportJob?.status === 'failed') {
-      refetch()
-      setIsGenerating(false)
-    }
-  }, [reportJob?.status, refetch])
-
-  const handleGenerate = () => {
-    generateReport(undefined, {
-      onSuccess: () => setIsGenerating(true),
-    })
+  const pollWhileActive = (query: { state: { data?: { status?: string } | null } }) => {
+    const status = query.state.data?.status
+    return status === 'queued' || status === 'running' ? 3000 : false
   }
 
-  const formatDate = (createdAt: string) => {
-    return new Date(createdAt).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+  const { data: pendingJob } = useAnalysisJobById(pendingJobId, {
+    refetchInterval: pollWhileActive,
+  })
+
+  const isGenerating =
+    !!pendingJobId &&
+    (!pendingJob || pendingJob.status === 'queued' || pendingJob.status === 'running')
+
+  const { data: lastReportJob, refetch: refetchLastReportJob } = useAnalysisJob(
+    'report_generation',
+    { enabled: !isGenerating && !isStarting },
+  )
+
+  useEffect(() => {
+    if (!pendingJobId || !pendingJob) return
+    const isDone = pendingJob.status === 'succeeded' || pendingJob.status === 'failed'
+    if (!isDone || completedJobIdRef.current === pendingJobId) return
+    completedJobIdRef.current = pendingJobId
+    refetch()
+    refetchLastReportJob()
+    setPendingJobId(null)
+  }, [pendingJobId, pendingJob, refetch, refetchLastReportJob])
+
+  const handleGenerate = () => {
+    if (isGenerating || isStarting) return
+    generateReport(undefined, {
+      onSuccess: (data) => {
+        if (data?.job_id) {
+          setPendingJobId(String(data.job_id))
+        }
+      },
     })
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-80px)] w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <ReportsPageSkeleton />
   }
 
+  const reportCount = reports?.length ?? 0
+  const generating = isGenerating || isStarting
+
+  const latestReportTime = reports?.[0]?.created_at
+    ? new Date(reports[0].created_at).getTime()
+    : 0
+  const lastJobTime = lastReportJob?.completed_at
+    ? new Date(lastReportJob.completed_at).getTime()
+    : lastReportJob?.created_at
+      ? new Date(lastReportJob.created_at).getTime()
+      : 0
+  const showFailure =
+    !generating &&
+    lastReportJob?.status === 'failed' &&
+    lastJobTime >= latestReportTime
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 pb-24">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Reports</h1>
-          <p className="mt-2 text-zinc-500">
-            Strategic growth reports generated from your content and competitor analysis.
+    <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
+      <header className="flex flex-col justify-between gap-4 border-b border-border-subtle pb-6 md:flex-row md:items-end md:gap-6 md:pb-8">
+        <div className="min-w-0 max-w-2xl">
+          <h1 className="text-lg font-semibold text-white md:text-2xl">Reports</h1>
+          <p className="mt-1.5 text-xs leading-relaxed text-text-secondary md:mt-2 md:text-sm">
+            Strategy write-ups from your Reels and competitor data. Each report compares
+            your content, surfaces gaps, and suggests what to post next.
           </p>
+          {reportCount > 0 && (
+            <p className="mt-2 text-xs text-text-tertiary md:mt-3 md:text-sm">
+              {reportCount} {reportCount === 1 ? 'report' : 'reports'} generated
+            </p>
+          )}
         </div>
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating || reportJob?.status === 'running' || reportJob?.status === 'queued'}
+          disabled={isGenerating || isStarting}
+          className="w-full shrink-0 md:w-auto"
         >
-          {(isGenerating || reportJob?.status === 'running' || reportJob?.status === 'queued') ? (
+          <ButtonLoadingLabel
+            loading={isGenerating || isStarting}
+            loadingLabel="Generating…"
+          >
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
+              <Plus className="h-4 w-4" />
+              Generate report
             </>
-          ) : (
-            <>
-              <Zap className="h-4 w-4 mr-2" />
-              Generate New Report
-            </>
-          )}
+          </ButtonLoadingLabel>
         </Button>
-      </div>
+      </header>
 
-      {!reports || reports.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-20 rounded-3xl border border-dashed border-white/10 bg-white/[0.02]">
-          <AlertCircle className="h-12 w-12 text-zinc-600 mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">No reports yet</h2>
-          <p className="max-w-md text-zinc-500 mb-8">
-            Complete onboarding and video analysis, then generate your first strategic report.
-          </p>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => (window.location.href = '/onboarding')} className="border-white/10">
-              Go to Onboarding
-            </Button>
-            <Button onClick={handleGenerate}>Generate Report</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {reports.map((report, index) => (
-            <Link
-              key={report.id}
-              href={`/reports/${report.id}`}
-              className={cn(
-                'group block rounded-2xl border border-white/5 bg-[#09090b] p-6 transition-all hover:border-primary/30 hover:bg-[#0c0c0e]',
-                index === 0 && 'border-primary/20 bg-primary/5'
-              )}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-                    <FileText className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-lg font-bold text-white truncate">{report.title}</h2>
-                      {index === 0 && (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded">
-                          Latest
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-zinc-500 mb-2">{formatDate(report.created_at)}</p>
-                    <p className="text-sm text-zinc-400 line-clamp-2">{report.summary}</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-primary shrink-0 mt-1 transition-colors" />
-              </div>
-            </Link>
-          ))}
-        </div>
+      {generating && (
+        <ReportGenerationPanel
+          reportUi={getReportGenerationUi(
+            pendingJob?.progress ?? 0,
+            pendingJob?.status ?? 'queued',
+          )}
+          errorMessage={
+            pendingJob?.status === 'failed' ? pendingJob.error_message : undefined
+          }
+        />
       )}
+
+      {!generating && showFailure && (
+        <ReportGenerationError
+          message={lastReportJob?.error_message}
+          onRetry={handleGenerate}
+          retrying={isStarting}
+        />
+      )}
+
+      {!generating && reportCount > 0 && <ReportsList reports={reports!} />}
+
+      {!generating && reportCount === 0 && !showFailure && <ReportsEmptyState />}
     </div>
   )
 }
