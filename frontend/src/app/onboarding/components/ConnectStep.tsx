@@ -1,6 +1,8 @@
 'use client'
 
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
+import { Button } from '@/components/ui/button'
+import { OnboardingStepFrame } from './OnboardingStepFrame'
 
 interface ConnectStepProps {
   onConnect: () => void
@@ -9,32 +11,23 @@ interface ConnectStepProps {
 
 export function ConnectStep({ onConnect, isConnecting }: ConnectStepProps) {
   return (
-    <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center px-4 text-center animate-in fade-in zoom-in duration-500">
-      <h1 className="mb-6 max-w-4xl text-5xl font-black tracking-tight text-white md:text-7xl lg:text-8xl">
-        Know exactly what <br />
-        to post <span className="text-primary italic">next.</span>
-      </h1>
-      
-      <p className="mb-10 max-w-2xl text-lg text-muted-foreground md:text-xl">
-        Connect your account to discover your content pillars, analyze competitors, 
-        and generate a high-performing growth roadmap in minutes.
-      </p>
-
-      <div 
-        onClick={onConnect}
-        className="flex flex-col items-center gap-4 cursor-pointer group"
-      >
-        {isConnecting ? (
-           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        ) : (
-          <>
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary group-hover:text-primary/80 transition-colors">
-              Start by connecting your account above
-            </p>
-            <ArrowRight className="h-6 w-6 text-primary group-hover:text-primary/80 transition-colors" />
-          </>
-        )}
+    <OnboardingStepFrame narrow>
+      <div className="text-center">
+        <h1 className="text-xl font-semibold text-white sm:text-2xl">
+          Connect your Instagram
+        </h1>
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-text-secondary">
+          We&apos;ll import your Reels, detect your niche, and suggest competitors
+          to track.
+        </p>
+        <div className="mt-8">
+          <Button size="lg" onClick={onConnect} disabled={isConnecting} className="w-full sm:w-auto">
+            <ButtonLoadingLabel loading={isConnecting} loadingLabel="Connecting…">
+              Connect Instagram
+            </ButtonLoadingLabel>
+          </Button>
+        </div>
       </div>
-    </div>
+    </OnboardingStepFrame>
   )
 }
