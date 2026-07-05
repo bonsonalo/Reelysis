@@ -6,42 +6,34 @@ import {
 
 export type { ProgressTask, ProgressTaskStatus }
 
+const PHASES = [
+  { start: 0, end: 55, label: 'Pulling competitor profiles and Reels' },
+  { start: 55, end: 82, label: 'Analyzing your videos' },
+  { start: 82, end: 88, label: 'Benchmarking against competitors' },
+  { start: 88, end: 100, label: 'Writing your growth strategy' },
+] as const
+
 export function getReportGenerationUi(progress: number, status: string | undefined) {
   const jobStatus = status ?? 'queued'
   const pct = jobStatus === 'succeeded' ? 100 : Math.min(100, Math.max(0, progress))
 
-  const tasks: ProgressTask[] = [
-    {
-      label: 'Refreshing competitor profiles and Reels',
-      status: phaseStatus(pct, 0, 55, jobStatus),
-    },
-    {
-      label: 'Transcribing and analyzing videos',
-      status: phaseStatus(pct, 55, 82, jobStatus),
-    },
-    {
-      label: 'Comparing your content to the market',
-      status: phaseStatus(pct, 82, 88, jobStatus),
-    },
-    {
-      label: 'Writing your growth strategy',
-      status: phaseStatus(pct, 88, 100, jobStatus),
-    },
-  ]
+  const tasks: ProgressTask[] = PHASES.map(({ start, end, label }) => ({
+    label,
+    status: phaseStatus(pct, start, end, jobStatus),
+  }))
 
   const runningTask = tasks.find((t) => t.status === 'running')
 
-  let description =
-    'This can take several minutes the first time. We fetch competitor data, analyze videos, then write your report.'
+  let description = 'Working on your report'
 
   if (jobStatus === 'failed') {
-    description = 'Report generation hit an error. You can retry or continue to the dashboard.'
+    description = 'Report generation failed'
   } else if (jobStatus === 'succeeded') {
-    description = 'Your strategy report is ready.'
+    description = 'Your report is ready'
   } else if (runningTask) {
-    description = `${runningTask.label}…`
+    description = runningTask.label
   } else if (jobStatus === 'queued') {
-    description = 'Starting report generation…'
+    description = 'Starting'
   }
 
   return { tasks, description, progressPercent: pct }
