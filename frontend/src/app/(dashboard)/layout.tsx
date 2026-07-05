@@ -1,18 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/store/hook'
-import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser'
-import { Loader2, Menu, X, Zap } from 'lucide-react'
+import { Loader2, Menu } from 'lucide-react'
+import { BrandLogo } from '@/components/shared/BrandLogo'
+import { PageContainer } from '@/components/shared/Panel'
 import { Sidebar } from '@/components/shared/Sidebar'
+import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser'
+import { useAuth, useAppDispatch, useSidebar } from '@/store/hook'
+import { openMobileSidebar } from '@/store/slices/sidebarSlice'
 import { cn } from '@/lib/utils'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const router = useRouter()
+  const dispatch = useAppDispatch()
   const { isAuthenticated } = useAuth()
   const { isLoading } = useCurrentUser()
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const { isMobileOpen, closeMobileSidebar } = useSidebar()
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -20,10 +28,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isLoading, isAuthenticated, router])
 
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1024) {
+        closeMobileSidebar()
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [closeMobileSidebar])
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
   }
@@ -31,44 +49,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated) return null
 
   return (
-    <div className="flex h-screen bg-black text-white overflow-hidden relative">
-      
-      {/* Mobile Sidebar Overlay */}
-      <div className={cn(
-        "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-all lg:hidden",
-        isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-      )} onClick={() => setIsSidebarOpen(false)} />
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-black text-white">
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/70 transition-opacity lg:hidden',
+          isMobileOpen
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0',
+        )}
+        onClick={closeMobileSidebar}
+        aria-hidden={!isMobileOpen}
+      />
 
-      {/* Sidebar Container */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 w-[248px] shrink-0 border-r border-border-sidebar bg-surface-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        <Sidebar />
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Top Header */}
-        <header className="flex h-16 items-center justify-between border-b border-white/5 bg-[#09090b] px-6 lg:hidden">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-               <Zap className="h-5 w-5 text-black fill-current" />
-            </div>
-            <span className="text-lg font-black tracking-tighter uppercase">Reelysis</span>
-          </div>
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="rounded-lg border border-white/10 p-2 text-zinc-400 hover:bg-white/5 hover:text-white"
+      <div className="flex min-w-0 flex-1 flex-col bg-black">
+        <header className="flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 lg:hidden">
+          <BrandLogo size="sm" />
+          <button
+            type="button"
+            onClick={() => dispatch(openMobileSidebar())}
+            className="rounded-md p-2 text-text-secondary transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            aria-label="Open menu"
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
           </button>
         </header>
 
-        {/* Main Content Scroll Area */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="p-6 md:p-10 lg:p-12">
-            {children}
-          </div>
+        <main className="flex-1 overflow-y-auto">
+          <PageContainer>{children}</PageContainer>
         </main>
       </div>
     </div>
