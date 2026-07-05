@@ -10,7 +10,7 @@ const buttonVariants = {
   default:
     "bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700 active:scale-[0.98]",
   destructive:
-    "bg-red-500 text-white hover:bg-red-600 active:bg-red-700 active:scale-[0.98]",
+    "bg-red-700 text-white hover:bg-red-600 active:bg-red-800 active:scale-[0.98]",
   outline:
     "border border-zinc-600 bg-zinc-900 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800 hover:text-white active:bg-zinc-700 active:scale-[0.98]",
   secondary:
@@ -24,7 +24,7 @@ const focusVariants = {
   default:
     "focus-visible:ring-orange-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
   destructive:
-    "focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+    "focus-visible:ring-red-700/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
   outline:
     "focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
   secondary:
