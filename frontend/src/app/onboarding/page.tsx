@@ -31,7 +31,7 @@ type OnboardingStep =
   | 'ANALYZING' 
   | 'NICHE' 
   | 'FINDING_COMPETITORS' 
-  | 'COMPETITORS' 
+  | 'COMPETITORS'
   | 'GENERATING_ROADMAP'
   | 'COMPLETED'
 
@@ -53,7 +53,6 @@ function OnboardingContent() {
   const [isConnecting, setIsConnecting] = useState(false)
   
   // Manual Gate States
-  const [hasApprovedSync, setHasApprovedSync] = useState(false)
   const [hasTriggeredSync, setHasTriggeredSync] = useState(false)
   const [hasApprovedCompetitors, setHasApprovedCompetitors] = useState(false)
 
@@ -217,20 +216,12 @@ function OnboardingContent() {
       return <ConnectStep onConnect={handleConnect} isConnecting={isConnecting} />
     
     case 'ANALYZING':
-      const isConnectionSuccess = !hasApprovedSync && (isConnected || isJustConnected)
       return (
         <AnalyzingStep
-          statusText={
-            isConnectionSuccess
-              ? 'Instagram connected. Start the sync when you are ready.'
-              : syncUi.description
-          }
-          tasks={isConnectionSuccess ? undefined : syncUi.tasks}
-        >
-          {isConnectionSuccess && (
-            <Button onClick={() => setHasApprovedSync(true)}>Start sync</Button>
-          )}
-        </AnalyzingStep>
+          variant="shimmer"
+          statusText={syncUi.description}
+          errorMessage={syncJob?.status === 'failed' ? syncJob.error_message : undefined}
+        />
       )
     
     case 'NICHE':
