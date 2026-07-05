@@ -6,19 +6,74 @@ from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException
 
-from app.core.database import engine
+from app.core.database import AsyncSessionLocal
 from app.core.logger import logger
 from app.core.celery_app import celery_app
 from app.model.video_analysis import VideoAnalysis, MediaSource
 from app.model.analysis_job import AnalysisJob
 from app.model.account_report import AccountReport
 from app.model.recommendations import Recommendation
-from app.service.ai_service import generate_strategic_report_service
+from app.service.ai_service import generate_strategic_report_service, GeminiQuotaExceededError, remaining_gemini_budget
+from app.core.config import settings
+from app.service.competitor_service import prepare_competitor_data_for_report
+from app.service.transcript_service import run_transcription_sync
+from app.service.video_analysis_service import run_video_analysis_sync
+
+STALE_RUNNING_REPORT_SECONDS = 20 * 60
+
+
+def _report_job_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
+    reference = now or datetime.now(timezone.utc)
+    started = job.started_at
+    if started is None or started.year <= 1971:
+        return max(0.0, (reference - job.created_at.replace(tzinfo=timezone.utc if job.created_at.tzinfo is None else job.created_at.tzinfo)).total_seconds())
+    started_aware = started if started.tzinfo else started.replace(tzinfo=timezone.utc)
+    ref_aware = reference if reference.tzinfo else reference.replace(tzinfo=timezone.utc)
+    return max(0.0, (ref_aware - started_aware).total_seconds())
+
+
+async def reconcile_report_generation_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
+    """Fail report jobs left running too long (e.g. worker restart mid-task)."""
+    if job.job_type != "report_generation" or job.status not in ("queued", "running"):
+        return job
+
+    now = datetime.now(timezone.utc)
+    age = _report_job_age_seconds(job, now)
+
+    if job.status == "running" and age >= STALE_RUNNING_REPORT_SECONDS:
+        logger.warning("Failing stale report_generation job %s (age %.0fs)", job.id, age)
+        job.status = "failed"
+        job.error_message = "Report generation timed out. Please try again."
+        job.completed_at = now
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+
+    return job
+
 
 async def trigger_report_generation_service(user_id: UUID, db: AsyncSession):
     """
     Triggers the generation of a new strategic growth report.
+    Returns an existing in-flight job if one is already running.
     """
+    active_stmt = (
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.user_id == user_id,
+            AnalysisJob.job_type == "report_generation",
+            AnalysisJob.status.in_(("queued", "running")),
+        )
+        .order_by(desc(AnalysisJob.created_at))
+        .limit(1)
+    )
+    active = (await db.exec(active_stmt)).first()
+    if active:
+        active = await reconcile_report_generation_job(active, db)
+        if active.status in ("queued", "running"):
+            logger.info("Report generation already in progress for user %s (job %s)", user_id, active.id)
+            return active
+
     job = AnalysisJob(
         user_id=user_id,
         job_type="report_generation",
@@ -40,7 +95,7 @@ def generate_report_task(job_id: str, user_id: str):
     return asyncio.run(_generate_report_internal(job_id, user_id))
 
 async def _generate_report_internal(job_id: str, user_id: str):
-    async with AsyncSession(engine) as db:
+    async with AsyncSessionLocal() as db:
         try:
             job = await db.get(AnalysisJob, UUID(job_id))
             if not job: return
@@ -49,23 +104,50 @@ async def _generate_report_internal(job_id: str, user_id: str):
             job.started_at = datetime.now(timezone.utc)
             await db.commit()
 
-            # 1. Harvest and Aggregate Data
-            user_brief = await _prepare_user_brief(db, UUID(user_id))
-            competitor_brief = await _prepare_competitor_brief(db, UUID(user_id))
-            
-            job.progress = 30
+            user_uuid = UUID(user_id)
+
+            # 1. Refresh competitor profiles + reels when stale (batch Bright Data).
+            await prepare_competitor_data_for_report(db, user_uuid, job)
+
+            job.progress = max(job.progress, 58)
             await db.commit()
 
-            # 2. Call AI Strategist
+            # 2. Transcribe + analyze any pending media before building the brief.
+            await asyncio.to_thread(run_transcription_sync, user_uuid)
+            job.progress = 70
+            await db.commit()
+
+            video_budget = remaining_gemini_budget(reserve=settings.GEMINI_REPORT_RESERVE)
+            if video_budget <= 0 and not await _has_video_analysis(db, user_uuid):
+                raise GeminiQuotaExceededError(
+                    "No Gemini budget left today for video analysis and no prior analyses exist. "
+                    "Try again tomorrow, or run competitor discovery on a different day."
+                )
+
+            await asyncio.to_thread(run_video_analysis_sync, user_uuid, video_budget)
+            job.progress = 82
+            await db.commit()
+
+            # 3. Harvest and aggregate analysis data.
+            user_brief = await _prepare_user_brief(db, user_uuid)
+            competitor_brief = await _prepare_competitor_brief(db, user_uuid)
+            
+            job.progress = 88
+            await db.commit()
+
+            # 4. Call AI strategist.
+            if remaining_gemini_budget(reserve=0) < 1:
+                raise GeminiQuotaExceededError(
+                    "No Gemini budget left today for the final report. "
+                    "Video analysis used the remaining free-tier quota. Try again tomorrow."
+                )
+
             report_data = await generate_strategic_report_service(user_brief, competitor_brief)
-            
-            if not report_data:
-                raise Exception("AI failed to generate report.")
 
-            job.progress = 80
+            job.progress = 95
             await db.commit()
 
-            # 3. Save the Final Report
+            # 5. Save the final report.
             report = AccountReport(
                 user_id=UUID(user_id),
                 title=f"Growth Strategy - {datetime.now().strftime('%B %Y')}",
@@ -80,7 +162,7 @@ async def _generate_report_internal(job_id: str, user_id: str):
             await db.commit()
             await db.refresh(report)
 
-            # 4. Save individual Roadmap Recommendations
+            # 6. Save individual roadmap recommendations.
             for item in report_data.roadmap:
                 rec = Recommendation(
                     user_id=UUID(user_id),
@@ -104,6 +186,7 @@ async def _generate_report_internal(job_id: str, user_id: str):
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
+                job.completed_at = datetime.now(timezone.utc)
                 await db.commit()
 
 async def get_latest_report_service(user_id: UUID, db: AsyncSession):
@@ -154,6 +237,11 @@ async def get_roadmap_service(user_id: UUID, db: AsyncSession):
     stmt = select(Recommendation).where(Recommendation.account_report_id == report.id).order_by(desc(Recommendation.priority))
     results = await db.exec(stmt)
     return results.all()
+
+async def _has_video_analysis(db: AsyncSession, user_id: UUID) -> bool:
+    stmt = select(VideoAnalysis).where(VideoAnalysis.user_id == user_id).limit(1)
+    return (await db.exec(stmt)).first() is not None
+
 
 async def _prepare_user_brief(db: AsyncSession, user_id: UUID):
     stmt = select(VideoAnalysis).where(
