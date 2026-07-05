@@ -37,16 +37,12 @@ export function PageHeaderSkeleton({
 
 export function SettingsPageSkeleton() {
   return (
-    <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
+    <div className="space-y-6 pb-16 sm:space-y-8 sm:pb-20">
       <PageHeaderSkeleton lines={2} />
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <div className="flex gap-1 lg:w-52 lg:flex-col">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-28 lg:w-full" />
-          ))}
-        </div>
-        <div className="min-w-0 flex-1">
-          <Skeleton className="h-[280px] w-full rounded-[10px] md:h-[320px]" />
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
+        <Skeleton className="h-11 w-full rounded-[10px] lg:h-[148px] lg:w-52" />
+        <div className="min-w-0 flex-1 lg:max-w-2xl">
+          <Skeleton className="h-[360px] w-full rounded-[10px] sm:h-[420px]" />
         </div>
       </div>
     </div>
