@@ -33,6 +33,9 @@ GEMINI_HANDLES_TO_REQUEST = 15
 # Bright Data batch profile scrapes often need 5–10 min; 202 until all handles are ready.
 PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 15, 20, 25, 30] + [30] * 12 + [45] * 4
 
+# Reuse competitor scrape results for reports within this window.
+REPORT_COMPETITOR_FRESHNESS_SECONDS = 7 * 24 * 60 * 60
+
 MEDIA_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15, 15, 15]
 STALE_QUEUED_DISCOVERY_SECONDS = 180
 STALE_RUNNING_DISCOVERY_SECONDS = 720
@@ -63,8 +66,8 @@ def _discovery_job_age_seconds(job: AnalysisJob, now: datetime | None = None) ->
 
 
 async def reconcile_competitor_discovery_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
-    """Fail or re-dispatch stale competitor discovery / resync jobs."""
-    if job.job_type not in ("competitor_discovery", "competitor_resync") or job.status not in (
+    """Fail or re-dispatch stale competitor discovery jobs."""
+    if job.job_type != "competitor_discovery" or job.status not in (
         "queued",
         "running",
     ):
@@ -102,7 +105,7 @@ async def _get_running_competitor_job(user_id: UUID, db: AsyncSession) -> Analys
         select(AnalysisJob)
         .where(
             AnalysisJob.user_id == user_id,
-            AnalysisJob.job_type.in_(("competitor_discovery", "competitor_resync")),
+            AnalysisJob.job_type == "competitor_discovery",
             AnalysisJob.status.in_(("queued", "running")),
         )
         .order_by(AnalysisJob.created_at.desc())
@@ -230,43 +233,6 @@ async def rediscover_competitors_service(user_id: UUID, db: AsyncSession):
     )
 
 
-async def resync_competitors_service(user_id: UUID, db: AsyncSession):
-    """
-    Re-scrape Bright Data profiles for already-tracked competitors (no Gemini, no purge).
-    """
-    running = await _get_running_competitor_job(user_id, db)
-    if running:
-        logger.info(
-            "Competitor job already in progress for user %s (job %s); returning existing job",
-            user_id,
-            running.id,
-        )
-        return running
-
-    stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
-    competitors = (await db.exec(stmt)).all()
-    if not competitors:
-        raise ValueError("No competitors to resync. Run discovery or add handles first.")
-
-    handles = [c.handle for c in competitors]
-    job = AnalysisJob(
-        user_id=user_id,
-        job_type="competitor_resync",
-        status="queued",
-        progress=0,
-        input_payload={"handles": handles},
-    )
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
-
-    celery_app.send_task(
-        "app.service.competitor_service.poll_competitor_results_task",
-        args=[str(job.id), str(user_id)],
-    )
-    return job
-
-
 @celery_app.task(name="app.service.competitor_service.fetch_competitor_media_task")
 def fetch_competitor_media_task(competitor_id: str, user_id: str):
     return asyncio.run(_fetch_competitor_media_internal(competitor_id, user_id))
@@ -349,10 +315,6 @@ async def _poll_results_internal(job_id: str, user_id: str):
             if not job:
                 return
 
-            if job.job_type == "competitor_resync":
-                await _resync_profiles_internal(job, user_id, db)
-                return
-
             niche = job.input_payload.get("niche", "")
             discovery_mode = job.input_payload.get("mode", DISCOVERY_MODE_INITIAL)
             force_refresh = discovery_mode == DISCOVERY_MODE_REFRESH
@@ -398,22 +360,15 @@ async def _poll_results_internal(job_id: str, user_id: str):
             job.progress = 10
             await db.commit()
 
-            # STAGE 2: Wait for profile snapshot (~4 min max)
-            results = None
-            for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
-                if delay:
-                    await asyncio.sleep(delay)
-                results = await social_data_client.get_snapshot_results(snapshot_id)
-                if results is not None:
-                    break
-                logger.info(
-                    "Bright Data profile snapshot %s not ready (attempt %d/%d)",
-                    snapshot_id,
-                    attempt + 1,
-                    len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS),
-                )
-                job.progress = min(90, 10 + (attempt + 1) * 7)
-                await db.commit()
+            # STAGE 2: Wait for profile snapshot (~10 min max)
+            results = await _poll_profile_snapshot(
+                snapshot_id,
+                job=job,
+                db=db,
+                progress_start=10,
+                progress_end=90,
+                log_label="discovery",
+            )
 
             if not results:
                 raise Exception("Timed out waiting for competitor discovery data from provider.")
@@ -457,72 +412,146 @@ async def _poll_results_internal(job_id: str, user_id: str):
                 await db.commit()
 
 
-async def _resync_profiles_internal(job: AnalysisJob, user_id: str, db: AsyncSession):
-    """Re-scrape tracked competitor profiles via Bright Data without replacing the list."""
-    user_uuid = UUID(user_id)
-    try:
-        job.status = "running"
-        job.started_at = datetime.now(timezone.utc)
-        await db.commit()
-
-        handles = list(job.input_payload.get("handles") or [])
-        if not handles:
-            stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_uuid)
-            handles = [c.handle for c in (await db.exec(stmt)).all()]
-
-        if not handles:
-            raise Exception("No competitors to resync.")
-
-        snapshot_id, resync_error = await social_data_client.fetch_profiles_for_handles(handles)
-        if not snapshot_id:
-            raise Exception(resync_error or "Failed to trigger competitor profile resync.")
-
-        job.input_payload = {**job.input_payload, "snapshot_id": snapshot_id}
-        job.progress = 20
-        await db.commit()
-
-        results = None
-        for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
-            if delay:
-                await asyncio.sleep(delay)
-            results = await social_data_client.get_snapshot_results(snapshot_id)
-            if results is not None:
-                break
-            logger.info(
-                "Bright Data resync snapshot %s not ready (attempt %d/%d)",
-                snapshot_id,
-                attempt + 1,
-                len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS),
-            )
-            job.progress = min(90, 20 + (attempt + 1) * 7)
-            await db.commit()
-
-        if results is None:
-            raise Exception(
-                "Timed out waiting for competitor profile resync from provider "
-                "(Bright Data can take up to a few minutes — try again)."
-            )
-
-        updated_ids = await _update_existing_competitors_from_profiles(db, results, user_uuid)
-        if not updated_ids:
-            raise Exception("Could not refresh any tracked competitor profiles.")
-
-        job.status = "succeeded"
-        job.progress = 100
-        job.completed_at = datetime.now(timezone.utc)
-        await db.commit()
-
-        top_ids = [str(cid) for cid in updated_ids[:MAX_COMPETITORS_TO_ANALYZE]]
-        celery_app.send_task(
-            "app.service.competitor_service.fetch_competitor_media_batch_task",
-            args=[top_ids, user_id],
+async def _poll_profile_snapshot(
+    snapshot_id: str,
+    *,
+    job: AnalysisJob | None = None,
+    db: AsyncSession | None = None,
+    progress_start: int = 10,
+    progress_end: int = 90,
+    log_label: str = "profile",
+) -> list | None:
+    """Poll a Bright Data batch snapshot until ready or timeout."""
+    results = None
+    for attempt, delay in enumerate(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS):
+        if delay:
+            await asyncio.sleep(delay)
+        results = await social_data_client.get_snapshot_results(snapshot_id)
+        if results is not None:
+            return results
+        logger.info(
+            "Bright Data %s snapshot %s not ready (attempt %d/%d)",
+            log_label,
+            snapshot_id,
+            attempt + 1,
+            len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS),
         )
-    except Exception as e:
-        logger.error("Error in competitor resync task: %s", e)
-        job.status = "failed"
-        job.error_message = str(e)
-        job.completed_at = datetime.now(timezone.utc)
+        if job and db is not None:
+            span = max(progress_end - progress_start, 1)
+            job.progress = min(
+                progress_end,
+                progress_start + int(((attempt + 1) / len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS)) * span),
+            )
+            db.add(job)
+            await db.commit()
+    return None
+
+
+async def _get_top_competitors(db: AsyncSession, user_id: UUID) -> list[CompetitorAccount]:
+    stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
+    competitors = (await db.exec(stmt)).all()
+    return competitors[:MAX_COMPETITORS_TO_ANALYZE]
+
+
+async def competitor_data_needs_refresh(db: AsyncSession, user_id: UUID) -> bool:
+    """True when competitor profiles, media, or analysis are missing or stale."""
+    from app.model.video_analysis import VideoAnalysis, MediaSource
+
+    top = await _get_top_competitors(db, user_id)
+    if not top:
+        return False
+
+    now = _utc_now()
+    for competitor in top:
+        synced_at = competitor.last_synced_at
+        if synced_at is None:
+            return True
+        if synced_at.tzinfo is None:
+            age = _seconds_since_timestamp(synced_at.replace(tzinfo=timezone.utc), now)
+        else:
+            age = _seconds_since_timestamp(synced_at, now)
+        if age > REPORT_COMPETITOR_FRESHNESS_SECONDS:
+            return True
+
+        media_stmt = select(CompetitorMedia).where(
+            CompetitorMedia.competitor_account_id == competitor.id,
+            CompetitorMedia.user_id == user_id,
+        )
+        if not (await db.exec(media_stmt)).first():
+            return True
+
+    analysis_stmt = select(VideoAnalysis).where(
+        VideoAnalysis.user_id == user_id,
+        VideoAnalysis.media_source == MediaSource.COMPETITOR,
+    )
+    if not (await db.exec(analysis_stmt)).first():
+        return True
+
+    return False
+
+
+async def prepare_competitor_data_for_report(
+    db: AsyncSession,
+    user_id: UUID,
+    job: AnalysisJob | None = None,
+) -> bool:
+    """
+    Refresh competitor profiles + reels when stale before report generation.
+    Returns True if a Bright Data refresh ran.
+    """
+    if not await competitor_data_needs_refresh(db, user_id):
+        logger.info("Competitor data still fresh for user %s — skipping Bright Data", user_id)
+        return False
+
+    top = await _get_top_competitors(db, user_id)
+    if not top:
+        return False
+
+    handles = [c.handle for c in top]
+    if job:
+        job.progress = 5
+        db.add(job)
         await db.commit()
+
+    snapshot_id, fetch_error = await social_data_client.fetch_profiles_for_handles(handles)
+    if not snapshot_id:
+        raise Exception(fetch_error or "Failed to refresh competitor profiles for report.")
+
+    results = await _poll_profile_snapshot(
+        snapshot_id,
+        job=job,
+        db=db,
+        progress_start=8,
+        progress_end=35,
+        log_label="report-profile",
+    )
+    if not results:
+        raise Exception(
+            "Timed out waiting for competitor profiles before report generation. Try again shortly."
+        )
+
+    updated_ids = await _update_existing_competitors_from_profiles(db, results, user_id)
+    if not updated_ids:
+        raise Exception("Could not refresh competitor profiles before report generation.")
+
+    if job:
+        job.progress = 40
+        db.add(job)
+        await db.commit()
+
+    await _fetch_all_competitor_media(db, updated_ids[:MAX_COMPETITORS_TO_ANALYZE], user_id)
+
+    if job:
+        job.progress = 55
+        db.add(job)
+        await db.commit()
+
+    logger.info(
+        "Prepared competitor Bright Data for report (user=%s, accounts=%d)",
+        user_id,
+        len(updated_ids),
+    )
+    return True
 
 
 async def _update_existing_competitors_from_profiles(
