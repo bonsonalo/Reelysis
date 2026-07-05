@@ -21,7 +21,25 @@ type ErrorInfo = {
 function interpretError(message?: string | null): ErrorInfo {
   const text = (message ?? '').toLowerCase()
 
-  if (text.includes('quota') || text.includes('budget') || text.includes('tomorrow')) {
+  if (
+    text.includes('final report') &&
+    text.includes('tomorrow') &&
+    (text.includes('budget') || text.includes('quota'))
+  ) {
+    return {
+      title: 'Almost there',
+      description:
+        'Your videos were analyzed, but we ran out of AI capacity before writing the report. Those analyses are saved. Try again tomorrow and it should finish quickly.',
+      tone: 'limit',
+      canRetry: false,
+    }
+  }
+  if (
+    text.includes('daily quota') ||
+    text.includes('daily limit') ||
+    text.includes('no gemini budget left today') ||
+    (text.includes('tomorrow') && (text.includes('quota') || text.includes('budget')))
+  ) {
     return {
       title: 'Daily AI limit reached',
       description:
@@ -38,10 +56,29 @@ function interpretError(message?: string | null): ErrorInfo {
       canRetry: true,
     }
   }
-  if (text.includes('rate') || text.includes('429')) {
+  if (
+    text.includes('503') ||
+    text.includes('unavailable') ||
+    text.includes('high demand') ||
+    text.includes('try again in a few minutes')
+  ) {
     return {
-      title: 'The AI is busy right now',
-      description: 'We hit a brief rate limit. Wait a moment, then try again.',
+      title: 'AI is under heavy load',
+      description: 'Gemini hit a temporary capacity spike. Wait a few minutes, then try again.',
+      tone: 'error',
+      canRetry: true,
+    }
+  }
+  if (
+    text.includes('429') ||
+    text.includes('rate limit') ||
+    text.includes('per minute') ||
+    text.includes('perminute') ||
+    text.includes('too many requests per minute')
+  ) {
+    return {
+      title: 'Too many requests at once',
+      description: 'Wait about a minute, then try again.',
       tone: 'error',
       canRetry: true,
     }
