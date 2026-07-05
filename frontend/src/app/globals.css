@@ -4,11 +4,11 @@
 :root {
   --background: #000000;
   --foreground: #ffffff;
-  --card: #09090b;
+  --card: #121212;
   --card-foreground: #ffffff;
   --popover: #000000;
   --popover-foreground: #ffffff;
-  --primary: #f97316; /* Action Orange */
+  --primary: #f97316;
   --primary-foreground: #ffffff;
   --secondary: #27272a;
   --secondary-foreground: #ffffff;
@@ -22,6 +22,22 @@
   --input: #27272a;
   --ring: #f97316;
   --radius: 0.75rem;
+
+  /* Elevation — page darkest, then sidebar, then cards/inputs */
+  --surface-page: #000000;
+  --surface-sidebar: #0a0a0a;
+  --surface-card: #121212;
+  --surface-input: #18181b;
+  --surface-hover: #1a1a1e;
+
+  /* Borders — structural chrome slightly stronger than cards */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-sidebar: rgba(255, 255, 255, 0.1);
+
+  /* Text — secondary tuned per surface */
+  --text-secondary: #a1a1aa;
+  --text-label: #d4d4d8;
+  --text-tertiary: #71717a;
 }
 
 @theme inline {
@@ -40,13 +56,68 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
+  --color-surface-page: var(--surface-page);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-card: var(--surface-card);
+  --color-surface-input: var(--surface-input);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-sidebar: var(--border-sidebar);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-label: var(--text-label);
+  --color-text-tertiary: var(--text-tertiary);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    100deg,
+    var(--text-tertiary) 0%,
+    var(--text-tertiary) 40%,
+    #ffffff 50%,
+    var(--text-tertiary) 60%,
+    var(--text-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: shimmer-sweep 2.2s linear infinite;
 }
