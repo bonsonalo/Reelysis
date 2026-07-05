@@ -12,6 +12,7 @@ import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@
 import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
 import { getReportGenerationUi } from '@/features/reports/utils/reportGenerationProgress'
+import { getCompetitorDiscoveryUi, getInstagramSyncUi } from '@/features/jobs/utils/jobProgressUtils'
 
 // Components
 import { ConnectStep } from './components/ConnectStep'
@@ -19,8 +20,11 @@ import { AnalyzingStep } from './components/AnalyzingStep'
 import { NicheStep } from './components/NicheStep'
 import { CompetitorStep } from './components/CompetitorStep'
 import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
-import { Loader2, CheckCircle2, ArrowRight, Check } from 'lucide-react'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
+import { OnboardingPageSkeleton } from '@/components/shared/PageSkeletons'
+import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { OnboardingStepFrame } from './components/OnboardingStepFrame'
 
 type OnboardingStep = 
   | 'CONNECT' 
@@ -33,11 +37,7 @@ type OnboardingStep =
 
 export default function OnboardingPage() {
   return (
-    <Suspense fallback={
-      <div className="flex h-screen w-full items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense fallback={<OnboardingPageSkeleton />}>
       <OnboardingContent />
     </Suspense>
   )
@@ -129,18 +129,16 @@ function OnboardingContent() {
   const account = accounts?.[0]
   const isConnected = !!account
 
-  const syncTasks = [
-    { label: "Establishing Meta Handshake", status: isJustConnected || isConnected ? "completed" : "running" as any },
-    { label: "Indexing Reel Performance", status: syncJob?.status === "succeeded" ? "completed" : (syncJob ? "running" : "pending") as any },
-    { label: "Parsing Captions & Hashtags", status: syncJob?.status === "succeeded" ? "completed" : "pending" as any },
-    { label: "Profiling Content Pillars", status: account?.niche_detected ? "completed" : "pending" as any },
-  ]
+  const syncUi = getInstagramSyncUi(
+    syncJob?.progress ?? 0,
+    syncJob?.status,
+    !!account?.niche_detected,
+  )
 
-  const discoveryTasks = [
-    { label: "Querying Market Database", status: "completed" as any },
-    { label: "Identifying High-Growth Profiles", status: discoveryJob?.status === "succeeded" ? "completed" : "running" as any },
-    { label: "Calculating Engagement Strength", status: discoveryJob?.status === "succeeded" ? "completed" : "pending" as any },
-  ]
+  const discoveryUi = getCompetitorDiscoveryUi(
+    discoveryJob?.progress ?? 0,
+    discoveryJob?.status,
+  )
 
   // 3. Flow Logic
   useEffect(() => {
@@ -214,7 +212,6 @@ function OnboardingContent() {
   }
 
   // 5. Render
-  console.log('Rendering step:', step)
   switch (step) {
     case 'CONNECT':
       return <ConnectStep onConnect={handleConnect} isConnecting={isConnecting} />
@@ -222,22 +219,16 @@ function OnboardingContent() {
     case 'ANALYZING':
       const isConnectionSuccess = !hasApprovedSync && (isConnected || isJustConnected)
       return (
-        <AnalyzingStep 
-          title={isConnectionSuccess ? "Auth Verified" : "Data Indexing"}
-          description={isConnectionSuccess 
-            ? "Instagram node connected. Initializing deep-scan sequence." 
-            : "Indexing your Reel metrics and transcribing content DNA."
+        <AnalyzingStep
+          statusText={
+            isConnectionSuccess
+              ? 'Instagram connected. Start the sync when you are ready.'
+              : syncUi.description
           }
-          tasks={syncTasks}
+          tasks={isConnectionSuccess ? undefined : syncUi.tasks}
         >
           {isConnectionSuccess && (
-            <Button 
-              onClick={() => setHasApprovedSync(true)}
-              className="mt-8 h-12 px-8 text-lg font-bold flex items-center gap-2"
-            >
-              <Check className="h-5 w-5" />
-              <span>Initialize Deep Scan</span>
-            </Button>
+            <Button onClick={() => setHasApprovedSync(true)}>Start sync</Button>
           )}
         </AnalyzingStep>
       )
@@ -256,37 +247,34 @@ function OnboardingContent() {
       const isDiscoveryDone = discoveryJob?.status === 'succeeded'
       const isDiscoveryFailed = discoveryJob?.status === 'failed'
       return (
-        <AnalyzingStep 
-          title={isDiscoveryFailed ? "Discovery Unavailable" : isDiscoveryDone ? "Indexing Complete" : "Market Discovery"} 
-          description={isDiscoveryFailed
-            ? "Auto-discovery couldn't find accounts. Add competitors manually or retry."
-            : isDiscoveryDone
-            ? "Competitor dataset ready for review and selection." 
-            : "Scanning the niche for top-performing creator benchmarks."
+        <AnalyzingStep
+          statusText={
+            isDiscoveryFailed
+              ? discoveryUi.description
+              : isDiscoveryDone
+                ? 'Competitor accounts found. Review and confirm your list.'
+                : discoveryUi.description
           }
-          tasks={discoveryTasks}
+          tasks={isDiscoveryDone ? undefined : discoveryUi.tasks}
+          errorMessage={isDiscoveryFailed ? discoveryJob?.error_message : undefined}
         >
           {isDiscoveryDone && (
-            <Button 
+            <Button
               onClick={() => {
                 setHasApprovedCompetitors(true)
                 setStep('COMPETITORS')
               }}
-              className="mt-8 h-12 px-8 text-lg font-bold flex items-center gap-2"
             >
-              <Check className="h-5 w-5" />
-              <span>View Market Data</span>
+              Review competitors
             </Button>
           )}
           {isDiscoveryFailed && (
-            <div className="flex flex-col items-center gap-4 mt-8 w-full max-w-md mx-auto">
+            <div className="flex w-full max-w-md flex-col items-center gap-4">
               <div className="flex flex-wrap justify-center gap-3">
-                <Button
-                  onClick={() => rediscoverCompetitors()}
-                  disabled={isRediscovering}
-                  className="h-12 px-8 text-lg font-bold"
-                >
-                  {isRediscovering ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Retry discovery'}
+                <Button onClick={() => rediscoverCompetitors()} disabled={isRediscovering}>
+                  <ButtonLoadingLabel loading={isRediscovering} loadingLabel="Retrying…">
+                    Retry discovery
+                  </ButtonLoadingLabel>
                 </Button>
                 <Button
                   variant="outline"
@@ -294,7 +282,6 @@ function OnboardingContent() {
                     setHasApprovedCompetitors(true)
                     setStep('COMPETITORS')
                   }}
-                  className="h-12 px-8 text-lg font-bold border-white/10"
                 >
                   Add manually
                 </Button>
@@ -312,7 +299,6 @@ function OnboardingContent() {
       )
     
     case 'COMPETITORS':
-      console.log('COMPETITORS step rendering:', { competitors, competitorsCount: competitors?.length })
       return (
         <CompetitorStep 
           competitors={competitors || []} 
@@ -326,36 +312,29 @@ function OnboardingContent() {
       const isRoadmapFailed = roadmapJob?.status === 'failed'
       const roadmapUi = getReportGenerationUi(roadmapJob?.progress ?? 0, roadmapJob?.status)
       return (
-        <AnalyzingStep 
-          title={isRoadmapFailed ? "Strategy Generation Failed" : "Building Your Strategy"} 
-          description={roadmapUi.description}
-          tasks={roadmapUi.tasks}
-          progressPercent={roadmapUi.progressPercent}
+        <AnalyzingStep
+          statusText={roadmapUi.description}
+          tasks={isRoadmapFailed ? undefined : roadmapUi.tasks}
+          errorMessage={isRoadmapFailed ? roadmapJob?.error_message : undefined}
         >
-          {isRoadmapFailed && roadmapJob?.error_message && (
-            <p className="text-sm text-red-400 text-center max-w-md mb-4">{roadmapJob.error_message}</p>
-          )}
           {isRoadmapFailed && (
-            <div className="flex gap-4 mt-8">
-              <Button 
-                onClick={() => generateRoadmap(undefined, {
-                  onSuccess: (data) => {
-                    if (data?.job_id) {
-                      setPendingReportJobId(String(data.job_id))
-                    }
-                    setStep('GENERATING_ROADMAP')
-                  },
-                })}
-                className="h-12 px-8 text-lg font-bold"
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button
+                onClick={() =>
+                  generateRoadmap(undefined, {
+                    onSuccess: (data) => {
+                      if (data?.job_id) {
+                        setPendingReportJobId(String(data.job_id))
+                      }
+                      setStep('GENERATING_ROADMAP')
+                    },
+                  })
+                }
               >
                 Retry
               </Button>
-              <Button 
-                onClick={() => setStep('COMPLETED')}
-                variant="outline"
-                className="h-12 px-8 text-lg font-bold"
-              >
-                Skip & Continue
+              <Button onClick={() => setStep('COMPLETED')} variant="outline">
+                Skip and continue
               </Button>
             </div>
           )}
@@ -365,22 +344,27 @@ function OnboardingContent() {
     
     case 'COMPLETED':
       return (
-        <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center px-4 text-center animate-in fade-in zoom-in duration-700">
-          <div className="mb-6 rounded-full bg-emerald-500/10 p-4">
-            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+        <OnboardingStepFrame narrow>
+          <div className="text-center">
+            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-surface-card">
+              <Check className="h-6 w-6 text-primary" strokeWidth={2} />
+            </div>
+            <h1 className="text-lg font-semibold text-white sm:text-xl">
+              Your strategy report is ready
+            </h1>
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-text-secondary">
+              We analyzed your Reels and competitors. Open the dashboard to read
+              your report and next steps.
+            </p>
+            <Button
+              onClick={() => router.push('/dashboard')}
+              className="mt-8 w-full sm:w-auto"
+              size="lg"
+            >
+              Go to dashboard
+            </Button>
           </div>
-          <h1 className="mb-2 text-4xl font-bold text-white">Your Strategy is Ready!</h1>
-          <p className="mb-10 max-w-md text-muted-foreground">
-            We've analyzed your niche and competitors. Your personalized growth roadmap is waiting for you in the dashboard.
-          </p>
-          <Button 
-            onClick={() => router.push('/dashboard')}
-            className="h-14 px-12 text-lg font-bold shadow-xl shadow-primary/20 flex items-center gap-2"
-          >
-            <Check className="h-5 w-5" />
-            <span>Finish & Go to Dashboard</span>
-          </Button>
-        </div>
+        </OnboardingStepFrame>
       )
 
     default:
