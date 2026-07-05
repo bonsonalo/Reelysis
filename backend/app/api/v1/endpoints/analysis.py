@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from uuid import UUID
 from typing import List, Optional
 
 from app.api.dep import db_dependency, user_authentication_dependency
+from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
 from app.service.analysis_service import get_job_status_service, get_user_jobs_service
 from app.service.report_service import (
     trigger_report_generation_service, 
@@ -37,13 +38,14 @@ router = APIRouter(
 async def get_jobs(
     db: db_dependency,
     current_user: user_authentication_dependency,
-    job_type: Optional[str] = Query(None, alias="type")
+    job_type: Optional[str] = Query(None, alias="type"),
+    limit: Optional[int] = Query(None, ge=1, le=50),
 ):
     """
     Returns the list of background jobs for the current user.
     """
     try:
-        jobs = await get_user_jobs_service(current_user["id"], job_type, db)
+        jobs = await get_user_jobs_service(current_user["id"], job_type, db, limit=limit)
         return jobs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -211,9 +213,11 @@ async def get_job_status(
     }
 
 @router.post("/report/generate")
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
 async def generate_report(
+    request: Request,
     db: db_dependency,
-    current_user: user_authentication_dependency
+    current_user: user_authentication_dependency,
 ):
     """
     Manually triggers the strategic report generation job.
