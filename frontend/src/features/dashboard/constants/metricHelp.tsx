@@ -81,7 +81,7 @@ export const METRIC_HELP = {
     title: 'Content Pillar',
     body: (
       <Tip
-        what="The main theme — tutorial, story, tips, etc."
+        what="The main theme (tutorial, story, tips, etc.)"
         aim="Post more of what performs best for you."
       />
     ),
@@ -90,7 +90,7 @@ export const METRIC_HELP = {
     title: 'Pacing',
     body: (
       <Tip
-        what="How fast your Reel moves — cuts, energy, flow."
+        what="How fast your Reel moves: cuts, energy, flow."
         aim="Fast usually wins on Reels, but match your message."
       />
     ),
