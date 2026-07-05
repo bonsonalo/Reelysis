@@ -65,7 +65,11 @@ def transcribe_media_url(audio_url: str, caption: str = "") -> TranscriptResult:
             confidence=result.get("confidence"),
         )
     except Exception as e:
-        logger.exception(f"Transcription failed for URL: {e}")
+        message = str(e).lower()
+        if "no spoken audio" in message or "language_detection cannot be performed" in message:
+            logger.info("No spoken audio in media; will analyze from captions and metrics only.")
+        else:
+            logger.warning("Transcription failed for URL: %s", e)
         return TranscriptResult(text="", source="none")
 
 
@@ -212,7 +216,10 @@ def _run_transcription_internal(job_id: str, user_id: str):
                 job.progress = 100
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
-                _enqueue_video_analysis(db, user_uuid)
+                logger.info(
+                    "Transcription complete for user %s; video analysis deferred to report generation.",
+                    user_uuid,
+                )
                 return
 
             for index, (kind, item_id) in enumerate(targets):
@@ -250,7 +257,10 @@ def _run_transcription_internal(job_id: str, user_id: str):
             job.completed_at = datetime.now(timezone.utc)
             db.commit()
 
-            _enqueue_video_analysis(db, user_uuid)
+            logger.info(
+                "Transcription complete for user %s; video analysis deferred to report generation.",
+                user_uuid,
+            )
 
         except Exception as e:
             db.rollback()
@@ -261,21 +271,3 @@ def _run_transcription_internal(job_id: str, user_id: str):
                 job.error_message = str(e)
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
-
-
-def _enqueue_video_analysis(db: Session, user_id: UUID):
-    video_job = AnalysisJob(
-        user_id=user_id,
-        job_type="video_analysis",
-        status="queued",
-        progress=0,
-    )
-    db.add(video_job)
-    db.commit()
-    db.refresh(video_job)
-
-    celery_app.send_task(
-        "app.service.video_analysis_service.run_video_analysis_task",
-        args=[str(video_job.id), str(user_id)],
-    )
-    logger.info(f"Video analysis queued after transcription for user {user_id}")
