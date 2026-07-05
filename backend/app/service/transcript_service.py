@@ -139,6 +139,28 @@ async def run_bulk_transcription_service(user_id: UUID, db: AsyncSession) -> Ana
     return job
 
 
+def run_transcription_sync(user_id: UUID) -> None:
+    """Run pending transcriptions inline (no Celery, no video-analysis enqueue)."""
+    with Session(sync_engine) as db:
+        targets = _collect_transcription_targets(db, user_id)
+        for kind, item_id in targets:
+            try:
+                if kind == "own":
+                    item = db.exec(select(MediaItem).where(MediaItem.id == item_id)).first()
+                else:
+                    item = db.exec(
+                        select(CompetitorMedia).where(CompetitorMedia.id == item_id)
+                    ).first()
+                if not item:
+                    continue
+                _apply_transcript_to_item(item, item.caption)
+                db.add(item)
+                db.commit()
+            except StaleDataError:
+                db.rollback()
+                logger.warning("Skipping stale %s media %s during sync transcription", kind, item_id)
+
+
 def enqueue_transcription_for_user(db: Session, user_id: UUID) -> AnalysisJob:
     """Sync helper for Celery workers that already hold a Session."""
     job = AnalysisJob(
