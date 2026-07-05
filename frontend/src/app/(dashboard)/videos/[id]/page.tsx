@@ -1,210 +1,309 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useVideoAnalysis } from '@/features/dashboard/hooks/useVideoAnalysis'
-import { 
-  ArrowLeft, 
-  Zap, 
-  Target, 
-  BarChart3, 
-  MessageSquareText, 
-  TrendingUp,
-  AlertCircle,
-  CheckCircle2,
-  ShieldCheck,
-  Play,
-  ExternalLink
-} from 'lucide-react'
+import { ReelThumbnail } from '@/features/dashboard/components/ReelThumbnail'
+import { ArrowLeft, ArrowUpRight, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MetricLabel } from '@/components/shared/MetricInfoTip'
 import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
-import { Loader2 } from 'lucide-react'
+import { Panel } from '@/components/shared/Panel'
+import { cn } from '@/lib/utils'
+
+function formatNumber(num: number) {
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
+  return num.toLocaleString()
+}
+
+function hookScoreTone(score: number) {
+  if (score >= 80) return 'text-emerald-400'
+  if (score < 50) return 'text-text-secondary'
+  return 'text-white'
+}
+
+function StatCell({
+  label,
+  help,
+  value,
+  valueClassName,
+}: {
+  label: string
+  help?: (typeof METRIC_HELP)[keyof typeof METRIC_HELP]
+  value: string
+  valueClassName?: string
+}) {
+  return (
+    <div className="px-4 py-4 sm:px-5 sm:py-5">
+      <div className="text-xs text-text-secondary sm:text-sm">
+        <MetricLabel label={label} help={help} tipSide="top" />
+      </div>
+      <p
+        className={cn(
+          'mt-1.5 text-xl font-semibold tabular-nums tracking-tight sm:text-2xl',
+          valueClassName ?? 'text-white',
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function InsightSection({
+  title,
+  description,
+  items,
+}: {
+  title: string
+  description: string
+  items: string[]
+}) {
+  return (
+    <Panel className="overflow-hidden">
+      <div className="border-b border-border-subtle px-4 py-4 sm:px-6 md:py-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-sm font-semibold text-white md:text-base">{title}</h2>
+          {items.length > 0 && (
+            <span className="shrink-0 text-xs tabular-nums text-text-tertiary">
+              {items.length}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 max-w-xl text-xs leading-relaxed text-text-secondary md:text-sm">
+          {description}
+        </p>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-text-tertiary sm:px-6 md:py-8">
+          Nothing noted for this reel.
+        </p>
+      ) : (
+        <ol className="divide-y divide-border-subtle">
+          {items.map((item, index) => (
+            <li
+              key={index}
+              className="flex gap-3.5 px-4 py-4 sm:gap-4 sm:px-6 sm:py-[1.125rem] md:py-5"
+            >
+              <span
+                className="mt-[0.55rem] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-input text-[10px] font-medium tabular-nums text-text-tertiary"
+                aria-hidden
+              >
+                {index + 1}
+              </span>
+              <p className="min-w-0 flex-1 text-sm leading-[1.7] text-text-secondary md:text-[15px] md:leading-[1.75]">
+                {item}
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Panel>
+  )
+}
 
 export default function VideoDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const videoId = params.id as string
-  
+
   const { data, isLoading } = useVideoAnalysis(videoId)
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-80px)] w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
+        <div className="border-b border-border-subtle pb-6 md:pb-8">
+          <div className="mb-5 h-4 w-24 animate-pulse rounded bg-white/[0.06]" />
+          <div className="h-7 w-2/3 max-w-lg animate-pulse rounded bg-white/[0.06]" />
+          <div className="mt-3 h-4 w-40 animate-pulse rounded bg-white/[0.04]" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,300px)_1fr]">
+          <div className="mx-auto aspect-[9/16] w-full max-w-[220px] animate-pulse rounded-[10px] bg-surface-card sm:max-w-[260px] lg:mx-0 lg:max-w-none" />
+          <div className="space-y-4">
+            <div className="h-[120px] animate-pulse rounded-[10px] bg-surface-card" />
+            <div className="h-[200px] animate-pulse rounded-[10px] bg-surface-card" />
+            <div className="h-[240px] animate-pulse rounded-[10px] bg-surface-card" />
+          </div>
+        </div>
       </div>
     )
   }
 
-  if (!data) {
+  if (!data?.media) {
     return (
-      <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center text-center">
-        <AlertCircle className="h-12 w-12 text-zinc-500 mb-4" />
-        <h2 className="text-xl font-bold text-white">Video analysis not found.</h2>
-        <Button variant="link" onClick={() => router.back()} className="text-primary mt-2">
-          Go back
+      <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center p-4 text-center">
+        <AlertCircle className="mb-4 h-12 w-12 text-text-tertiary" />
+        <h2 className="text-base font-semibold text-white">Reel not found</h2>
+        <p className="mt-2 max-w-sm text-sm text-text-secondary">
+          This reel may have been removed or is no longer synced to your account.
+        </p>
+        <Button asChild className="mt-6">
+          <Link href="/videos">Back to Reels</Link>
         </Button>
       </div>
     )
   }
 
   const { media, analysis, metrics } = data
-  const detail = analysis.analysis_detail
+  const detail = analysis?.analysis_detail
+  const views = metrics?.view ?? 0
+  const hookScore = analysis?.hook_score ?? 0
+  const engagement = analysis?.engagement_score ?? 0
+  const confidence = analysis?.confidence ?? 0
+  const caption = media.caption?.trim()
+  const hasTranscript =
+    Boolean(media.transcript_text) && media.transcript_source !== 'none'
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <button 
-          onClick={() => router.back()}
-          className="group flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+    <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
+      <header className="border-b border-border-subtle pb-6 md:pb-8">
+        <Link
+          href="/videos"
+          className="mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-          <span className="font-bold text-sm uppercase tracking-wider">Back to Dashboard</span>
-        </button>
-        
-        <a 
-          href={media.permalink} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 text-primary hover:underline font-bold text-sm"
-        >
-          View on Instagram <ExternalLink className="h-4 w-4" />
-        </a>
-      </div>
+          <ArrowLeft className="h-4 w-4" />
+          All Reels
+        </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Video Preview & Primary Stats */}
-        <div className="space-y-6">
-          <div className="relative aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 bg-zinc-900 shadow-2xl group">
-             <img
-               src={media.thumbnail_url}
-               alt="Video Thumbnail"
-               className="h-full w-full object-cover opacity-80"
-               referrerPolicy="no-referrer"
-             />
-             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-16 w-16 rounded-full bg-primary/20 backdrop-blur-md border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                   <Play className="h-8 w-8 fill-current ml-1" />
-                </div>
-             </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold leading-snug text-white md:text-2xl">
+              {caption || 'Untitled reel'}
+            </h1>
+            {analysis && (
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+                <span className="capitalize">{analysis.content_pillar}</span>
+                {detail?.pacing && (
+                  <>
+                    <span className="text-text-tertiary" aria-hidden>
+                      ·
+                    </span>
+                    <span>{detail.pacing} pacing</span>
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-             <div className="rounded-2xl border border-white/5 bg-[#09090b] p-4 text-center">
-                <div className="text-[10px] uppercase font-bold text-zinc-500 mb-1">
-                  <MetricLabel label="Total Views" help={METRIC_HELP.videoViews} className="justify-center" />
-                </div>
-                <p className="text-2xl font-black text-white">{metrics.view.toLocaleString()}</p>
-             </div>
-             <div className="rounded-2xl border border-white/5 bg-[#09090b] p-4 text-center">
-                <div className="text-[10px] uppercase font-bold text-zinc-500 mb-1">
-                  <MetricLabel label="Engagement" help={METRIC_HELP.videoEngagement} className="justify-center" />
-                </div>
-                <p className="text-2xl font-black text-emerald-500">{analysis.engagement_score}%</p>
-             </div>
-          </div>
+          <a
+            href={media.permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+          >
+            Open on Instagram
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
         </div>
+      </header>
 
-        {/* Right: AI Analysis Deep Dive */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Top Scorecard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 relative overflow-visible">
-               <Zap className="absolute -top-2 -right-2 h-16 w-16 text-primary/10 -rotate-12" />
-               <div className="text-xs font-bold text-primary uppercase tracking-widest mb-2">
-                 <MetricLabel label="Hook Score" help={METRIC_HELP.hookScore} />
-               </div>
-               <h3 className="text-4xl font-black text-white">{analysis.hook_score}<span className="text-lg text-primary/40">/100</span></h3>
-               <p className="text-xs text-zinc-400 mt-2 font-medium">"{detail.hook}"</p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,300px)_1fr]">
+        <aside className="lg:sticky lg:top-8 lg:self-start">
+          <a
+            href={media.permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative mx-auto block aspect-[9/16] w-full max-w-[220px] overflow-hidden rounded-[10px] border border-border-subtle bg-surface-card transition-[border-color] duration-150 hover:border-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 sm:max-w-[260px] lg:mx-0 lg:max-w-none"
+          >
+            <ReelThumbnail
+              thumbnailUrl={media.thumbnail_url}
+              alt={caption || 'Reel'}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/15" />
+          </a>
+          <p className="mt-3 hidden text-center text-xs text-text-tertiary lg:block">
+            Tap to watch on Instagram
+          </p>
+        </aside>
+
+        <div className="min-w-0 space-y-4 md:space-y-6">
+          <Panel className="grid grid-cols-2 divide-x divide-y divide-border-subtle sm:grid-cols-4 sm:divide-y-0">
+            <StatCell
+              label="Views"
+              help={METRIC_HELP.videoViews}
+              value={formatNumber(views)}
+            />
+            <StatCell
+              label="Engagement"
+              help={METRIC_HELP.videoEngagement}
+              value={`${engagement}%`}
+            />
+            <StatCell
+              label="Hook score"
+              help={METRIC_HELP.hookScore}
+              value={analysis ? `${hookScore}/100` : '-'}
+              valueClassName={analysis ? hookScoreTone(hookScore) : undefined}
+            />
+            <StatCell
+              label="Confidence"
+              help={METRIC_HELP.aiConfidence}
+              value={analysis ? `${confidence}%` : '-'}
+            />
+          </Panel>
+
+          {detail?.hook && (
+            <blockquote className="border-l-2 border-primary/30 py-0.5 pl-4 text-sm leading-[1.7] text-text-secondary md:text-[15px] md:leading-[1.75]">
+              <span className="mb-1.5 block text-xs font-medium text-text-label md:text-sm">
+                Opening hook
+              </span>
+              &ldquo;{detail.hook}&rdquo;
+            </blockquote>
+          )}
+
+          {analysis ? (
+            <div className="space-y-4 md:space-y-5">
+              <InsightSection
+                title="What worked"
+                description="Patterns that helped this reel perform"
+                items={detail?.strengths ?? []}
+              />
+              <InsightSection
+                title="Try next time"
+                description="Small tweaks for your next post"
+                items={detail?.weaknesses ?? []}
+              />
+            </div>
+          ) : (
+            <Panel className="px-4 py-10 text-center sm:px-6">
+              <p className="text-sm text-text-secondary">
+                Analysis isn&apos;t ready for this reel yet. Run New Analysis from the dashboard.
+              </p>
+            </Panel>
+          )}
+
+          <Panel className="overflow-hidden">
+            <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
+              <h2 className="text-sm font-semibold text-white md:text-base">Caption</h2>
+            </div>
+            <div className="px-4 py-4 sm:px-6 sm:py-5">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary md:text-base">
+                {caption || 'No caption on this reel.'}
+              </p>
             </div>
 
-            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
-               <ShieldCheck className="h-5 w-5 text-primary mb-3" />
-               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                 <MetricLabel label="AI Confidence" help={METRIC_HELP.aiConfidence} />
-               </div>
-               <h3 className="text-4xl font-black text-white">{analysis.confidence}<span className="text-lg text-zinc-500">%</span></h3>
-               <p className="text-xs text-zinc-400 mt-2">How certain the model is in this assessment</p>
+            <div className="border-t border-border-subtle px-4 py-4 sm:px-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-white md:text-base">Transcript</h2>
+                {hasTranscript && media.transcript_source && (
+                  <span className="text-xs text-text-tertiary">via {media.transcript_source}</span>
+                )}
+              </div>
+              {!hasTranscript && (
+                <p className="mt-1 text-xs text-text-tertiary">
+                  No spoken audio detected. Analysis used caption and metrics.
+                </p>
+              )}
             </div>
-            
-            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
-               <Target className="h-5 w-5 text-primary mb-3" />
-               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                 <MetricLabel label="Content Pillar" help={METRIC_HELP.contentPillar} />
-               </div>
-               <h3 className="text-xl font-bold text-white capitalize">{analysis.content_pillar}</h3>
+            <div className="border-t border-border-subtle px-4 py-4 sm:px-6 sm:py-5">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary md:text-base">
+                {hasTranscript
+                  ? media.transcript_text
+                  : 'Transcript not available for this reel.'}
+              </p>
             </div>
-
-            <div className="rounded-2xl border border-white/5 bg-[#09090b] p-6 overflow-visible">
-               <BarChart3 className="h-5 w-5 text-primary mb-3" />
-               <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                 <MetricLabel label="Pacing" help={METRIC_HELP.pacing} />
-               </div>
-               <h3 className="text-xl font-bold text-white">{detail.pacing}</h3>
-            </div>
-          </div>
-
-          {/* Transcript & Insights */}
-          <div className="space-y-6">
-             <div className="rounded-2xl border border-white/5 bg-[#09090b] p-8">
-                <div className="flex items-center gap-3 mb-6">
-                   <MessageSquareText className="h-5 w-5 text-primary" />
-                   <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Caption &amp; Transcript</h3>
-                </div>
-                <div className="prose prose-invert max-w-none">
-                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Caption</p>
-                   <p className="text-zinc-400 leading-relaxed italic border-l-2 border-primary/30 pl-4 py-1">
-                      {media.caption || "No caption available."}
-                   </p>
-                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mt-6 mb-2">Transcript</p>
-                   {media.transcript_source && media.transcript_source !== 'none' && media.transcript_text && (
-                     <p className="text-[10px] text-zinc-600 mb-2">
-                       Source: {media.transcript_source}
-                     </p>
-                   )}
-                   {(!media.transcript_text || media.transcript_source === 'none') && (
-                     <p className="text-[10px] text-amber-500/80 mb-2">
-                       Metadata-only analysis — no spoken transcript available.
-                     </p>
-                   )}
-                   <p className="text-white leading-relaxed font-medium">
-                      {media.transcript_text || "Transcript not available — analysis used caption and metrics only."}
-                   </p>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/5 p-6">
-                   <div className="flex items-center gap-2 mb-4 text-emerald-500">
-                      <CheckCircle2 className="h-5 w-5" />
-                      <h4 className="font-bold uppercase text-xs tracking-widest">Key Strengths</h4>
-                   </div>
-                   <ul className="space-y-3">
-                      {detail.strengths.map((s: string, i: number) => (
-                        <li key={i} className="text-sm text-zinc-300 flex items-start gap-2">
-                           <div className="h-1 w-1 rounded-full bg-emerald-500 mt-2" />
-                           {s}
-                        </li>
-                      ))}
-                   </ul>
-                </div>
-
-                <div className="rounded-2xl border border-orange-500/10 bg-orange-500/5 p-6">
-                   <div className="flex items-center gap-2 mb-4 text-orange-500">
-                      <TrendingUp className="h-5 w-5" />
-                      <h4 className="font-bold uppercase text-xs tracking-widest">Areas for Growth</h4>
-                   </div>
-                   <ul className="space-y-3">
-                      {detail.weaknesses.map((w: string, i: number) => (
-                        <li key={i} className="text-sm text-zinc-300 flex items-start gap-2">
-                           <div className="h-1 w-1 rounded-full bg-orange-500 mt-2" />
-                           {w}
-                        </li>
-                      ))}
-                   </ul>
-                </div>
-             </div>
-          </div>
+          </Panel>
         </div>
       </div>
     </div>
