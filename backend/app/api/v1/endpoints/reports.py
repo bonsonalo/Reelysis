@@ -1,9 +1,10 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.api.dep import db_dependency, user_authentication_dependency
+from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
 from app.schema.report_schema import ReportDetailResponse, ReportListItem, RecommendationResponse
 from app.service.report_service import (
     get_recommendations_for_report_service,
@@ -28,7 +29,9 @@ async def list_reports(
 
 
 @router.post("/generate")
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
 async def generate_report(
+    request: Request,
     db: db_dependency,
     current_user: user_authentication_dependency,
 ):
