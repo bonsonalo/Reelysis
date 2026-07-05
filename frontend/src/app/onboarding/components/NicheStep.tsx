@@ -1,7 +1,9 @@
 'use client'
 
-import { Sparkles, Loader2, Check } from 'lucide-react'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
+import { Panel } from '@/components/shared/Panel'
+import { OnboardingStepFrame } from './OnboardingStepFrame'
 
 interface NicheStepProps {
   niche: string
@@ -12,44 +14,42 @@ interface NicheStepProps {
 
 export function NicheStep({ niche, setNiche, onConfirm, isConfirming }: NicheStepProps) {
   return (
-    <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center px-4 animate-in fade-in slide-in-from-bottom-10 duration-700">
-      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#09090b] p-8 shadow-2xl">
-        <div className="mb-6 flex items-center justify-center">
-          <div className="rounded-full bg-primary/10 p-3">
-            <Sparkles className="h-8 w-8 text-primary" />
+    <OnboardingStepFrame narrow>
+      <Panel className="overflow-hidden">
+        <div className="border-b border-border-subtle px-4 py-4 sm:px-6 md:py-5">
+          <h2 className="text-sm font-semibold text-white md:text-base">Your niche</h2>
+          <p className="mt-0.5 text-xs leading-relaxed text-text-secondary md:text-sm">
+            We grouped your synced Reels and suggest this category. Edit it if
+            something looks off.
+          </p>
+        </div>
+
+        <div className="space-y-6 px-4 py-5 sm:px-6 md:py-6">
+          <div className="space-y-2">
+            <label htmlFor="niche" className="block text-xs font-medium text-text-label md:text-sm">
+              Content niche
+            </label>
+            <input
+              id="niche"
+              type="text"
+              value={niche}
+              onChange={(e) => setNiche(e.target.value)}
+              className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input px-4 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 sm:h-11"
+            />
           </div>
-        </div>
-        
-        <h2 className="mb-2 text-center text-2xl font-bold text-white">We detected your niche!</h2>
-        <p className="mb-8 text-center text-muted-foreground">
-          Our AI analyzed your content and suggests this category:
-        </p>
 
-        <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
-          <input 
-            type="text" 
-            value={niche}
-            onChange={(e) => setNiche(e.target.value)}
-            className="w-full bg-transparent text-center text-xl font-bold text-primary outline-none"
-          />
-          <p className="mt-1 text-xs text-primary/60">Click to edit if needed</p>
+          <Button
+            onClick={onConfirm}
+            disabled={isConfirming || !niche.trim()}
+            className="w-full"
+            size="lg"
+          >
+            <ButtonLoadingLabel loading={isConfirming} loadingLabel="Saving…">
+              Confirm niche
+            </ButtonLoadingLabel>
+          </Button>
         </div>
-
-        <Button 
-          onClick={onConfirm}
-          disabled={isConfirming}
-          className="h-12 w-full text-lg font-bold flex items-center justify-center gap-2"
-        >
-          {isConfirming ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <>
-              <Check className="h-5 w-5" />
-              <span>Yes, that's correct</span>
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
+      </Panel>
+    </OnboardingStepFrame>
   )
 }
