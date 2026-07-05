@@ -6,8 +6,26 @@ import json
 import os
 import re
 import time
+import asyncio
 
 _COMPETITOR_HANDLES_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+
+GEMINI_DAILY_QUOTA_MESSAGE = (
+    "Gemini API daily quota reached (free tier: 20 requests/day for gemini-2.5-flash). "
+    "Try again tomorrow or run competitor discovery on a different day to save budget for reports."
+)
+
+GEMINI_RATE_LIMIT_MESSAGE = (
+    "Gemini rate limit reached (too many requests per minute). Wait about a minute, then try again."
+)
+
+GEMINI_TRANSIENT_MESSAGE = (
+    "Gemini is temporarily unavailable due to high demand. Try again in a few minutes."
+)
+
+
+class GeminiQuotaExceededError(Exception):
+    """Raised when Gemini free-tier daily quota is exhausted."""
 
 
 def get_genai_client():
@@ -61,6 +79,10 @@ def detect_niche_service_sync(
     try:
         client = get_genai_client()
         prompt = _build_niche_detection_prompt(biography, captions, hashtags)
+        if not reserve_gemini_call():
+            logger.error("Gemini daily budget exhausted before niche detection")
+            return None
+        _throttle_gemini_rpm()
         response = client.models.generate_content(
             model=settings.AI_MODEL_FLASH,
             contents=prompt,
@@ -85,6 +107,49 @@ def _get_sync_redis():
     return redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
+def _gemini_usage_key() -> str:
+    from datetime import date
+
+    return f"gemini_usage:{date.today().isoformat()}"
+
+
+def get_gemini_calls_today() -> int:
+    if settings.AI_SIMULATION_MODE:
+        return 0
+    try:
+        value = _get_sync_redis().get(_gemini_usage_key())
+        return int(value) if value else 0
+    except Exception as e:
+        logger.warning("Could not read Gemini usage counter: %s", e)
+        return 0
+
+
+def remaining_gemini_budget(*, reserve: int = 0) -> int:
+    """How many Gemini calls can still be made today (after reserve)."""
+    if settings.AI_SIMULATION_MODE:
+        return settings.GEMINI_DAILY_BUDGET
+    return max(0, settings.GEMINI_DAILY_BUDGET - get_gemini_calls_today() - reserve)
+
+
+def reserve_gemini_call() -> bool:
+    """Atomically reserve one daily Gemini slot. Returns False when budget is exhausted."""
+    if settings.AI_SIMULATION_MODE:
+        return True
+    try:
+        redis = _get_sync_redis()
+        key = _gemini_usage_key()
+        count = redis.incr(key)
+        if count == 1:
+            redis.expire(key, 86400 * 2)
+        if count > settings.GEMINI_DAILY_BUDGET:
+            redis.decr(key)
+            return False
+        return True
+    except Exception as e:
+        logger.warning("Could not reserve Gemini call slot: %s", e)
+        return True
+
+
 def _parse_gemini_retry_seconds(error: Exception) -> int | None:
     text = str(error)
     match = re.search(r"retry in (\d+(?:\.\d+)?)s", text, re.IGNORECASE)
@@ -98,9 +163,125 @@ def _is_gemini_quota_error(error: Exception) -> bool:
     return "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower()
 
 
+def _is_gemini_transient_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return "503" in text or "unavailable" in text or "high demand" in text
+
+
+def _is_gemini_rate_limit_error(error: Exception) -> bool:
+    """Per-minute 429, not the daily cap."""
+    if not _is_gemini_quota_error(error):
+        return False
+    return not _is_gemini_daily_quota_error(error)
+
+
 def _is_gemini_daily_quota_error(error: Exception) -> bool:
+    """
+    True only for the per-DAY free-tier cap, not the per-minute rate limit.
+
+    Both errors reference the same metric (…/generate_content_free_tier_requests),
+    so we key off the quotaId dimension: 'PerDay' => daily cap (retry tomorrow),
+    'PerMinute' => transient rate limit (short backoff + retry).
+    """
     text = str(error)
-    return "PerDay" in text or "free_tier_requests" in text
+    lowered = text.lower()
+    if "perminute" in lowered or "per minute" in lowered:
+        return False
+    return "PerDay" in text or "per day" in lowered
+
+
+def _throttle_gemini_rpm() -> None:
+    """
+    Pace Gemini calls to stay under the free-tier per-minute request limit.
+
+    A single report fires many flash calls in a burst (one per video + the final
+    write-up), which trips the 5 rpm free-tier ceiling. This uses a Redis fixed-window
+    counter so calls across all workers stay within GEMINI_MAX_RPM, sleeping into the
+    next window when the current one is full.
+    """
+    if settings.AI_SIMULATION_MODE:
+        return
+
+    max_rpm = max(1, settings.GEMINI_MAX_RPM)
+    try:
+        redis = _get_sync_redis()
+    except Exception as e:
+        logger.warning("Could not connect to Redis for Gemini RPM throttle: %s", e)
+        return
+
+    for _ in range(6):  # safety cap: never wait more than ~a few windows
+        window = int(time.time() // 60)
+        key = f"gemini_rpm:{window}"
+        try:
+            count = redis.incr(key)
+            if count == 1:
+                redis.expire(key, 120)
+        except Exception as e:
+            logger.warning("Could not apply Gemini RPM throttle: %s", e)
+            return
+
+        if count <= max_rpm:
+            return
+
+        try:
+            redis.decr(key)
+        except Exception:
+            pass
+
+        sleep_for = 60 - (time.time() % 60) + 0.5
+        logger.info(
+            "Gemini RPM limit (%s/min) reached; waiting %.1fs for next window",
+            max_rpm,
+            sleep_for,
+        )
+        time.sleep(min(sleep_for, 60))
+
+    logger.warning("Gemini RPM throttle exceeded max wait window; proceeding")
+
+
+async def _generate_content_with_retry(
+    client,
+    *,
+    model: str,
+    contents,
+    config=None,
+    max_attempts: int = 5,
+):
+    """Call Gemini with backoff on transient/rate-limit errors; fail fast on daily quota."""
+    last_error: Exception | None = None
+    for attempt in range(max_attempts):
+        if attempt == 0 and not settings.AI_SIMULATION_MODE and not reserve_gemini_call():
+            raise GeminiQuotaExceededError(GEMINI_DAILY_QUOTA_MESSAGE)
+        try:
+            await asyncio.to_thread(_throttle_gemini_rpm)
+            kwargs = {"model": model, "contents": contents}
+            if config is not None:
+                kwargs["config"] = config
+            return await asyncio.to_thread(client.models.generate_content, **kwargs)
+        except Exception as e:
+            last_error = e
+            logger.error("Gemini generate_content failed (attempt %s): %s", attempt + 1, e)
+            if _is_gemini_daily_quota_error(e):
+                raise GeminiQuotaExceededError(GEMINI_DAILY_QUOTA_MESSAGE) from e
+            if attempt < max_attempts - 1:
+                if _is_gemini_rate_limit_error(e):
+                    delay = _parse_gemini_retry_seconds(e) or 30
+                    await asyncio.sleep(min(delay, 60))
+                    continue
+                if _is_gemini_transient_error(e):
+                    await asyncio.sleep(min(5 * (attempt + 1), 30))
+                    continue
+            break
+
+    if last_error:
+        if _is_gemini_daily_quota_error(last_error):
+            raise GeminiQuotaExceededError(GEMINI_DAILY_QUOTA_MESSAGE) from last_error
+        if _is_gemini_rate_limit_error(last_error):
+            raise RuntimeError(GEMINI_RATE_LIMIT_MESSAGE) from last_error
+        if _is_gemini_transient_error(last_error):
+            raise RuntimeError(GEMINI_TRANSIENT_MESSAGE) from last_error
+        raise last_error
+    raise RuntimeError("Gemini generate_content failed with no error")
 
 
 def get_cached_competitor_handles_sync(niche: str, exclude_handle: str | None = None) -> list[str]:
@@ -218,6 +399,9 @@ def suggest_competitor_handles_sync(
     last_error: Exception | None = None
     for attempt in range(3):
         try:
+            if not reserve_gemini_call():
+                return ([], GEMINI_DAILY_QUOTA_MESSAGE)
+            _throttle_gemini_rpm()
             response = client.models.generate_content(
                 model=settings.AI_MODEL_FLASH,
                 contents=prompt,
@@ -350,19 +534,22 @@ async def analyze_video_service(caption: str, transcript: str, hashtags: list[st
         Evaluate hook, pacing, category, content pillar, strengths, and weaknesses.
         """
         
-        response = client.models.generate_content(
+        response = await _generate_content_with_retry(
+            client,
             model=settings.AI_MODEL_FLASH,
             contents=prompt,
             config={
                 'response_mime_type': 'application/json',
                 'response_schema': VideoAnalysisResponse,
-            }
+            },
         )
         
         analysis = response.parsed
         logger.info(f"AI Video Analysis successful for topic: {analysis.topic}")
         return analysis
 
+    except GeminiQuotaExceededError:
+        raise
     except Exception as e:
         logger.error(f"Error in Gemini video analysis: {e}")
         return None
@@ -409,19 +596,24 @@ async def generate_strategic_report_service(user_data: dict, competitor_data: li
         4. Generate a detailed report in Markdown format for the user to read.
         """
         
-        response = client.models.generate_content(
-            model=settings.AI_MODEL_PRO, # Using Pro for the final strategic report
+        response = await _generate_content_with_retry(
+            client,
+            model=settings.AI_MODEL_PRO,
             contents=prompt,
             config={
                 'response_mime_type': 'application/json',
                 'response_schema': StrategicReportResponse,
-            }
+            },
         )
         
         report = response.parsed
         logger.info("AI Strategic Report generated successfully.")
         return report
 
+    except GeminiQuotaExceededError:
+        raise
     except Exception as e:
         logger.error(f"Error in Gemini strategic report generation: {e}")
-        return None
+        if _is_gemini_daily_quota_error(e):
+            raise GeminiQuotaExceededError(GEMINI_DAILY_QUOTA_MESSAGE) from e
+        raise
