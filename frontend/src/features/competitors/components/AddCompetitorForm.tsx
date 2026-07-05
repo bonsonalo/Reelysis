@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
 import { useAddCompetitor } from '../hooks/useCompetitors'
 
@@ -40,27 +40,24 @@ export function AddCompetitorForm({ className, onAdded }: AddCompetitorFormProps
 
   return (
     <form onSubmit={handleSubmit} className={className}>
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">@</span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-tertiary">
+            @
+          </span>
           <input
             type="text"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             placeholder="competitor_handle"
             disabled={isPending}
-            className="w-full h-12 pl-9 pr-4 rounded-xl border border-white/10 bg-black text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary/50"
+            className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input pl-8 pr-3 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
           />
         </div>
-        <Button type="submit" disabled={isPending} className="h-12 px-6 font-bold shrink-0">
-          {isPending ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Add competitor
-            </>
-          )}
+        <Button type="submit" size="sm" disabled={isPending} className="shrink-0">
+          <ButtonLoadingLabel loading={isPending} loadingLabel="Adding…">
+            Add competitor
+          </ButtonLoadingLabel>
         </Button>
       </div>
       {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
