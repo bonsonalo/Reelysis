@@ -13,7 +13,8 @@ from app.model.competitor_media import CompetitorMedia
 from app.model.media_metrics import MediaMetric
 from app.model.video_analysis import VideoAnalysis, MediaSource
 from app.model.analysis_job import AnalysisJob
-from app.service.ai_service import analyze_video_service
+from app.service.ai_service import analyze_video_service, GeminiQuotaExceededError, remaining_gemini_budget
+from app.core.config import settings
 from app.utils.scoring import normalize_score_0_100
 
 async def run_bulk_video_analysis_service(user_id: UUID, db: AsyncSession):
@@ -40,7 +41,55 @@ async def run_bulk_video_analysis_service(user_id: UUID, db: AsyncSession):
 def run_video_analysis_task(job_id: str, user_id: str):
     return _run_analysis_internal(job_id, user_id)
 
-def _run_analysis_internal(job_id: str, user_id: str):
+def _competitor_engagement(item: CompetitorMedia) -> int:
+    metrics = item.metrics or {}
+    views = int(metrics.get("view_count") or metrics.get("views") or 0)
+    likes = int(metrics.get("like_count") or metrics.get("likes") or 0)
+    comments = int(metrics.get("comment_count") or metrics.get("comments") or 0)
+    return views + likes * 10 + comments * 5
+
+
+def _select_videos_for_budget(
+    own_media: list[MediaItem],
+    comp_media: list[CompetitorMedia],
+    gemini_budget: int | None,
+) -> tuple[list[MediaItem], list[CompetitorMedia]]:
+    """Pick the highest-value unanalyzed videos that fit today's Gemini budget."""
+    if gemini_budget is None:
+        return own_media, comp_media
+    if gemini_budget <= 0:
+        return [], []
+
+    own_sorted = sorted(
+        own_media,
+        key=lambda item: item.published_at or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    comp_sorted = sorted(comp_media, key=_competitor_engagement, reverse=True)
+
+    max_own = min(len(own_sorted), settings.REPORT_MAX_OWN_VIDEOS, gemini_budget)
+    own_selected = own_sorted[:max_own]
+    remaining = gemini_budget - len(own_selected)
+    comp_selected = comp_sorted[
+        : min(len(comp_sorted), settings.REPORT_MAX_COMPETITOR_VIDEOS, remaining)
+    ]
+
+    if len(own_selected) + len(comp_selected) < len(own_media) + len(comp_media):
+        logger.info(
+            "Free-tier Gemini budget: analyzing %d/%d own + %d/%d competitor videos "
+            "(budget=%d for video analysis; %d reserved for report)",
+            len(own_selected),
+            len(own_media),
+            len(comp_selected),
+            len(comp_media),
+            gemini_budget,
+            settings.GEMINI_REPORT_RESERVE,
+        )
+
+    return own_selected, comp_selected
+
+
+def _run_analysis_internal(job_id: str, user_id: str, gemini_budget: int | None = None):
     try:
         job_uuid = UUID(job_id)
         user_uuid = UUID(user_id)
@@ -62,6 +111,7 @@ def _run_analysis_internal(job_id: str, user_id: str):
             # 1. Find all unanalyzed videos
             own_media = _get_unanalyzed_own_media(db, UUID(user_id))
             comp_media = _get_unanalyzed_competitor_media(db, UUID(user_id))
+            own_media, comp_media = _select_videos_for_budget(own_media, comp_media, gemini_budget)
             
             total_videos = len(own_media) + len(comp_media)
             if total_videos == 0:
@@ -123,12 +173,31 @@ def _run_analysis_internal(job_id: str, user_id: str):
             job.completed_at = datetime.now(timezone.utc)
             db.commit()
 
+        except GeminiQuotaExceededError:
+            raise
         except Exception as e:
             logger.error(f"Error in bulk analysis task: {e}")
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
                 db.commit()
+
+def run_video_analysis_sync(user_id: UUID, gemini_budget: int | None = None) -> None:
+    """Run pending video analysis inline for report generation."""
+    if gemini_budget is None:
+        gemini_budget = remaining_gemini_budget(reserve=settings.GEMINI_REPORT_RESERVE)
+    with Session(sync_engine) as db:
+        job = AnalysisJob(
+            user_id=user_id,
+            job_type="video_analysis",
+            status="queued",
+            progress=0,
+        )
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        _run_analysis_internal(str(job.id), str(user_id), gemini_budget=gemini_budget)
+
 
 async def get_video_analysis_service(video_id: UUID, user_id: UUID, db: AsyncSession):
     """
