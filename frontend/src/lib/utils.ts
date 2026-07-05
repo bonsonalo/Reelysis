@@ -35,7 +35,7 @@ export function formatLastSynced(isoDate: string | null | undefined): string {
 
 export function formatSyncError(message: string): string {
   if (message.includes('ConnectTimeout')) {
-    return 'Could not reach Instagram — connection timed out. Check your internet and try again.'
+    return 'Could not reach Instagram. Connection timed out. Check your internet and try again.'
   }
   if (message.includes('ReadTimeout')) {
     return 'Instagram took too long to respond. Try again in a moment.'
