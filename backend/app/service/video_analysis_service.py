@@ -56,7 +56,7 @@ def _select_videos_for_budget(
 ) -> tuple[list[MediaItem], list[CompetitorMedia]]:
     """Pick the highest-value unanalyzed videos that fit today's Gemini budget."""
     if gemini_budget is None:
-        return own_media, comp_media
+        gemini_budget = remaining_gemini_budget(reserve=settings.GEMINI_REPORT_RESERVE)
     if gemini_budget <= 0:
         return [], []
 
@@ -90,6 +90,9 @@ def _select_videos_for_budget(
 
 
 def _run_analysis_internal(job_id: str, user_id: str, gemini_budget: int | None = None):
+    if gemini_budget is None:
+        gemini_budget = remaining_gemini_budget(reserve=settings.GEMINI_REPORT_RESERVE)
+
     try:
         job_uuid = UUID(job_id)
         user_uuid = UUID(user_id)
