@@ -6,6 +6,7 @@ from sqlmodel import select, desc
 from typing import Optional
 from app.service.instagram_service import reconcile_instagram_sync_job
 from app.service.competitor_service import reconcile_competitor_discovery_job
+from app.service.report_service import reconcile_report_generation_job
 
 async def get_job_status_service(job_id: UUID, user_id: UUID, db: AsyncSession):
 
@@ -24,10 +25,17 @@ async def get_job_status_service(job_id: UUID, user_id: UUID, db: AsyncSession):
         job = await reconcile_instagram_sync_job(job, db)
     elif job.job_type == "competitor_discovery":
         job = await reconcile_competitor_discovery_job(job, db)
+    elif job.job_type == "report_generation":
+        job = await reconcile_report_generation_job(job, db)
         
     return job
 
-async def get_user_jobs_service(user_id: UUID, job_type: Optional[str], db: AsyncSession):
+async def get_user_jobs_service(
+    user_id: UUID,
+    job_type: Optional[str],
+    db: AsyncSession,
+    limit: Optional[int] = None,
+):
     """
     Retrieves background jobs for a specific user, optionally filtered by type.
     """
@@ -36,5 +44,17 @@ async def get_user_jobs_service(user_id: UUID, job_type: Optional[str], db: Asyn
         stmt = stmt.where(AnalysisJob.job_type == job_type)
     
     stmt = stmt.order_by(desc(AnalysisJob.created_at))
+    if limit is not None:
+        stmt = stmt.limit(limit)
     result = await db.exec(stmt)
-    return result.all()
+    jobs = result.all()
+
+    if job_type == "report_generation" and jobs:
+        reconciled = []
+        for job in jobs:
+            if job.status in ("queued", "running"):
+                job = await reconcile_report_generation_job(job, db)
+            reconciled.append(job)
+        return reconciled
+
+    return jobs
