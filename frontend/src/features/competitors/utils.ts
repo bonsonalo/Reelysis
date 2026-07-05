@@ -4,7 +4,7 @@
 export const MIN_FOLLOWERS_FOR_ENGAGEMENT_DISPLAY = 10_000
 
 export function formatCompetitorEngagement(rank: number): string {
-  if (!rank) return '—'
+  if (!rank) return '-'
   const percent = rank / 100
   if (percent < 0.1) return percent.toFixed(2)
   if (percent < 10) return percent.toFixed(1)
