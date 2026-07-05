@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageEmptyState } from '@/components/shared/PageEmptyState'
 import { ReelCard } from '@/features/dashboard/components/ReelCard'
 
 type ReelItem = {
@@ -40,9 +41,11 @@ export function DashboardReelsGrid({
 
   if (!videos.length) {
     return (
-      <p className="py-8 text-sm text-text-secondary">
-        No Reels imported yet. Run New Analysis after connecting Instagram.
-      </p>
+      <PageEmptyState
+        className="py-4 md:py-6"
+        primary="No Reels synced yet."
+        secondary="Run a sync from the dashboard to import them."
+      />
     )
   }
 
