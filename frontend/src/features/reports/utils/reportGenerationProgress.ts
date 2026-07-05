@@ -32,7 +32,7 @@ export function getReportGenerationUi(progress: number, status: string | undefin
   const runningTask = tasks.find((t) => t.status === 'running')
 
   let description =
-    'This can take several minutes the first time — we fetch competitor data, analyze videos, then write your report.'
+    'This can take several minutes the first time. We fetch competitor data, analyze videos, then write your report.'
 
   if (jobStatus === 'failed') {
     description = 'Report generation hit an error. You can retry or continue to the dashboard.'
