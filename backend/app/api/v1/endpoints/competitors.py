@@ -1,14 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from uuid import UUID
 from fastapi.responses import Response
 from app.api.dep import db_dependency, user_authentication_dependency
+from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
 from app.model.competitor_accounts import CompetitorAccount
 from app.schema.competitor_schema import AddCompetitorRequest
 from app.service.competitor_service import (
     add_competitor_by_handle_service,
     rediscover_competitors_service,
-    resync_competitors_service,
 )
 from app.utils.cdn_image import fetch_cdn_image
 from sqlmodel import select
@@ -55,7 +55,9 @@ async def add_competitor(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/discover")
+@limiter.limit(job_trigger_limit, key_func=get_user_key)
 async def discover_competitors(
+    request: Request,
     db: db_dependency,
     current_user: user_authentication_dependency,
 ):
@@ -73,25 +75,6 @@ async def discover_competitors(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/resync")
-async def resync_competitors(
-    db: db_dependency,
-    current_user: user_authentication_dependency,
-):
-    """
-    Re-scrape Instagram stats for already-tracked competitors (no new Gemini suggestions).
-    """
-    try:
-        job = await resync_competitors_service(current_user["id"], db)
-        return {
-            "message": "Competitor profile resync triggered",
-            "job_id": job.id,
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{competitor_id}/avatar")
 async def get_competitor_avatar(
