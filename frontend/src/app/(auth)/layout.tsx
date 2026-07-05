@@ -1,10 +1,5 @@
-
-
+import { AuthShell } from '@/components/auth/AuthShell'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-    return (
-        <div>
-            {children}
-        </div>
-    )
+  return <AuthShell>{children}</AuthShell>
 }
