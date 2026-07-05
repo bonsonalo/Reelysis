@@ -1,12 +1,14 @@
 'use client'
 
-import { Users2, X, Check, Loader2 } from 'lucide-react'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
+import { Panel } from '@/components/shared/Panel'
 import { CompetitorAccount } from '@/features/competitors/api'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
 import { CompetitorAvatar } from '@/features/competitors/components/CompetitorAvatar'
+import { OnboardingStepFrame } from './OnboardingStepFrame'
 
 interface CompetitorStepProps {
   competitors: CompetitorAccount[]
@@ -15,8 +17,19 @@ interface CompetitorStepProps {
   isFinishing: boolean
 }
 
-export function CompetitorStep({ competitors, onRemove, onFinish, isFinishing }: CompetitorStepProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>(competitors.map(c => c.id))
+function formatFollowers(count: number) {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`
+  return count.toLocaleString()
+}
+
+export function CompetitorStep({
+  competitors,
+  onRemove,
+  onFinish,
+  isFinishing,
+}: CompetitorStepProps) {
+  const [selectedIds, setSelectedIds] = useState<string[]>(competitors.map((c) => c.id))
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -29,103 +42,126 @@ export function CompetitorStep({ competitors, onRemove, onFinish, isFinishing }:
   }, [competitors])
 
   const toggleSelect = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(i => i !== id))
-    } else {
-      setSelectedIds([...selectedIds, id])
-    }
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    )
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center px-4 py-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
-      <div className="w-full max-w-4xl">
-        <div className="mb-10 text-center">
-          <div className="mb-4 inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
-            <Users2 className="h-8 w-8 text-primary" />
-          </div>
-          <h2 className="text-3xl font-bold text-white">Choose your competitors</h2>
-          <p className="mt-2 text-muted-foreground">
+    <OnboardingStepFrame className="!items-start sm:!items-center">
+      <div className="w-full max-w-2xl">
+        <header className="mb-6 text-center sm:mb-8">
+          <h2 className="text-lg font-semibold text-white sm:text-xl">
+            Choose accounts to track
+          </h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-text-secondary">
             {competitors.length > 0
-              ? 'Select accounts to analyze, or add more by handle below.'
+              ? 'Select accounts for your benchmarks, or add more by handle below.'
               : 'Add at least one competitor handle to continue.'}
           </p>
-        </div>
+        </header>
 
-        <div className="mb-8 rounded-2xl border border-white/10 bg-[#09090b] p-6">
-          <AddCompetitorForm />
-        </div>
+        <Panel className="mb-6 overflow-hidden">
+          <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
+            <h3 className="text-sm font-semibold text-white">Add competitor</h3>
+            <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
+              Track any public account by handle.
+            </p>
+          </div>
+          <div className="px-4 py-4 sm:px-6">
+            <AddCompetitorForm />
+          </div>
+        </Panel>
 
         {competitors.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-12">
-          {competitors.map((comp) => {
-            const isSelected = selectedIds.includes(comp.id)
-            return (
-              <div 
-                key={comp.id}
-                onClick={() => toggleSelect(comp.id)}
-                className={cn(
-                  "group relative flex items-center gap-4 rounded-2xl border p-4 transition-all cursor-pointer",
-                  isSelected 
-                    ? "border-primary bg-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)]" 
-                    : "border-white/10 bg-[#09090b] grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-white/20"
-                )}
-              >
-                <div className="h-12 w-12 flex-shrink-0 rounded-full overflow-hidden border border-white/5">
-                  <CompetitorAvatar
-                    competitorId={comp.id}
-                    handle={comp.handle}
-                    className="h-full w-full"
-                    iconClassName="h-5 w-5 text-muted-foreground"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white truncate">@{comp.handle}</p>
-                  <p className="text-xs text-muted-foreground truncate">{comp.followers_count.toLocaleString()} followers</p>
-                </div>
-                
-                <div className={cn(
-                  "h-6 w-6 rounded-full border flex items-center justify-center transition-all",
-                  isSelected 
-                    ? "bg-primary border-primary text-black" 
-                    : "border-white/20 text-transparent"
-                )}>
-                  <Check className="h-4 w-4 stroke-[3px]" />
-                </div>
+          <Panel className="mb-8 overflow-hidden">
+            <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
+              <h3 className="text-sm font-semibold text-white">Suggested accounts</h3>
+              <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
+                {selectedIds.length} of {competitors.length} selected
+              </p>
+            </div>
+            <ul className="divide-y divide-border-subtle">
+              {competitors.map((comp) => {
+                const isSelected = selectedIds.includes(comp.id)
+                return (
+                  <li key={comp.id}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleSelect(comp.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleSelect(comp.id)
+                        }
+                      }}
+                      className={cn(
+                        'group flex cursor-pointer items-center gap-4 px-4 py-3.5 transition-colors duration-150 sm:px-6 sm:py-4',
+                        isSelected ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
+                          isSelected
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-border-subtle bg-surface-input',
+                        )}
+                        aria-hidden
+                      >
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold leading-none">✓</span>
+                        )}
+                      </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onRemove(comp.id)
-                  }}
-                  className="absolute top-2 right-2 p-1 rounded-full text-zinc-500 hover:text-red-400 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label={`Remove @${comp.handle}`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                      <CompetitorAvatar
+                        competitorId={comp.id}
+                        handle={comp.handle}
+                        className="h-10 w-10 shrink-0 rounded-full"
+                        iconClassName="h-4 w-4 text-text-tertiary"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">
+                          @{comp.handle}
+                        </p>
+                        <p className="text-xs text-text-secondary">
+                          {formatFollowers(comp.followers_count)} followers
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onRemove(comp.id)
+                        }}
+                        className="shrink-0 text-xs text-text-secondary transition-colors duration-150 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </Panel>
         )}
 
         <div className="flex justify-center">
-          <Button 
+          <Button
             onClick={onFinish}
             disabled={isFinishing || selectedIds.length === 0}
-            className="h-14 px-12 text-lg font-bold shadow-xl shadow-primary/20 flex items-center gap-2"
+            size="lg"
+            className="w-full sm:w-auto"
           >
-            {isFinishing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Check className="h-5 w-5" />
-                <span>Approve & Generate Strategy</span>
-              </>
-            )}
+            <ButtonLoadingLabel loading={isFinishing} loadingLabel="Generating report…">
+              Generate strategy report
+            </ButtonLoadingLabel>
           </Button>
         </div>
       </div>
-    </div>
+    </OnboardingStepFrame>
   )
 }
