@@ -20,8 +20,14 @@ from app.service.competitor_service import discover_competitors_service
 from app.utils.caption import parse_hashtags_from_caption, top_frequent_hashtags
 
 from cryptography.fernet import Fernet
-from sqlmodel import Session, select, desc
+from sqlmodel import Session, select, desc, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.model.recommendations import Recommendation
+from app.model.account_report import AccountReport
+from app.model.video_analysis import VideoAnalysis
+from app.model.competitor_media import CompetitorMedia
+from app.model.competitor_accounts import CompetitorAccount
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
@@ -255,19 +261,43 @@ async def get_connected_accounts_service(user_id: UUID, db: AsyncSession):
     result = await db.exec(stmt)
     return result.all()
 
-async def disconnect_instagram_service(user_id: UUID, db: AsyncSession):
+
+async def _get_instagram_account(user_id: UUID, db: AsyncSession) -> InstagramAccount | None:
+    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
+    return (await db.exec(stmt)).first()
+
+
+async def purge_user_instagram_data_service(user_id: UUID, db: AsyncSession):
+    """Permanently delete all Instagram-derived data for a user."""
+    await db.exec(delete(Recommendation).where(Recommendation.user_id == user_id))
+    await db.exec(delete(AccountReport).where(AccountReport.user_id == user_id))
+    await db.exec(delete(VideoAnalysis).where(VideoAnalysis.user_id == user_id))
+    await db.exec(delete(MediaItem).where(MediaItem.user_id == user_id))
+    await db.exec(delete(CompetitorMedia).where(CompetitorMedia.user_id == user_id))
+    await db.exec(delete(CompetitorAccount).where(CompetitorAccount.user_id == user_id))
+    await db.exec(delete(AnalysisJob).where(AnalysisJob.user_id == user_id))
+
     token_stmt = select(ExternalToken).where(ExternalToken.user_id == user_id)
     token = (await db.exec(token_stmt)).first()
     if token:
         await db.delete(token)
-        
-    account_stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
-    account = (await db.exec(account_stmt)).first()
+
+    account = await _get_instagram_account(user_id, db)
     if account:
         await db.delete(account)
-        
+
     await db.commit()
     return True
+
+
+async def disconnect_instagram_service(user_id: UUID, db: AsyncSession):
+    """Disconnect Instagram and permanently delete all synced data for this user."""
+    account = await _get_instagram_account(user_id, db)
+    if not account:
+        raise ValueError("No Instagram account connected.")
+    await purge_user_instagram_data_service(user_id, db)
+    return True
+
 
 async def _fail_superseded_queued_sync_jobs(user_id: UUID, db: AsyncSession) -> int:
     """Fail queued sync jobs that were overtaken by a newer completed job."""
@@ -311,11 +341,15 @@ async def _fail_superseded_queued_sync_jobs(user_id: UUID, db: AsyncSession) -> 
     return len(stale_jobs)
 
 
-async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
-    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
-    account = (await db.exec(stmt)).first()
+async def _require_active_instagram_account(user_id: UUID, db: AsyncSession) -> InstagramAccount:
+    account = await _get_instagram_account(user_id, db)
     if not account:
         raise ValueError("No Instagram account connected.")
+    return account
+
+
+async def trigger_instagram_sync_service(user_id: UUID, db: AsyncSession):
+    account = await _require_active_instagram_account(user_id, db)
 
     await _fail_superseded_queued_sync_jobs(user_id, db)
 
@@ -379,10 +413,7 @@ async def update_instagram_niche_service(
     trigger_discovery: bool = False,
 ):
     """Update confirmed niche from settings without forcing onboarding discovery."""
-    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
-    account = (await db.exec(stmt)).first()
-    if not account:
-        raise ValueError("Instagram account not found.")
+    account = await _require_active_instagram_account(user_id, db)
 
     clean_niche = niche.strip()
     if not clean_niche:
@@ -409,10 +440,7 @@ async def update_instagram_niche_service(
 
 async def detect_instagram_niche_service(user_id: UUID, db: AsyncSession):
     """Re-run AI niche detection from the user's synced Instagram content."""
-    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
-    account = (await db.exec(stmt)).first()
-    if not account:
-        raise ValueError("Instagram account not found.")
+    account = await _require_active_instagram_account(user_id, db)
     if not account.last_synced_at:
         raise ValueError("Sync your Instagram account first so we can analyze your content.")
 
@@ -449,6 +477,7 @@ def sync_instagram_data_task(job_id: str, user_id: str):
     Background task to sync Instagram data using synchronous database session.
     """
     return _sync_instagram_data_internal(job_id, user_id)
+
 
 def _sync_instagram_data_internal(job_id: str, user_id: str):
     with Session(sync_engine) as db:
