@@ -1,105 +1,109 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useRegister } from '../hooks/useRegister';
-import { useAuth } from '@/store/hook';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useRegister } from '../hooks/useRegister'
+import { useAuth } from '@/store/hook'
+import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
+import { AuthField } from '@/components/auth/AuthField'
+import { Button } from '@/components/ui/button'
 
 export default function RegisterForm() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const router = useRouter();
-  const { mutate: register, isPending } = useRegister();
-  const { error, status } = useAuth();
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const router = useRouter()
+  const { mutate: register, isPending } = useRegister()
+  const { error, status } = useAuth()
 
   useEffect(() => {
     if (status === 'succeeded') {
-      router.push('/onboarding');
+      router.push('/onboarding')
     }
-  }, [status, router]);
+  }, [status, router])
 
   const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password || isPending) return;
-    register({ name, email, password });
-  };
+    e.preventDefault()
+    if (!name || !email || !password || isPending) return
+    register({ name, email, password })
+  }
 
   return (
-  <div className="min-h-screen flex items-center justify-center bg-[#1C1A1A]">
-      <div className="flex w-full max-w-5xl rounded-2xl overflow-hidden shadow-xl border border-gray-900">
-
-        {/* Left panel */}
-        <div className="hidden md:flex flex-col justify-between bg-[#181818] p-12 w-1/2 min-h-[36rem]">
-          <div>
-            <div className="text-white font-bold text-lg mb-10 tracking-tight">
-              Reelysis
-            </div>
-            <div className="uppercase text-gray-500 text-xs font-semibold mb-3 tracking-wider">
-              Registration
-            </div>
-            <h1 className="text-4xl font-extrabold text-white mb-4 leading-tight">
-              Platform Analytics Registration.
-            </h1>
-            <p className="text-gray-400 mb-10 text-base">
-              Establish your account to begin content performance tracking and competitor analysis.
-            </p>
-            <div className="space-y-4">
-              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
-                <div className="text-white font-bold text-base">Transcript Analysis</div>
-                <div className="text-gray-500 text-sm">Automated processing for all video content.</div>
-              </div>
-              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
-                <div className="text-white font-bold text-base">Competitor Tracking</div>
-                <div className="text-gray-500 text-sm">Automated discovery and monitoring.</div>
-              </div>
-              <div className="flex flex-col bg-[#1e1e1e] rounded-lg p-4">
-                <div className="text-white font-bold text-base">Growth Reporting</div>
-                <div className="text-gray-500 text-sm">Comprehensive performance metrics.</div>
-              </div>
-            </div>
-          </div>
-          <div className="text-gray-600 text-xs mt-10">
-            © 2026 Reelysis{' '}
-            <span className="underline cursor-pointer">Privacy</span> ·{' '}
-            <span className="underline cursor-pointer">Terms</span>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-16 bg-[#0d0d0d]">
-            <form onSubmit={handleRegister} className="w-full max-w-sm">
-                <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
-                <p className="text-sm text-gray-400 mb-6">Existing user? <a href="/login" className="ml-2 text-orange-500 hover:underline">Sign in →</a></p>
-
-                {error && (
-                <div className="mb-4 text-red-500 text-sm font-medium">{error}</div>
-                )}
-
-                <div className="mb-5 mt-6">
-                    <label className="block text-gray-300 text-sm mb-1" htmlFor="name">Full name</label>
-                    <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} disabled={isPending} placeholder="Name" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
-                </div>
-
-                <div className="mb-5">
-                    <label className="block text-gray-300 text-sm mb-1" htmlFor="email">Email address</label>
-                    <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={isPending} placeholder="email@example.com" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
-                </div>
-
-                <div className="mb-8">
-                    <label className="block text-gray-300 text-sm mb-1" htmlFor="password">Password</label>
-                    <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={isPending} placeholder="********" className="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-white/5 focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-600 text-sm" required />
-                </div>
-
-                <Button type="submit" disabled={isPending} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg">
-                {isPending ? 'Processing...' : 'Register'}
-                </Button>
-            </form>
-        </div>
-
+    <>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-lg font-semibold text-white sm:text-xl">Create your account</h1>
+        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+          Already have an account?{' '}
+          <Link
+            href="/login"
+            className="text-primary transition-colors duration-150 hover:text-orange-400"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
-  );
 
+      <form onSubmit={handleRegister} className="space-y-5 sm:space-y-6">
+        {error && (
+          <div className="rounded-[10px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        <AuthField
+          id="name"
+          label="Full name"
+          value={name}
+          onChange={setName}
+          autoComplete="name"
+          placeholder="Your name"
+          disabled={isPending}
+          required
+        />
+
+        <AuthField
+          id="email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
+          placeholder="you@example.com"
+          disabled={isPending}
+          required
+        />
+
+        <AuthField
+          id="password"
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          placeholder="Create a password"
+          disabled={isPending}
+          required
+        />
+
+        <Button type="submit" className="mt-1 w-full sm:mt-2" size="lg" disabled={isPending}>
+          <ButtonLoadingLabel loading={isPending} loadingLabel="Creating account…">
+            Get started
+          </ButtonLoadingLabel>
+        </Button>
+
+        <p className="pt-1 text-center text-xs leading-relaxed text-text-tertiary sm:pt-2">
+          By creating an account, you agree to our{' '}
+          <Link href="/terms" className="text-text-secondary transition-colors hover:text-white">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="text-text-secondary transition-colors hover:text-white">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      </form>
+    </>
+  )
 }
