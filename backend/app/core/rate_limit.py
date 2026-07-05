@@ -51,7 +51,7 @@ limiter = Limiter(
     key_func=get_ip_key,
     storage_uri=_storage_uri(),
     enabled=settings.RATE_LIMIT_ENABLED,
-    headers_enabled=True,
+    headers_enabled=False,
 )
 
 
