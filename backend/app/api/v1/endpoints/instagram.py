@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from uuid import UUID
 from fastapi.responses import RedirectResponse
 from sqlmodel import select
+from app.core.config import settings
 from app.core.logger import logger
 from app.core.rate_limit import (
     ai_trigger_limit,
@@ -50,7 +51,8 @@ async def oauth_callback(code: str, state: str, db: db_dependency):
     try:
         logger.info(f"CALLBACK HIT — full code param: {code}")
         await handle_oauth_callback_service(code, state, db)
-        return RedirectResponse(url="http://localhost:3000/onboarding?connected=true", status_code=302)
+        frontend = settings.FRONTEND_URL.rstrip("/")
+        return RedirectResponse(url=f"{frontend}/onboarding?connected=true", status_code=302)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=400, detail=str(e))
