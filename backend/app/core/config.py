@@ -2,6 +2,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.logger import logger
 
 class Settings(BaseSettings):
+    APP_ENV: str = "development"
+    FRONTEND_URL: str = "http://localhost:3000"
+    # Comma-separated allowed browser origins (e.g. https://app.vercel.app). Falls back to FRONTEND_URL.
+    CORS_ORIGINS: str = ""
+    RUN_MIGRATIONS_ON_STARTUP: bool = True
+
     DB_URL: str
     SECRET_KEY: str
     ALGORITHM: str
@@ -41,6 +47,22 @@ class Settings(BaseSettings):
         str_strip_whitespace=True
     )
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() == "production"
+
+    def cors_origin_list(self) -> list[str]:
+        origins: list[str] = []
+        if self.CORS_ORIGINS.strip():
+            origins = [o.strip().rstrip("/") for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        elif self.FRONTEND_URL.strip():
+            origins = [self.FRONTEND_URL.strip().rstrip("/")]
+
+        if not self.is_production:
+            for local in ("http://localhost:3000", "http://127.0.0.1:3000"):
+                if local not in origins:
+                    origins.append(local)
+        return origins
 
 
 try:
