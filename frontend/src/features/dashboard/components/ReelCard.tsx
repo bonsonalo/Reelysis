@@ -11,6 +11,7 @@ type ReelCardVideo = {
   hook_score: number
   views: number
   engagement_rate: number | string
+  has_analysis?: boolean
 }
 
 type ReelCardProps = {
@@ -58,10 +59,12 @@ export function ReelCard({ video, formatNumber, className }: ReelCardProps) {
         <p
           className={cn(
             'mt-2 text-xs font-medium tabular-nums text-zinc-300',
-            video.hook_score >= 80 && 'text-emerald-400',
+            video.has_analysis && video.hook_score >= 80 && 'text-emerald-400',
           )}
         >
-          Hook {video.hook_score}/100
+          {video.has_analysis
+            ? `Hook ${video.hook_score}/100`
+            : 'Hook score after report'}
         </p>
       </div>
     </Link>
