@@ -13,6 +13,7 @@ from app.schema.auth_schema import LoginInfo, UserCreate
 from app.model.user import User
 from app.api.dep import authenticate_user, bcrypt_context, create_access_token
 from app.model.auth import AuthSession
+from app.core.cookies import clear_auth_cookies, set_auth_cookies
 
 # sign up
 
@@ -60,22 +61,7 @@ async def register_user(user_info: UserCreate, db: AsyncSession, response: Respo
         expires_at= datetime.now(timezone.utc) + timedelta(days= 30)
     )
 
-    response.set_cookie(
-        key= "access_token",
-        value= access_token,
-        httponly= True,
-        secure= False, # Local dev
-        samesite= "lax", # Local dev
-        max_age= settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    response.set_cookie(
-        key= "refresh_token",
-        value= refresh_token,
-        httponly= True,
-        secure= False, # Local dev
-        samesite= "lax", # Local dev
-        max_age= 30 * 24 * 60 * 60
-    )
+    set_auth_cookies(response, access_token, refresh_token)
 
     db.add(refresh_storing)
     await db.commit()
@@ -113,22 +99,7 @@ async def login_user(user_credential: LoginInfo, db: AsyncSession, response: Res
             refresh_token_hash= bcrypt_context.hash(refresh_token),
             expires_at= datetime.now(timezone.utc) + timedelta(days= 30)
         )
-        response.set_cookie(
-            key= "access_token",
-            value= access_token,
-            httponly= True,
-            secure= False, # Local dev
-            samesite= "lax", # Local dev
-            max_age= settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        )
-        response.set_cookie(
-            key= "refresh_token",
-            value= refresh_token,
-            httponly= True,
-            secure= False, # Local dev
-            samesite= "lax", # Local dev
-            max_age= 30 * 24 * 60 * 60
-        )
+        set_auth_cookies(response, access_token, refresh_token)
 
         db.add(refresh_storing)
         await db.commit()
@@ -198,23 +169,7 @@ async def refresh_token_service(response, db: AsyncSession, request):
     )
     db.add(new_refresh_token)
 
-
-    response.set_cookie(
-        key= "access_token",
-        value= access_token,
-        httponly= True,
-        secure= False,
-        samesite= "lax",
-        max_age= settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    response.set_cookie(
-        key= "refresh_token",
-        value= refresh_token,
-        httponly= True,
-        secure= False,
-        samesite= "lax",
-        max_age= 30 * 24 * 60 * 60
-    )
+    set_auth_cookies(response, access_token, refresh_token)
     
     await db.commit()
 
@@ -233,8 +188,7 @@ async def logout_service( response: Response, db: AsyncSession, current_user):
         db.add(db_refresh_token)
         await db.commit()
 
-    response.delete_cookie(key= "access_token")
-    response.delete_cookie(key= "refresh_token")
+    clear_auth_cookies(response)
 
 
 async def profile_service(current_user, db: AsyncSession):

@@ -120,7 +120,8 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
             "views_change": "0%",
             "reach_change": "0%",
             "engagement_change": "0%",
-            "hook_change": "0"
+            "hook_change": "0",
+            "has_video_analysis": False,
         }
 
     # 2. Compare latest vs previous metric snapshots per media item
@@ -157,6 +158,8 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
                     hook_change = _format_hook_point_change(score, previous_hooks[media_id])
                 break
 
+    has_video_analysis = bool(latest_hooks)
+
     return {
         "total_views": total_views,
         "avg_reach": avg_reach,
@@ -167,6 +170,7 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
         "reach_change": reach_change,
         "engagement_change": engagement_change,
         "hook_change": hook_change,
+        "has_video_analysis": has_video_analysis,
     }
 
 async def get_growth_chart_service(user_id: UUID, db: AsyncSession):
@@ -300,7 +304,8 @@ async def get_recent_videos_service(user_id: UUID, db: AsyncSession, limit: int 
             "hook_score": normalize_score_0_100(analysis.hook_score) if analysis else 0,
             "views": views,
             "engagement_rate": round(engagement, 1),
-            "permalink": item.permalink
+            "permalink": item.permalink,
+            "has_analysis": analysis is not None,
         })
         
     return {"data": video_feed}

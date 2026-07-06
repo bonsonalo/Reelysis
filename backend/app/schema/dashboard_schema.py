@@ -12,6 +12,7 @@ class DashboardStats(BaseModel):
     reach_change: str
     engagement_change: str
     hook_change: str
+    has_video_analysis: bool = False
 
 class GrowthDataPoint(BaseModel):
     date: str
@@ -37,6 +38,7 @@ class VideoFeedItem(BaseModel):
     views: int
     engagement_rate: float
     permalink: str
+    has_analysis: bool = False
 
 class DashboardVideosResponse(BaseModel):
     data: List[VideoFeedItem]

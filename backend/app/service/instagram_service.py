@@ -624,7 +624,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             
             logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
             
-            # Trigger transcription then video analysis via Celery
+            # Trigger transcription only; Gemini video analysis runs during report generation.
             from app.service.transcript_service import enqueue_transcription_for_user
 
             enqueue_transcription_for_user(db, UUID(user_id))
