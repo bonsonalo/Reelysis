@@ -1,0 +1,25 @@
+# Render blueprint (API + worker). Add a requirements.txt under backend/ before deploy.
+services:
+  - type: web
+    name: reelysis-api
+    runtime: python
+    rootDir: backend
+    preDeployCommand: python scripts/run_migrations.py
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: RUN_MIGRATIONS_ON_STARTUP
+        value: "false"
+      # Set FRONTEND_URL, CORS_ORIGINS, DB_URL, REDIS_URL, secrets, etc. in the dashboard.
+
+  - type: worker
+    name: reelysis-worker
+    runtime: python
+    rootDir: backend
+    startCommand: celery -A app.core.celery_app worker --loglevel=info
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: RUN_MIGRATIONS_ON_STARTUP
+        value: "false"
