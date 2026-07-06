@@ -10,6 +10,7 @@ export interface DashboardStats {
   reach_change: string;
   engagement_change: string;
   hook_change: string;
+  has_video_analysis: boolean;
 }
 
 export interface GrowthDataPoint {
@@ -40,6 +41,7 @@ export interface VideoFeedItem {
   views: number;
   engagement_rate: number;
   permalink: string;
+  has_analysis?: boolean;
 }
 
 export interface DashboardVideosResponse {
