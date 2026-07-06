@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
 import { ReelCard } from '@/features/dashboard/components/ReelCard'
+import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
 
 type ReelItem = {
   id: string
@@ -13,12 +14,14 @@ type ReelItem = {
   hook_score: number
   views: number
   engagement_rate: number | string
+  has_analysis?: boolean
 }
 
 type DashboardReelsGridProps = {
   videos: ReelItem[]
   isLoading: boolean
   formatNumber: (num: number) => string
+  showAiPendingHint?: boolean
 }
 
 export function DashboardReelsGrid({
@@ -66,6 +69,7 @@ export function DashboardReelsSection({
   videos,
   isLoading,
   formatNumber,
+  showAiPendingHint = false,
 }: DashboardReelsGridProps) {
   return (
     <section className="space-y-4">
@@ -75,6 +79,9 @@ export function DashboardReelsSection({
           <p className="mt-1 text-sm text-text-secondary">
             Latest Reels from your account, with views and engagement
           </p>
+          {showAiPendingHint && (
+            <AiInsightsPending variant="inline" className="mt-2" />
+          )}
         </div>
         <Link href="/videos">
           <Button
