@@ -6,11 +6,20 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.routes import routers
+from app.core.config import settings
+from app.core.logger import logger
+from app.core.migrations import run_migrations
 from app.core.rate_limit import limiter
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.RUN_MIGRATIONS_ON_STARTUP:
+        try:
+            run_migrations()
+        except Exception:
+            logger.exception("Database migration failed on startup")
+            raise
     yield
 
 
@@ -31,7 +40,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origin_list(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
