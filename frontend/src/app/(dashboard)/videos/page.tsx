@@ -3,6 +3,7 @@
 import { useDashboardVideos } from '@/features/dashboard/hooks/useDashboardVideos'
 import { ReelCard } from '@/features/dashboard/components/ReelCard'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
+import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
 import { VideosPageSkeleton } from '@/components/shared/PageSkeletons'
 
 export default function AllVideosPage() {
@@ -19,6 +20,7 @@ export default function AllVideosPage() {
   }
 
   const reelCount = videos?.data.length ?? 0
+  const hasAnyAnalysis = videos?.data.some((video) => video.has_analysis) ?? false
 
   return (
     <div className="space-y-6 pb-16 sm:space-y-8 sm:pb-20">
@@ -31,6 +33,9 @@ export default function AllVideosPage() {
           <p className="mt-3 text-sm text-text-tertiary">
             {reelCount} {reelCount === 1 ? 'reel' : 'reels'}
           </p>
+        )}
+        {reelCount > 0 && !hasAnyAnalysis && (
+          <AiInsightsPending variant="inline" className="mt-3" />
         )}
       </header>
 

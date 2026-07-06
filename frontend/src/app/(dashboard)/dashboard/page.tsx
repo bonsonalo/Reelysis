@@ -14,6 +14,8 @@ import { GrowthChart } from '@/features/dashboard/components/GrowthChart'
 import { ContentPillarsChart } from '@/features/dashboard/components/ContentPillarsChart'
 import { DashboardReelsSection } from '@/features/dashboard/components/DashboardReelsGrid'
 import { DashboardStatCard } from '@/features/dashboard/components/DashboardStatCard'
+import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
+import { AI_INSIGHTS_EMPTY } from '@/features/dashboard/constants/aiInsightsCopy'
 import { ProcessStatus } from '@/components/shared/ProcessStatus'
 import { getInstagramSyncUi } from '@/features/jobs/utils/jobProgressUtils'
 import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
@@ -179,6 +181,7 @@ export default function DashboardPage() {
       : 'Run New Analysis to import your Reels'
 
   const pillarRows = pillars?.data ?? []
+  const hasVideoAnalysis = stats?.has_video_analysis ?? false
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -277,6 +280,8 @@ export default function DashboardPage() {
               }
               footerNoteHelp={METRIC_HELP.aiConfidence}
               icon={Target}
+              pending={!hasVideoAnalysis}
+              pendingHint={`${AI_INSIGHTS_EMPTY.primary} Go to Reports to generate one.`}
             />
           </>
         )}
@@ -412,10 +417,7 @@ export default function DashboardPage() {
           ) : pillarRows.length ? (
             <ContentPillarsChart data={pillarRows} />
           ) : (
-            <PageEmptyState
-              className="py-4 md:py-6"
-              primary="Pillar data appears after your Reels are analyzed."
-            />
+            <AiInsightsPending />
           )}
         </div>
       </Panel>
@@ -424,6 +426,7 @@ export default function DashboardPage() {
         videos={videos?.data ?? []}
         isLoading={isLoadingVideos}
         formatNumber={formatNumber}
+        showAiPendingHint={!hasVideoAnalysis && (videos?.data?.length ?? 0) > 0}
       />
     </div>
   )

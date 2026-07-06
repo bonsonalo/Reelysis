@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { MetricLabel } from '@/components/shared/MetricInfoTip'
 import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
 import { Panel } from '@/components/shared/Panel'
+import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
 import { cn } from '@/lib/utils'
 
 function formatNumber(num: number) {
@@ -266,10 +267,8 @@ export default function VideoDetailPage() {
               />
             </div>
           ) : (
-            <Panel className="px-4 py-10 text-center sm:px-6">
-              <p className="text-sm text-text-secondary">
-                Analysis isn&apos;t ready for this reel yet. Run New Analysis from the dashboard.
-              </p>
+            <Panel className="px-4 py-8 sm:px-6">
+              <AiInsightsPending />
             </Panel>
           )}
 
