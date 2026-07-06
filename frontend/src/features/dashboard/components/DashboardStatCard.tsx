@@ -12,6 +12,8 @@ type DashboardStatCardProps = {
   footerNote?: string
   footerNoteHelp?: MetricHelpContent
   icon: LucideIcon
+  pending?: boolean
+  pendingHint?: string
 }
 
 function getChangeDirection(change: string) {
@@ -32,8 +34,10 @@ export function DashboardStatCard({
   footerNote,
   footerNoteHelp,
   icon: Icon,
+  pending = false,
+  pendingHint,
 }: DashboardStatCardProps) {
-  const direction = getChangeDirection(change)
+  const direction = pending ? ('flat' as const) : getChangeDirection(change)
 
   return (
     <Panel className="p-4 sm:p-5">
@@ -43,31 +47,37 @@ export function DashboardStatCard({
             <MetricLabel label={label} help={help} tipSide="top" />
           </div>
           <p className="mt-2 text-2xl font-semibold leading-none tracking-tight tabular-nums text-white sm:text-3xl">
-            {value}
+            {pending ? '—' : value}
           </p>
         </div>
         <Icon className="h-4 w-4 shrink-0 text-text-tertiary" />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p
-          className={cn(
-            'inline-flex items-center gap-1 text-sm font-medium',
-            direction === 'up' && 'text-emerald-400',
-            direction === 'down' && 'text-red-400',
-            direction === 'flat' && 'text-text-secondary',
-          )}
-        >
-          {direction === 'up' && <TrendingUp className="h-3 w-3" />}
-          {direction === 'down' && <TrendingDown className="h-3 w-3" />}
-          <span>{change}</span>
+      {pending ? (
+        <p className="mt-4 text-xs leading-relaxed text-text-secondary sm:text-sm">
+          {pendingHint}
         </p>
-        {footerNote && (
-          <span className="shrink-0 text-sm tabular-nums text-text-secondary">
-            <MetricLabel label={footerNote} help={footerNoteHelp} tipSide="top" />
-          </span>
-        )}
-      </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p
+            className={cn(
+              'inline-flex items-center gap-1 text-sm font-medium',
+              direction === 'up' && 'text-emerald-400',
+              direction === 'down' && 'text-red-400',
+              direction === 'flat' && 'text-text-secondary',
+            )}
+          >
+            {direction === 'up' && <TrendingUp className="h-3 w-3" />}
+            {direction === 'down' && <TrendingDown className="h-3 w-3" />}
+            <span>{change}</span>
+          </p>
+          {footerNote && (
+            <span className="shrink-0 text-sm tabular-nums text-text-secondary">
+              <MetricLabel label={footerNote} help={footerNoteHelp} tipSide="top" />
+            </span>
+          )}
+        </div>
+      )}
     </Panel>
   )
 }
