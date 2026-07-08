@@ -27,7 +27,8 @@ config = context.config
 config = context.config
 
 sync_url = settings.DB_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://")
-config.set_main_option("sqlalchemy.url", sync_url)
+# Alembic uses configparser interpolation; escape '%' from URL-encoded passwords.
+config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
