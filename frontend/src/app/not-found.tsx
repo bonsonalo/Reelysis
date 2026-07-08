@@ -22,15 +22,15 @@ export default function NotFound() {
           The page you&apos;re looking for doesn&apos;t exist or may have been moved.
         </p>
         <div className="mt-8 flex w-full max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
-          <Button asChild className="w-full sm:w-auto">
-            <Link href="/dashboard">Go to dashboard</Link>
-          </Button>
-          <Button asChild variant="outline" className="w-full sm:w-auto">
-            <Link href="/">
+          <Link href="/dashboard" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto">Go to dashboard</Button>
+          </Link>
+          <Link href="/" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to home
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </main>
     </div>
