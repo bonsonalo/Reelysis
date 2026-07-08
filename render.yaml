@@ -1,11 +1,14 @@
-# Render blueprint (API + worker). Add a requirements.txt under backend/ before deploy.
+# Render blueprint.
+# Free tier: API + Celery in one Web Service (scripts/start.sh).
+# Paid upgrade: set web startCommand to uvicorn only and enable the worker service.
+
 services:
   - type: web
     name: reelysis-api
     runtime: python
     rootDir: backend
     preDeployCommand: python scripts/run_migrations.py
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: bash scripts/start.sh
     envVars:
       - key: APP_ENV
         value: production
@@ -13,13 +16,14 @@ services:
         value: "false"
       # Set FRONTEND_URL, CORS_ORIGINS, DB_URL, REDIS_URL, secrets, etc. in the dashboard.
 
-  - type: worker
-    name: reelysis-worker
-    runtime: python
-    rootDir: backend
-    startCommand: celery -A app.core.celery_app worker --loglevel=info
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: RUN_MIGRATIONS_ON_STARTUP
-        value: "false"
+  # Optional paid Background Worker (~$7/mo Starter). Prefer this when budget allows.
+  # - type: worker
+  #   name: reelysis-worker
+  #   runtime: python
+  #   rootDir: backend
+  #   startCommand: celery -A app.core.celery_app worker --loglevel=info
+  #   envVars:
+  #     - key: APP_ENV
+  #       value: production
+  #     - key: RUN_MIGRATIONS_ON_STARTUP
+  #       value: "false"
