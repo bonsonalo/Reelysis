@@ -100,6 +100,7 @@ type ChartTooltipContentProps = React.ComponentProps<"div"> & {
   active?: boolean
   payload?: Array<Record<string, any>>
   label?: React.ReactNode
+  labelClassName?: string
   labelFormatter?: (label: React.ReactNode, payload: Array<Record<string, any>>) => React.ReactNode
   formatter?: (
     value: unknown,
