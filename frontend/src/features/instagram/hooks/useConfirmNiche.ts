@@ -4,12 +4,14 @@ import { confirmNiche } from '../api'
 export const useConfirmNiche = (options?: UseMutationOptions<any, Error, string, unknown>) => {
   const queryClient = useQueryClient()
 
+  const userOnSuccess = options?.onSuccess
+
   return useMutation({
     mutationFn: (niche: string) => confirmNiche(niche),
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context, mutation) => {
       // Refresh the account data after confirmation
       queryClient.invalidateQueries({ queryKey: ['instagram-accounts'] })
-      options?.onSuccess?.(data, variables, context)
+      userOnSuccess?.(data, variables, context, mutation)
     },
     ...options
   })
