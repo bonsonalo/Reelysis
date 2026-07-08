@@ -56,6 +56,15 @@ export function GrowthChart({ data }: GrowthChartProps) {
   const yMax = useMemo(() => computeYMax(chartData), [chartData])
   const showDots = chartData.length <= 14
   const showEndLabels = chartData.length <= 8
+  const chartDataWithLabels = useMemo(
+    () =>
+      chartData.map((point, index) => ({
+        ...point,
+        reachLabel: index === chartData.length - 1 ? formatAxisValue(point.reach) : "",
+        viewsLabel: index === chartData.length - 1 ? formatAxisValue(point.views) : "",
+      })),
+    [chartData]
+  )
 
   if (chartData.length === 0) return null
 
@@ -66,7 +75,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
       onMouseDown={(e) => e.preventDefault()}
     >
       <LineChart
-        data={chartData}
+        data={chartDataWithLabels}
         margin={{ top: 16, right: showEndLabels ? 36 : 8, left: 0, bottom: 0 }}
       >
         <CartesianGrid
@@ -130,12 +139,9 @@ export function GrowthChart({ data }: GrowthChartProps) {
         >
           {showEndLabels && (
             <LabelList
-              dataKey="reach"
+              dataKey="reachLabel"
               position="right"
               offset={8}
-              formatter={(value: number, _entry, index) =>
-                index === chartData.length - 1 ? formatAxisValue(Number(value)) : ""
-              }
               className="fill-zinc-400 text-[10px] font-medium"
             />
           )}
@@ -161,12 +167,9 @@ export function GrowthChart({ data }: GrowthChartProps) {
         >
           {showEndLabels && (
             <LabelList
-              dataKey="views"
+              dataKey="viewsLabel"
               position="right"
               offset={8}
-              formatter={(value: number, _entry, index) =>
-                index === chartData.length - 1 ? formatAxisValue(Number(value)) : ""
-              }
               className="fill-[#f97316] text-[10px] font-semibold"
             />
           )}
