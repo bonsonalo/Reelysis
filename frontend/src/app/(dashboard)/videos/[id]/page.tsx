@@ -139,9 +139,9 @@ export default function VideoDetailPage() {
         <p className="mt-2 max-w-sm text-sm text-text-secondary">
           This reel may have been removed or is no longer synced to your account.
         </p>
-        <Button asChild className="mt-6">
-          <Link href="/videos">Back to Reels</Link>
-        </Button>
+        <Link href="/videos" className="mt-6">
+          <Button>Back to Reels</Button>
+        </Link>
       </div>
     )
   }
