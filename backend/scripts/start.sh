@@ -4,7 +4,15 @@
 #   uvicorn app.main:app --host 0.0.0.0 --port $PORT
 set -euo pipefail
 
-celery -A app.core.celery_app worker --loglevel=info &
+# Free instance has only 512MB RAM.
+# Run Celery in a minimal single-process mode to avoid OOM restarts.
+celery -A app.core.celery_app worker \
+  --loglevel=info \
+  --pool=solo \
+  --concurrency=1 \
+  --without-gossip \
+  --without-mingle \
+  --without-heartbeat &
 CELERY_PID=$!
 
 cleanup() {
