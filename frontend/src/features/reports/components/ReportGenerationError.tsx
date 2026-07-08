@@ -98,6 +98,7 @@ export function ReportGenerationError({
 }: ReportGenerationErrorProps) {
   const info = interpretError(message)
   const Icon = info.tone === 'limit' ? Clock : AlertTriangle
+  const isRetrying = Boolean(retrying)
 
   return (
     <section className="max-w-2xl py-2 md:py-4">
@@ -118,8 +119,8 @@ export function ReportGenerationError({
           <p className="text-sm leading-relaxed text-text-secondary">{info.description}</p>
           {info.canRetry && (
             <div className="pt-1">
-              <Button size="sm" variant="outline" onClick={onRetry} disabled={retrying}>
-                <ButtonLoadingLabel loading={retrying} loadingLabel="Retrying…">
+              <Button size="sm" variant="outline" onClick={onRetry} disabled={isRetrying}>
+                <ButtonLoadingLabel loading={isRetrying} loadingLabel="Retrying…">
                   Try again
                 </ButtonLoadingLabel>
               </Button>
