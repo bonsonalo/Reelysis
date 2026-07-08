@@ -77,9 +77,9 @@ export default function ReportDetailPage() {
       <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center p-4 text-center">
         <AlertCircle className="mb-4 h-12 w-12 text-zinc-600" />
         <h2 className="text-base font-semibold text-white">Report not found</h2>
-        <Button asChild className="mt-6">
-          <Link href="/reports">Back to reports</Link>
-        </Button>
+        <Link href="/reports" className="mt-6">
+          <Button>Back to reports</Button>
+        </Link>
       </div>
     )
   }
