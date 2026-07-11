@@ -1,3 +1,6 @@
+import ssl
+
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import create_engine
@@ -5,8 +8,23 @@ from sqlmodel import Session
 from app.core.config import settings
 
 
+def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
+    """asyncpg rejects sslmode in the URL query; map it to connect_args instead."""
+    url = make_url(db_url)
+    query = dict(url.query)
+    sslmode = query.pop("sslmode", None)
+    connect_args: dict = {}
+    if sslmode and sslmode.lower() not in ("disable", "allow"):
+        connect_args["ssl"] = ssl.create_default_context()
+    if sslmode is not None:
+        url = url.set(query=query)
+    return url.render_as_string(hide_password=False), connect_args
+
+
+_async_url, _async_connect_args = _async_engine_url_and_connect_args(settings.DB_URL)
+
 # Async engine for FastAPI
-engine = create_async_engine(settings.DB_URL)
+engine = create_async_engine(_async_url, connect_args=_async_connect_args)
 
 # Sync engine for Celery tasks
 sync_db_url = settings.DB_URL
