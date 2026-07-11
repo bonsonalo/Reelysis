@@ -1,10 +1,12 @@
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException
+
+from app.utils.time import utc_now
 
 from app.core.database import AsyncSessionLocal
 from app.core.logger import logger
@@ -23,13 +25,11 @@ STALE_RUNNING_REPORT_SECONDS = 20 * 60
 
 
 def _report_job_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
-    reference = now or datetime.now(timezone.utc)
+    reference = now or utc_now()
     started = job.started_at
     if started is None or started.year <= 1971:
-        return max(0.0, (reference - job.created_at.replace(tzinfo=timezone.utc if job.created_at.tzinfo is None else job.created_at.tzinfo)).total_seconds())
-    started_aware = started if started.tzinfo else started.replace(tzinfo=timezone.utc)
-    ref_aware = reference if reference.tzinfo else reference.replace(tzinfo=timezone.utc)
-    return max(0.0, (ref_aware - started_aware).total_seconds())
+        return max(0.0, (reference - job.created_at).total_seconds())
+    return max(0.0, (reference - started).total_seconds())
 
 
 async def reconcile_report_generation_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
@@ -37,7 +37,7 @@ async def reconcile_report_generation_job(job: AnalysisJob, db: AsyncSession) ->
     if job.job_type != "report_generation" or job.status not in ("queued", "running"):
         return job
 
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     age = _report_job_age_seconds(job, now)
 
     if job.status == "running" and age >= STALE_RUNNING_REPORT_SECONDS:
@@ -101,7 +101,7 @@ async def _generate_report_internal(job_id: str, user_id: str):
             if not job: return
             
             job.status = "running"
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = utc_now()
             await db.commit()
 
             user_uuid = UUID(user_id)
@@ -155,8 +155,8 @@ async def _generate_report_internal(job_id: str, user_id: str):
                 summary=report_data.summary,
                 report_json=report_data.model_dump(),
                 report_markdown=report_data.report_markdown,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                created_at=utc_now(),
+                updated_at=utc_now()
             )
             db.add(report)
             await db.commit()
@@ -178,7 +178,7 @@ async def _generate_report_internal(job_id: str, user_id: str):
             
             job.status = "succeeded"
             job.progress = 100
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utc_now()
             await db.commit()
 
         except Exception as e:
@@ -186,7 +186,7 @@ async def _generate_report_internal(job_id: str, user_id: str):
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 await db.commit()
 
 async def get_latest_report_service(user_id: UUID, db: AsyncSession):

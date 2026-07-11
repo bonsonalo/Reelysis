@@ -36,8 +36,11 @@ STALE_QUEUED_ABANDON_SECONDS = 600
 STALE_RUNNING_SYNC_SECONDS = 120
 
 
+from app.utils.time import utc_now
+
+
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return utc_now()
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
@@ -158,8 +161,8 @@ def _parse_insight_metrics(insights: dict) -> dict:
 def _parse_media_timestamp(item: dict) -> datetime:
     timestamp = item.get("timestamp")
     if not timestamp:
-        return datetime.now(timezone.utc)
-    return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return utc_now()
+    return datetime.fromisoformat(timestamp.replace("Z", "+00:00")).replace(tzinfo=None)
 
 async def get_oauth_url_service(user_id: UUID):
     try:
@@ -235,7 +238,7 @@ async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession)
         existing_token_stmt = select(ExternalToken).where(ExternalToken.user_id == user_id)
         existing_token = (await db.exec(existing_token_stmt)).first()
         
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=long_lived_token_data.get("expires_in", 5184000))
+        expires_at = utc_now() + timedelta(seconds=long_lived_token_data.get("expires_in", 5184000))
         
         if existing_token:
             existing_token.encrypted_access_token = encrypted_token
@@ -490,7 +493,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                 logger.info("Sync job %s already %s, skipping", job_id, job.status)
                 return
             job.status = "running"
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = utc_now()
             db.commit()
 
             token_stmt = select(ExternalToken).where(ExternalToken.user_id == UUID(user_id))
@@ -580,7 +583,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                     shares=int(metric_data.get("shares", 0) or 0),
                     total_interactions=int(metric_data.get("total_interactions", 0) or 0),
                     raw_metrics=metric_data,
-                    captured_at=datetime.now(timezone.utc),
+                    captured_at=utc_now(),
                 )
                 db.add(media_metric)
 
@@ -612,13 +615,13 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                     detected_niche = account.niche_detected
                 else:
                     detected_niche = account.niche_detected
-            account.last_synced_at = datetime.now(timezone.utc)
+            account.last_synced_at = utc_now()
             account.followers_count = profile_data.get("followers_count", account.followers_count)
             account.media_count = profile_data.get("media_count", account.media_count)
             
             job.progress = 100
             job.status = "succeeded"
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utc_now()
             db.commit()
             db.refresh(account)
             
@@ -635,5 +638,5 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             if job:
                 job.status = "failed"
                 job.error_message = str(e) or repr(e)
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 db.commit()

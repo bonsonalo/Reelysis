@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 from sqlmodel import select, col, desc, Session
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -15,6 +15,7 @@ from app.model.video_analysis import VideoAnalysis, MediaSource
 from app.model.analysis_job import AnalysisJob
 from app.service.ai_service import analyze_video_service, GeminiQuotaExceededError, remaining_gemini_budget
 from app.core.config import settings
+from app.utils.time import utc_now
 from app.utils.scoring import normalize_score_0_100
 
 async def run_bulk_video_analysis_service(user_id: UUID, db: AsyncSession):
@@ -62,7 +63,7 @@ def _select_videos_for_budget(
 
     own_sorted = sorted(
         own_media,
-        key=lambda item: item.published_at or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda item: item.published_at or datetime.min,
         reverse=True,
     )
     comp_sorted = sorted(comp_media, key=_competitor_engagement, reverse=True)
@@ -108,7 +109,7 @@ def _run_analysis_internal(job_id: str, user_id: str, gemini_budget: int | None 
                 return
             
             job.status = "running"
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = utc_now()
             db.commit()
 
             # 1. Find all unanalyzed videos
@@ -120,7 +121,7 @@ def _run_analysis_internal(job_id: str, user_id: str, gemini_budget: int | None 
             if total_videos == 0:
                 job.status = "succeeded"
                 job.progress = 100
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 db.commit()
                 return
 
@@ -173,7 +174,7 @@ def _run_analysis_internal(job_id: str, user_id: str, gemini_budget: int | None 
                 db.commit()
 
             job.status = "succeeded"
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utc_now()
             db.commit()
 
         except GeminiQuotaExceededError:
@@ -280,7 +281,7 @@ def _save_analysis(db: Session, user_id: UUID, source: MediaSource, data, engage
         hook_score=hook_score,
         engagement_score=engagement_score,
         analysis_detail=detail,
-        created_at=datetime.now(timezone.utc)
+        created_at=utc_now()
     )
     db.add(analysis)
     db.commit()

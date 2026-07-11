@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+from app.utils.time import utc_now
 from uuid import UUID
 
 from sqlmodel import select, func, desc
@@ -174,7 +175,7 @@ async def get_dashboard_stats_service(user_id: UUID, db: AsyncSession):
     }
 
 async def get_growth_chart_service(user_id: UUID, db: AsyncSession):
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = utc_now() - timedelta(days=30)
 
     stmt = (
         select(MediaMetric, MediaItem)

@@ -1,7 +1,9 @@
 from sqlmodel import SQLModel, Field, Column, ForeignKey, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.utils.time import utc_now
 
 
 
@@ -27,7 +29,7 @@ class AuthSession(SQLModel, table= True):
     )
     refresh_token_hash: str
     expires_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         nullable= False
     )
     revoked_at: datetime | None = Field(default=None)

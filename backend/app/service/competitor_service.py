@@ -46,8 +46,11 @@ DISCOVERY_MODE_INITIAL = "initial"
 DISCOVERY_MODE_REFRESH = "refresh_suggestions"
 
 
+from app.utils.time import utc_now
+
+
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return utc_now()
 
 
 def _seconds_since_timestamp(ts: datetime, now: datetime | None = None) -> float:
@@ -184,7 +187,7 @@ async def add_competitor_by_handle_service(user_id: UUID, handle: str, db: Async
         media_count=0,
         engagement_rank=0,
         source_metadata={"source": "manual"},
-        last_synced_at=datetime.now(timezone.utc),
+        last_synced_at=utc_now(),
     )
     db.add(competitor)
     await db.commit()
@@ -321,7 +324,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
             user_uuid = UUID(user_id)
 
             job.status = "running"
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = utc_now()
             await db.commit()
 
             account_stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_uuid)
@@ -393,7 +396,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
 
             job.status = "succeeded"
             job.progress = 100
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utc_now()
             await db.commit()
 
             # STAGE 4: Reel fetch + transcription in background (not part of discovery job polling)
@@ -408,7 +411,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 await db.commit()
 
 
@@ -592,7 +595,7 @@ async def _update_existing_competitors_from_profiles(
         if media_count > 0:
             competitor.media_count = media_count
         competitor.engagement_rank = engagement_rank
-        competitor.last_synced_at = datetime.now(timezone.utc)
+        competitor.last_synced_at = utc_now()
         db.add(competitor)
         touched_ids.append(competitor.id)
 
@@ -665,7 +668,7 @@ async def _process_and_save_competitors(
             existing.media_count = media_count
         if engagement_rank > 0:
             existing.engagement_rank = engagement_rank
-        existing.last_synced_at = datetime.now(timezone.utc)
+        existing.last_synced_at = utc_now()
         db.add(existing)
 
     ranked_candidates: list[tuple[int, dict]] = []
@@ -721,7 +724,7 @@ async def _process_and_save_competitors(
                 "source": "auto_discovery",
                 "follower_tier": min_followers,
             },
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=utc_now(),
         )
         db.add(competitor)
         await db.flush()
@@ -858,7 +861,7 @@ async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id:
             transcript_text=provider_transcript,
             transcript_source="provider" if provider_transcript else "none",
             metrics=entry.get("metrics", {}),
-            published_at=datetime.now(timezone.utc),
+            published_at=utc_now(),
         )
         db.add(media)
     try:
@@ -901,7 +904,7 @@ async def _refresh_competitor_profiles(
                 profiles = normalize_competitor_profiles(raw)
                 if profiles:
                     await _enrich_competitor_from_provider_entry(db, comp_id, profiles[0])
-                    competitor.last_synced_at = datetime.now(timezone.utc)
+                    competitor.last_synced_at = utc_now()
                     db.add(competitor)
             else:
                 remaining.append((comp_id, snapshot_id))

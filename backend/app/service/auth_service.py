@@ -2,7 +2,7 @@ from fastapi import Response
 from jose import JWTError
 from sqlmodel import select
 from app.core.config import settings
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import jwt
 from uuid import UUID
 from app.model.user import User
@@ -14,6 +14,7 @@ from app.model.user import User
 from app.api.dep import authenticate_user, bcrypt_context, create_access_token
 from app.model.auth import AuthSession
 from app.core.cookies import clear_auth_cookies, set_auth_cookies
+from app.utils.time import utc_now
 
 # sign up
 
@@ -58,7 +59,7 @@ async def register_user(user_info: UserCreate, db: AsyncSession, response: Respo
     refresh_storing= AuthSession(
         user_id= user_credential.id,
         refresh_token_hash= bcrypt_context.hash(refresh_token),
-        expires_at= datetime.now(timezone.utc) + timedelta(days= 30)
+        expires_at= utc_now() + timedelta(days= 30)
     )
 
     set_auth_cookies(response, access_token, refresh_token)
@@ -97,7 +98,7 @@ async def login_user(user_credential: LoginInfo, db: AsyncSession, response: Res
         refresh_storing= AuthSession(
             user_id= user.id,
             refresh_token_hash= bcrypt_context.hash(refresh_token),
-            expires_at= datetime.now(timezone.utc) + timedelta(days= 30)
+            expires_at= utc_now() + timedelta(days= 30)
         )
         set_auth_cookies(response, access_token, refresh_token)
 
@@ -134,7 +135,7 @@ async def refresh_token_service(response, db: AsyncSession, request):
     
     db_refresh_token_stmt = select(AuthSession).where(
         AuthSession.user_id == id,
-        AuthSession.expires_at > datetime.now(timezone.utc),
+        AuthSession.expires_at > utc_now(),
         AuthSession.revoked_at == None
     )
     db_refresh_token = (await db.exec(db_refresh_token_stmt)).first()
@@ -159,13 +160,13 @@ async def refresh_token_service(response, db: AsyncSession, request):
         token_purpose= "refresh",
         expires_delta= timedelta(days= 30)
     )
-    db_refresh_token.revoked_at= datetime.now(timezone.utc)
+    db_refresh_token.revoked_at= utc_now()
     db.add(db_refresh_token)
     
     new_refresh_token= AuthSession(
         user_id= id,
         refresh_token_hash= bcrypt_context.hash(refresh_token),
-        expires_at= datetime.now(timezone.utc) + timedelta(days= 30)
+        expires_at= utc_now() + timedelta(days= 30)
     )
     db.add(new_refresh_token)
 
@@ -178,13 +179,13 @@ async def refresh_token_service(response, db: AsyncSession, request):
 async def logout_service( response: Response, db: AsyncSession, current_user):
     stmt = select(AuthSession).where(
         AuthSession.user_id == current_user["id"],
-        AuthSession.expires_at > datetime.now(timezone.utc),
+        AuthSession.expires_at > utc_now(),
         AuthSession.revoked_at == None
     )
     db_refresh_token = (await db.exec(stmt)).first()
     
     if db_refresh_token:
-        db_refresh_token.revoked_at= datetime.now(timezone.utc)
+        db_refresh_token.revoked_at= utc_now()
         db.add(db_refresh_token)
         await db.commit()
 

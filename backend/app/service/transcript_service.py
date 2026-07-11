@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from app.utils.time import utc_now
 from typing import Optional
 from uuid import UUID
 
@@ -205,7 +205,7 @@ def _run_transcription_internal(job_id: str, user_id: str):
 
         try:
             job.status = "running"
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = utc_now()
             db.commit()
 
             targets = _collect_transcription_targets(db, user_uuid)
@@ -214,7 +214,7 @@ def _run_transcription_internal(job_id: str, user_id: str):
             if total == 0:
                 job.status = "succeeded"
                 job.progress = 100
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 db.commit()
                 logger.info(
                     "Transcription complete for user %s; video analysis deferred to report generation.",
@@ -254,7 +254,7 @@ def _run_transcription_internal(job_id: str, user_id: str):
 
             job.status = "succeeded"
             job.progress = 100
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = utc_now()
             db.commit()
 
             logger.info(
@@ -269,5 +269,5 @@ def _run_transcription_internal(job_id: str, user_id: str):
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = utc_now()
                 db.commit()

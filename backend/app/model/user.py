@@ -2,7 +2,9 @@ from pydantic import EmailStr
 from sqlmodel import SQLModel, Field, Column, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.utils.time import utc_now
 
 
 class User(SQLModel, table= True):
@@ -18,7 +20,7 @@ class User(SQLModel, table= True):
     name: str
     password_hash: str
     created_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc)
+        default_factory=utc_now
         )
     
     external_token: "ExternalToken" = Relationship(

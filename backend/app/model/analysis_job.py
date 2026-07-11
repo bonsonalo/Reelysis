@@ -4,7 +4,9 @@
 from sqlmodel import Column, ForeignKey, SQLModel, Field, Relationship
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.utils.time import utc_epoch, utc_now
 from typing import Any
 
 
@@ -47,15 +49,15 @@ class AnalysisJob(SQLModel, table= True):
     )
     error_message: str = Field(default="")
     retry_count: int = Field(default=0)
-    started_at: datetime = Field(default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc))
-    completed_at: datetime = Field(default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc))
+    started_at: datetime = Field(default_factory=utc_epoch)
+    completed_at: datetime = Field(default_factory=utc_epoch)
     created_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc)
+        default_factory=utc_now
     )
     updated_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         sa_column= Column(
-            onupdate= lambda: datetime.now(timezone.utc)
+            onupdate=utc_now
         )
     )
 

@@ -8,12 +8,13 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 import uuid
 from app.core.config import settings
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import jwt
 from uuid import UUID   
 from app.model.user import User
 from app.core.logger import logger
 from app.core.database import get_db
+from app.utils.time import utc_now
 
 
 bcrypt_context= CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -41,7 +42,7 @@ async def create_access_token(email: EmailStr, id: uuid.UUID, token_purpose: str
             "token_type": token_purpose
         }
 
-        expire= datetime.now(timezone.utc) + expires_delta
+        expire= utc_now() + expires_delta
         encode.update({"exp": expire})
 
 

@@ -1,7 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.utils.time import utc_now
 from typing import Any
 
 
@@ -37,12 +39,12 @@ class AccountReport(SQLModel, table= True):
     )
     report_markdown: str
     created_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc)
+        default_factory=utc_now
     )
     updated_at: datetime= Field(
-        default_factory= lambda: datetime.now(timezone.utc),
+        default_factory=utc_now,
         sa_column= Column(
-            onupdate= lambda: datetime.now(timezone.utc)
+            onupdate=utc_now
         )
     )
 
