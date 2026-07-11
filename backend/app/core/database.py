@@ -2,6 +2,7 @@ import ssl
 
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import create_engine
 from sqlmodel import Session
@@ -27,8 +28,9 @@ def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
     query = dict(url.query)
     sslmode = query.pop("sslmode", None)
     connect_args: dict = {
-        # Required for Supabase transaction pooler (PgBouncer, port 6543).
+        # Supabase transaction pooler (PgBouncer, port 6543): disable all prepared statements.
         "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
     }
     ssl_ctx = _asyncpg_ssl_connect_arg(sslmode)
     if ssl_ctx is not None:
@@ -40,8 +42,12 @@ def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
 
 _async_url, _async_connect_args = _async_engine_url_and_connect_args(settings.DB_URL)
 
-# Async engine for FastAPI
-engine = create_async_engine(_async_url, connect_args=_async_connect_args)
+# Async engine for FastAPI (NullPool: let Supabase pooler own connections).
+engine = create_async_engine(
+    _async_url,
+    connect_args=_async_connect_args,
+    poolclass=NullPool,
+)
 
 # Sync engine for Celery tasks
 sync_db_url = settings.DB_URL
@@ -52,7 +58,7 @@ elif sync_db_url.startswith("postgresql+psycopg2://"):
 elif sync_db_url.startswith("sqlite://") and not sync_db_url.startswith("sqlite:///"):
     sync_db_url = sync_db_url.replace("sqlite://", "sqlite:///", 1)
 
-sync_engine = create_engine(sync_db_url)
+sync_engine = create_engine(sync_db_url, connect_args={"prepare_threshold": None})
 
 # Async Session for FastAPI
 AsyncSessionLocal = async_sessionmaker(
