@@ -8,14 +8,28 @@ from sqlmodel import Session
 from app.core.config import settings
 
 
+def _asyncpg_ssl_connect_arg(sslmode: str | None) -> ssl.SSLContext | None:
+    if not sslmode or sslmode.lower() in ("disable", "allow"):
+        return None
+    mode = sslmode.lower()
+    if mode == "require":
+        # Supabase pooler: TLS required, but chain may not verify on all PaaS hosts.
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    return ssl.create_default_context()
+
+
 def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
     """asyncpg rejects sslmode in the URL query; map it to connect_args instead."""
     url = make_url(db_url)
     query = dict(url.query)
     sslmode = query.pop("sslmode", None)
     connect_args: dict = {}
-    if sslmode and sslmode.lower() not in ("disable", "allow"):
-        connect_args["ssl"] = ssl.create_default_context()
+    ssl_ctx = _asyncpg_ssl_connect_arg(sslmode)
+    if ssl_ctx is not None:
+        connect_args["ssl"] = ssl_ctx
     if sslmode is not None:
         url = url.set(query=query)
     return url.render_as_string(hide_password=False), connect_args
