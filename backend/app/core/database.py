@@ -26,7 +26,10 @@ def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
     url = make_url(db_url)
     query = dict(url.query)
     sslmode = query.pop("sslmode", None)
-    connect_args: dict = {}
+    connect_args: dict = {
+        # Required for Supabase transaction pooler (PgBouncer, port 6543).
+        "statement_cache_size": 0,
+    }
     ssl_ctx = _asyncpg_ssl_connect_arg(sslmode)
     if ssl_ctx is not None:
         connect_args["ssl"] = ssl_ctx
