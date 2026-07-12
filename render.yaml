@@ -13,6 +13,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: PYTHON_VERSION
+        value: 3.12.3
       - key: RUN_MIGRATIONS_ON_STARTUP
         value: "false"
       # Set FRONTEND_URL, CORS_ORIGINS, DB_URL, REDIS_URL, secrets, etc. in the dashboard.
@@ -25,6 +27,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: PYTHON_VERSION
+        value: 3.12.3
       - key: RUN_MIGRATIONS_ON_STARTUP
         value: "false"
       # Copy the same env vars as reelysis-api (DB_URL, REDIS_URL, GEMINI_*, etc.).

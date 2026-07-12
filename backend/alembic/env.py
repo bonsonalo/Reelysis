@@ -26,7 +26,9 @@ config = context.config
 
 config = context.config
 
-sync_url = settings.DB_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+from app.core.db_url import normalize_sync_db_url
+
+sync_url = normalize_sync_db_url(settings.DB_URL)
 # Alembic uses configparser interpolation; escape '%' from URL-encoded passwords.
 config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
