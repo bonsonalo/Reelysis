@@ -1,86 +1,64 @@
 import ssl
 
-from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import create_engine
 from sqlmodel import Session
+
 from app.core.config import settings
-
-
-def _asyncpg_ssl_connect_arg(sslmode: str | None) -> ssl.SSLContext | None:
-    if not sslmode or sslmode.lower() in ("disable", "allow"):
-        return None
-    mode = sslmode.lower()
-    if mode == "require":
-        # Supabase pooler: TLS required, but chain may not verify on all PaaS hosts.
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return ctx
-    return ssl.create_default_context()
-
-
-def _async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
-    """asyncpg rejects sslmode in the URL query; map it to connect_args instead."""
-    url = make_url(db_url)
-    query = dict(url.query)
-    sslmode = query.pop("sslmode", None)
-    connect_args: dict = {
-        # Supabase transaction pooler (PgBouncer, port 6543): disable all prepared statements.
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    }
-    ssl_ctx = _asyncpg_ssl_connect_arg(sslmode)
-    if ssl_ctx is not None:
-        connect_args["ssl"] = ssl_ctx
-    if sslmode is not None:
-        url = url.set(query=query)
-    return url.render_as_string(hide_password=False), connect_args
-
-
-_async_url, _async_connect_args = _async_engine_url_and_connect_args(settings.DB_URL)
-
-# Async engine for FastAPI (NullPool: let Supabase pooler own connections).
-engine = create_async_engine(
-    _async_url,
-    connect_args=_async_connect_args,
-    poolclass=NullPool,
+from app.core.db_url import (
+    build_async_engine_url_and_connect_args,
+    normalize_sync_db_url,
+    uses_supabase_transaction_pooler,
 )
 
-# Sync engine for Celery tasks
-sync_db_url = settings.DB_URL
-if sync_db_url.startswith("postgresql+asyncpg://"):
-    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-elif sync_db_url.startswith("postgresql+psycopg2://"):
-    sync_db_url = sync_db_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
-elif sync_db_url.startswith("sqlite://") and not sync_db_url.startswith("sqlite:///"):
-    sync_db_url = sync_db_url.replace("sqlite://", "sqlite:///", 1)
+_async_url, _async_connect_args, _via_pooler = build_async_engine_url_and_connect_args(
+    settings.DB_URL,
+)
 
-sync_engine = create_engine(sync_db_url, connect_args={"prepare_threshold": None})
+if _via_pooler:
+    engine = create_async_engine(
+        _async_url,
+        connect_args=_async_connect_args,
+        poolclass=NullPool,
+    )
+else:
+    engine = create_async_engine(
+        _async_url,
+        connect_args=_async_connect_args,
+        pool_size=5,
+        max_overflow=5,
+        pool_pre_ping=True,
+    )
 
-# Async Session for FastAPI
+sync_db_url = normalize_sync_db_url(settings.DB_URL)
+sync_connect_args: dict = {}
+if uses_supabase_transaction_pooler(settings.DB_URL):
+    sync_connect_args["prepare_threshold"] = None
+
+sync_engine = create_engine(
+    sync_db_url,
+    connect_args=sync_connect_args,
+    pool_pre_ping=True,
+)
+
 AsyncSessionLocal = async_sessionmaker(
-    bind= engine,
-    class_= AsyncSession,
-    expire_on_commit= False,
-    autoflush= False,
-    autocommit= False
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
 )
 
-# Sync Session for Celery tasks
 SyncSessionLocal = Session(bind=sync_engine)
 
-
-#get_db()
 
 async def get_db():
     async with AsyncSessionLocal() as db:
         yield db
 
 
-# Import all models to ensure they are registered in SQLModel registry
 from app.model.user import User
 from app.model.auth import AuthSession
 from app.model.external_token import ExternalToken
