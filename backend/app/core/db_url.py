@@ -118,3 +118,17 @@ def build_sync_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
         connect_args["prepare_threshold"] = None
     return url.render_as_string(hide_password=False), connect_args
 
+
+def describe_db_target(db_url: str) -> str:
+    """Safe one-line summary for logs (no password)."""
+    try:
+        async_url, _, via_pooler = build_async_engine_url_and_connect_args(db_url)
+        url = make_url(async_url)
+        host = url.host or "(missing host)"
+        port = url.port or 5432
+        user = url.username or "(missing user)"
+        mode = "transaction-pooler" if via_pooler else "direct-or-session-pooler"
+        return f"host={host} port={port} user={user} mode={mode}"
+    except Exception as exc:
+        return f"invalid DB_URL ({exc})"
+

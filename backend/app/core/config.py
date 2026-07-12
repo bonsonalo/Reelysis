@@ -68,6 +68,8 @@ class Settings(BaseSettings):
 try:
     settings= Settings()
     logger.info("env validated")
+    from app.core.db_url import describe_db_target
+    logger.info("DB connection target: %s", describe_db_target(settings.DB_URL))
 
 except Exception as e:
     logger.error(str(e))
