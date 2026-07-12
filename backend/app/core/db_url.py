@@ -28,13 +28,33 @@ def normalize_sync_db_url(db_url: str) -> str:
     return url
 
 
+def is_supabase_pooler_host(db_url: str) -> bool:
+    url = make_url(normalize_async_db_url(db_url))
+    return "pooler" in (url.host or "").lower()
+
+
 def uses_supabase_transaction_pooler(db_url: str) -> bool:
     """PgBouncer transaction mode (port 6543) needs NullPool and no prepared statements."""
     url = make_url(normalize_async_db_url(db_url))
     if url.port == 6543:
         return True
     host = (url.host or "").lower()
-    return "pooler" in host and url.port != 5432
+    return "pooler" in host and url.port not in (None, 5432)
+
+
+def requires_pgbouncer_compat(db_url: str) -> bool:
+    """
+    Disable asyncpg/SQLAlchemy prepared statements for Supabase pooler URLs.
+    Required for transaction pooler (6543); safe for session pooler (5432) too.
+    """
+    return uses_supabase_transaction_pooler(db_url) or is_supabase_pooler_host(db_url)
+
+
+def asyncpg_pgbouncer_connect_args() -> dict:
+    return {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
 
 
 def asyncpg_ssl_connect_arg(sslmode: str | None, *, ssl_required: bool = False) -> ssl.SSLContext | None:
@@ -89,10 +109,10 @@ def build_async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict, boo
     query = dict(url.query)
     cleaned_query, sslmode, ssl_required = _parse_ssl_query_params(query)
     via_pooler = uses_supabase_transaction_pooler(normalized)
+    pgbouncer_compat = requires_pgbouncer_compat(normalized)
     connect_args: dict = {}
-    if via_pooler:
-        connect_args["statement_cache_size"] = 0
-        connect_args["prepared_statement_cache_size"] = 0
+    if pgbouncer_compat:
+        connect_args.update(asyncpg_pgbouncer_connect_args())
     ssl_ctx = asyncpg_ssl_connect_arg(sslmode, ssl_required=ssl_required)
     if ssl_ctx is not None:
         connect_args["ssl"] = ssl_ctx
@@ -114,7 +134,7 @@ def build_sync_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
     if cleaned_query != query:
         url = url.set(query=cleaned_query)
     connect_args: dict = {}
-    if uses_supabase_transaction_pooler(db_url):
+    if requires_pgbouncer_compat(db_url):
         connect_args["prepare_threshold"] = None
     return url.render_as_string(hide_password=False), connect_args
 
@@ -127,8 +147,11 @@ def describe_db_target(db_url: str) -> str:
         host = url.host or "(missing host)"
         port = url.port or 5432
         user = url.username or "(missing user)"
-        mode = "transaction-pooler" if via_pooler else "direct-or-session-pooler"
-        return f"host={host} port={port} user={user} mode={mode}"
+        mode = "transaction-pooler" if via_pooler else "session-pooler"
+        if not is_supabase_pooler_host(db_url):
+            mode = "direct"
+        compat = "pgbouncer-compat" if requires_pgbouncer_compat(db_url) else "prepared-ok"
+        return f"host={host} port={port} user={user} mode={mode} db={compat}"
     except Exception as exc:
         return f"invalid DB_URL ({exc})"
 
