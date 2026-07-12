@@ -190,7 +190,7 @@ async def update_recommendation_status(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/jobs/{job_id}")
+@router.get("/jobs/{job_id}", response_model=AnalysisJob)
 async def get_job_status(
     job_id: UUID,
     db: db_dependency,
@@ -200,17 +200,12 @@ async def get_job_status(
     Endpoint to poll the status of a background job.
     Delegates logic to the analysis_service.
     """
-    job = await get_job_status_service(job_id, current_user["id"], db)
-    
-    return {
-        "id": job.id,
-        "type": job.job_type,
-        "status": job.status,
-        "progress": job.progress,
-        "error_message": job.error_message,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at
-    }
+    try:
+        return await get_job_status_service(job_id, current_user["id"], db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/report/generate")
 @limiter.limit(job_trigger_limit, key_func=get_user_key)

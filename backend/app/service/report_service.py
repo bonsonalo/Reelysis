@@ -198,9 +198,11 @@ async def _generate_report_internal(job_id: str, user_id: str):
         except Exception as e:
             logger.error(f"Error in report generation task: {e}")
             if job:
+                await db.rollback()
                 job.status = "failed"
-                job.error_message = str(e)
+                job.error_message = str(e)[:2000]
                 job.completed_at = utc_now()
+                db.add(job)
                 await db.commit()
 
 async def get_latest_report_service(user_id: UUID, db: AsyncSession):

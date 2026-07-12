@@ -21,13 +21,14 @@ async def get_job_status_service(job_id: UUID, user_id: UUID, db: AsyncSession):
     if job.user_id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view this job")
 
-    if job.job_type == "instagram_sync":
-        job = await reconcile_instagram_sync_job(job, db)
-    elif job.job_type == "competitor_discovery":
-        job = await reconcile_competitor_discovery_job(job, db)
-    elif job.job_type == "report_generation":
-        job = await reconcile_report_generation_job(job, db)
-        
+    if job.status in ("queued", "running"):
+        if job.job_type == "instagram_sync":
+            job = await reconcile_instagram_sync_job(job, db)
+        elif job.job_type == "competitor_discovery":
+            job = await reconcile_competitor_discovery_job(job, db)
+        elif job.job_type == "report_generation":
+            job = await reconcile_report_generation_job(job, db)
+
     return job
 
 async def get_user_jobs_service(
