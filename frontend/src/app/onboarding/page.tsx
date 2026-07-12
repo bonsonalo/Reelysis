@@ -123,7 +123,7 @@ function OnboardingContent() {
   const { mutate: confirmNiche, isPending: isConfirmingNiche } = useConfirmNiche()
   const { mutate: removeCompetitor } = useRemoveCompetitor()
   const { mutate: rediscoverCompetitors, isPending: isRediscovering } = useRediscoverCompetitors()
-  const { mutate: generateRoadmap } = useGenerateRoadmap()
+  const { mutate: generateRoadmap, isPending: isGeneratingRoadmap } = useGenerateRoadmap()
 
   const account = accounts?.[0]
   const isConnected = !!account
@@ -295,7 +295,7 @@ function OnboardingContent() {
           competitors={competitors || []} 
           onRemove={(id) => removeCompetitor(id)} 
           onFinish={handleFinishOnboarding} 
-          isFinishing={false}
+          isFinishing={isGeneratingRoadmap}
         />
       )
     
