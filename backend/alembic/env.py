@@ -26,9 +26,9 @@ config = context.config
 
 config = context.config
 
-from app.core.db_url import normalize_sync_db_url
+from app.core.db_url import build_sync_engine_url_and_connect_args
 
-sync_url = normalize_sync_db_url(settings.DB_URL)
+sync_url, _ = build_sync_engine_url_and_connect_args(settings.DB_URL)
 # Alembic uses configparser interpolation; escape '%' from URL-encoded passwords.
 config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 

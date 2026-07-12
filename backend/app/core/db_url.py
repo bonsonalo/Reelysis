@@ -37,33 +37,84 @@ def uses_supabase_transaction_pooler(db_url: str) -> bool:
     return "pooler" in host and url.port != 5432
 
 
-def asyncpg_ssl_connect_arg(sslmode: str | None) -> ssl.SSLContext | None:
-    if not sslmode or sslmode.lower() in ("disable", "allow"):
-        return None
-    mode = sslmode.lower()
-    if mode == "require":
-        # Supabase: TLS required; chain may not verify on all PaaS hosts.
+def asyncpg_ssl_connect_arg(sslmode: str | None, *, ssl_required: bool = False) -> ssl.SSLContext | None:
+    if sslmode:
+        if sslmode.lower() in ("disable", "allow"):
+            return None
+        mode = sslmode.lower()
+        if mode == "require":
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            return ctx
+        return ssl.create_default_context()
+    if ssl_required:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
-    return ssl.create_default_context()
+    return None
+
+
+def _parse_ssl_query_params(query: dict) -> tuple[dict, str | None, bool]:
+    """
+    Strip ssl/sslmode from URL query (asyncpg rejects them as connect kwargs).
+    Returns (remaining_query, sslmode, ssl_required).
+    """
+    remaining = dict(query)
+    sslmode = remaining.pop("sslmode", None)
+    ssl_val = remaining.pop("ssl", None)
+
+    ssl_required = False
+    if sslmode:
+        ssl_required = sslmode.lower() not in ("disable", "allow")
+    elif ssl_val is not None:
+        token = str(ssl_val).strip().lower()
+        if token in ("true", "1", "yes", "require", "on"):
+            ssl_required = True
+        elif token in ("false", "0", "no", "disable", "off"):
+            ssl_required = False
+        else:
+            # e.g. ssl=verify-full — treat as required with explicit mode when possible
+            sslmode = token
+            ssl_required = token not in ("disable", "allow")
+
+    return remaining, sslmode, ssl_required
 
 
 def build_async_engine_url_and_connect_args(db_url: str) -> tuple[str, dict, bool]:
-    """asyncpg rejects sslmode in the URL query; map it to connect_args instead."""
+    """asyncpg rejects ssl/sslmode in the URL query; map them to connect_args instead."""
     normalized = normalize_async_db_url(db_url)
     url = make_url(normalized)
     query = dict(url.query)
-    sslmode = query.pop("sslmode", None)
+    cleaned_query, sslmode, ssl_required = _parse_ssl_query_params(query)
     via_pooler = uses_supabase_transaction_pooler(normalized)
     connect_args: dict = {}
     if via_pooler:
         connect_args["statement_cache_size"] = 0
         connect_args["prepared_statement_cache_size"] = 0
-    ssl_ctx = asyncpg_ssl_connect_arg(sslmode)
+    ssl_ctx = asyncpg_ssl_connect_arg(sslmode, ssl_required=ssl_required)
     if ssl_ctx is not None:
         connect_args["ssl"] = ssl_ctx
-    if sslmode is not None:
-        url = url.set(query=query)
+    if cleaned_query != query or sslmode is not None or ssl_required:
+        url = url.set(query=cleaned_query)
     return url.render_as_string(hide_password=False), connect_args, via_pooler
+
+
+def build_sync_engine_url_and_connect_args(db_url: str) -> tuple[str, dict]:
+    """psycopg accepts sslmode in the URL; convert Supabase ?ssl=true to sslmode=require."""
+    normalized = normalize_sync_db_url(db_url)
+    url = make_url(normalized)
+    query = dict(url.query)
+    cleaned_query, sslmode, ssl_required = _parse_ssl_query_params(query)
+    if ssl_required and not sslmode:
+        cleaned_query = {**cleaned_query, "sslmode": "require"}
+    elif sslmode and "sslmode" not in cleaned_query:
+        cleaned_query = {**cleaned_query, "sslmode": sslmode}
+    if cleaned_query != query:
+        url = url.set(query=cleaned_query)
+    connect_args: dict = {}
+    if uses_supabase_transaction_pooler(db_url):
+        connect_args["prepare_threshold"] = None
+    return url.render_as_string(hide_password=False), connect_args
+

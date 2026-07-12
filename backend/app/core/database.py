@@ -9,8 +9,7 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.db_url import (
     build_async_engine_url_and_connect_args,
-    normalize_sync_db_url,
-    uses_supabase_transaction_pooler,
+    build_sync_engine_url_and_connect_args,
 )
 
 _async_url, _async_connect_args, _via_pooler = build_async_engine_url_and_connect_args(
@@ -32,10 +31,7 @@ else:
         pool_pre_ping=True,
     )
 
-sync_db_url = normalize_sync_db_url(settings.DB_URL)
-sync_connect_args: dict = {}
-if uses_supabase_transaction_pooler(settings.DB_URL):
-    sync_connect_args["prepare_threshold"] = None
+sync_db_url, sync_connect_args = build_sync_engine_url_and_connect_args(settings.DB_URL)
 
 sync_engine = create_engine(
     sync_db_url,
