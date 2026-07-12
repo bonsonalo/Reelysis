@@ -21,7 +21,8 @@ from app.service.competitor_service import prepare_competitor_data_for_report
 from app.service.transcript_service import run_transcription_sync
 from app.service.video_analysis_service import run_video_analysis_sync
 
-STALE_RUNNING_REPORT_SECONDS = 20 * 60
+STALE_RUNNING_REPORT_SECONDS = 10 * 60
+STALE_QUEUED_REPORT_SECONDS = 180
 
 
 def _report_job_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
@@ -39,6 +40,16 @@ async def reconcile_report_generation_job(job: AnalysisJob, db: AsyncSession) ->
 
     now = utc_now()
     age = _report_job_age_seconds(job, now)
+
+    if job.status == "queued" and age >= STALE_QUEUED_REPORT_SECONDS:
+        logger.warning("Failing stale queued report_generation job %s (age %.0fs)", job.id, age)
+        job.status = "failed"
+        job.error_message = "Report timed out before starting. Wake the worker and try again."
+        job.completed_at = now
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+        return job
 
     if job.status == "running" and age >= STALE_RUNNING_REPORT_SECONDS:
         logger.warning("Failing stale report_generation job %s (age %.0fs)", job.id, age)
@@ -96,12 +107,15 @@ def generate_report_task(job_id: str, user_id: str):
 
 async def _generate_report_internal(job_id: str, user_id: str):
     async with AsyncSessionLocal() as db:
+        job: AnalysisJob | None = None
         try:
             job = await db.get(AnalysisJob, UUID(job_id))
-            if not job: return
+            if not job:
+                return
             
             job.status = "running"
             job.started_at = utc_now()
+            job.progress = 2
             await db.commit()
 
             user_uuid = UUID(user_id)

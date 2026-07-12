@@ -49,11 +49,18 @@ async def get_user_jobs_service(
     result = await db.exec(stmt)
     jobs = result.all()
 
-    if job_type == "report_generation" and jobs:
+    reconcilers = {
+        "instagram_sync": reconcile_instagram_sync_job,
+        "competitor_discovery": reconcile_competitor_discovery_job,
+        "report_generation": reconcile_report_generation_job,
+    }
+    reconcile_fn = reconcilers.get(job_type) if job_type else None
+
+    if reconcile_fn and jobs:
         reconciled = []
         for job in jobs:
             if job.status in ("queued", "running"):
-                job = await reconcile_report_generation_job(job, db)
+                job = await reconcile_fn(job, db)
             reconciled.append(job)
         return reconciled
 
