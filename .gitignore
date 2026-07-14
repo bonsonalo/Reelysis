@@ -17,8 +17,8 @@ ENV/
 instaenv/
 
 # Markdown docs (local specs / notes — do not push)
-
 *.md
+!README.md
 .cursorrules
 reelysis_design.png
 seed_demo.py
