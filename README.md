@@ -8,25 +8,32 @@
 
 ## Live links
 
-| Resource | URL |
-|----------|-----|
+
+| Resource     | URL                                                           |
+| ------------ | ------------------------------------------------------------- |
 | **Live app** | [reelysis-zeta.vercel.app](https://reelysis-zeta.vercel.app/) |
-| **API** | Render (private URL) |
-| **Contact** | bonsonalo@gmail.com |
+| **API**      | Render (private URL)                                          |
+| **Contact**  | [bonsonalo@gmail.com](mailto:bonsonalo@gmail.com)             |
+
 
 ---
+
+
 
 ## Problem
 
 Creators see views and likes in Instagram Insights, but not *why* content works or fails. Manual competitor research and content audits are slow and inconsistent.
 
 **Reelysis solves this by:**
+
 - Importing the user's Reels and performance metrics via Meta OAuth
 - Discovering similar creators in the same niche (AI-suggested handles + public data)
 - Transcribing and analyzing video content with Google Gemini
 - Generating a comparative strategy report with gaps, strengths, and next-post recommendations
 
 ---
+
+
 
 ## Architecture
 
@@ -69,17 +76,25 @@ flowchart TB
     CELERY --> BD
 ```
 
+
+
+
+
 ### Services
 
-| Layer | Stack | Role |
-|-------|-------|------|
-| Frontend | Next.js 16, TypeScript, React Query, Redux, Tailwind | Dashboard, onboarding, reports, video analysis UI |
-| API | FastAPI, SQLAlchemy (async), Alembic | Auth, Instagram OAuth, job triggers, data APIs |
-| Worker | Celery, Redis | Instagram sync, transcription, AI analysis, report generation |
-| Database | PostgreSQL (Supabase) | Users, accounts, media, metrics, analysis jobs, reports |
-| Cache / queue | Redis | Celery broker, OAuth state, rate limits, Gemini daily budget |
+
+| Layer         | Stack                                                | Role                                                          |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| Frontend      | Next.js 16, TypeScript, React Query, Redux, Tailwind | Dashboard, onboarding, reports, video analysis UI             |
+| API           | FastAPI, SQLAlchemy (async), Alembic                 | Auth, Instagram OAuth, job triggers, data APIs                |
+| Worker        | Celery, Redis                                        | Instagram sync, transcription, AI analysis, report generation |
+| Database      | PostgreSQL (Supabase)                                | Users, accounts, media, metrics, analysis jobs, reports       |
+| Cache / queue | Redis                                                | Celery broker, OAuth state, rate limits, Gemini daily budget  |
+
 
 ---
+
+
 
 ## Key features
 
@@ -94,6 +109,8 @@ flowchart TB
 
 ---
 
+
+
 ## Tech stack
 
 **Frontend:** Next.js (App Router), TypeScript, TanStack React Query, Redux Toolkit, Tailwind CSS, shadcn/ui, Recharts
@@ -106,24 +123,35 @@ flowchart TB
 
 ---
 
+
+
 ## Screenshots
 
+
+
 ### Landing page (hero)
-![Landing page](docs/screenshots/01-landing.png)
+
+Landing page
 
 ### Dashboard
-![Dashboard](docs/screenshots/02-dashboard.png)
+
+Dashboard
 
 ### Competitors
-![Competitors page](docs/screenshots/03-competitors.png)
+
+Competitors page
 
 ### Video analysis
-![Video analysis](docs/screenshots/04-video-analysis.png)
+
+Video analysis
 
 ### Strategy report
-![Report](docs/screenshots/05-report.png)
+
+Report
 
 ---
+
+
 
 ## Project structure
 
@@ -144,6 +172,8 @@ insta/
 ```
 
 ---
+
+
 
 ## Background job pipeline
 
@@ -166,26 +196,36 @@ sequenceDiagram
     User->>API: Fetch report
 ```
 
+
+
 Job types: `instagram_sync`, `competitor_discovery`, `transcription`, `video_analysis`, `report_generation`
 
 ---
+
+
 
 ## Production challenges solved
 
 These are real issues debugged during deployment — useful context for technical interviews:
 
-| Issue | Root cause | Fix |
-|-------|------------|-----|
-| `Network is unreachable` to Supabase | Render cannot reach IPv6-only direct DB hosts | Switched to Supabase **Session pooler** (IPv4-friendly hostname) |
-| `ModuleNotFoundError: psycopg2` | `postgresql://` URL made SQLAlchemy pick wrong driver | Centralized URL normalization (`postgresql+asyncpg://`, `postgresql+psycopg://`) |
-| `DuplicatePreparedStatementError` | Transaction pooler (port 6543) / PgBouncer incompatible with asyncpg prepared statements | Disabled statement cache, `NullPool`, `query_cache_size=0` on pooler connections |
-| Report jobs stuck at `running`, `progress: 0` | Worker DB errors left transactions aborted; no early progress signal | `rollback()` before failure updates; `progress: 2` on task start; faster stale-job timeouts |
-| ~10s login / signup / refresh | `NullPool` + new TCP+TLS per query, bcrypt on throttled CPU, remote DB latency | Documented tradeoff; session pooler (5432) improves connection reuse |
-| Growth chart empty / 100% deltas | Only one day of snapshot data after first sync | Expected behavior until a second sync day exists |
+
+| Issue                                         | Root cause                                                                               | Fix                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Network is unreachable` to Supabase          | Render cannot reach IPv6-only direct DB hosts                                            | Switched to Supabase **Session pooler** (IPv4-friendly hostname)                            |
+| `ModuleNotFoundError: psycopg2`               | `postgresql://` URL made SQLAlchemy pick wrong driver                                    | Centralized URL normalization (`postgresql+asyncpg://`, `postgresql+psycopg://`)            |
+| `DuplicatePreparedStatementError`             | Transaction pooler (port 6543) / PgBouncer incompatible with asyncpg prepared statements | Disabled statement cache, `NullPool`, `query_cache_size=0` on pooler connections            |
+| Report jobs stuck at `running`, `progress: 0` | Worker DB errors left transactions aborted; no early progress signal                     | `rollback()` before failure updates; `progress: 2` on task start; faster stale-job timeouts |
+| ~10s login / signup / refresh                 | `NullPool` + new TCP+TLS per query, bcrypt on throttled CPU, remote DB latency           | Documented tradeoff; session pooler (5432) improves connection reuse                        |
+| Growth chart empty / 100% deltas              | Only one day of snapshot data after first sync                                           | Expected behavior until a second sync day exists                                            |
+
 
 ---
 
+
+
 ## Local development
+
+
 
 ### Prerequisites
 
@@ -193,6 +233,8 @@ These are real issues debugged during deployment — useful context for technica
 - Node.js 20+
 - PostgreSQL (or Supabase dev URL)
 - Redis
+
+
 
 ### Backend
 
@@ -206,12 +248,16 @@ python scripts/run_migrations.py
 uvicorn app.main:app --reload
 ```
 
+
+
 ### Worker
 
 ```bash
 cd backend
 bash scripts/worker.sh
 ```
+
+
 
 ### Frontend
 
@@ -224,22 +270,28 @@ pnpm dev
 
 ---
 
+
+
 ## Environment variables (overview)
 
-| Variable | Purpose |
-|----------|---------|
-| `DB_URL` | Supabase PostgreSQL connection string |
-| `REDIS_URL` | Celery broker + app cache |
-| `JWT_SECRET` | Access / refresh token signing |
-| `META_APP_ID`, `META_APP_SECRET` | Instagram OAuth |
-| `GEMINI_API_KEY` | AI analysis and reports |
-| `ASSEMBLYAI_API_KEY` | Video transcription |
-| `BRIGHT_DATA_*` | Competitor public data |
-| `FRONTEND_URL`, `CORS_ORIGINS` | Cross-origin config |
+
+| Variable                         | Purpose                               |
+| -------------------------------- | ------------------------------------- |
+| `DB_URL`                         | Supabase PostgreSQL connection string |
+| `REDIS_URL`                      | Celery broker + app cache             |
+| `JWT_SECRET`                     | Access / refresh token signing        |
+| `META_APP_ID`, `META_APP_SECRET` | Instagram OAuth                       |
+| `GEMINI_API_KEY`                 | AI analysis and reports               |
+| `ASSEMBLYAI_API_KEY`             | Video transcription                   |
+| `BRIGHT_DATA_*`                  | Competitor public data                |
+| `FRONTEND_URL`, `CORS_ORIGINS`   | Cross-origin config                   |
+
 
 See `backend/app/core/config.py` for the full list.
 
 ---
+
+
 
 ## Author
 
@@ -251,6 +303,8 @@ See `backend/app/core/config.py` for the full list.
 - YouTube: [@BonsonDev](https://youtube.com/@BonsonDev)
 
 ---
+
+
 
 ## License
 
