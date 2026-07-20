@@ -10,7 +10,12 @@ from app.service.competitor_service import (
     add_competitor_by_handle_service,
     rediscover_competitors_service,
 )
-from app.utils.cdn_image import fetch_cdn_image
+from app.utils.cdn_image import (
+    competitor_avatar_cache_key,
+    fetch_cdn_image,
+    get_cached_avatar,
+    set_cached_avatar,
+)
 from sqlmodel import select
 
 router = APIRouter(
@@ -91,7 +96,21 @@ async def get_competitor_avatar(
     if not competitor or not competitor.profile_picture_url:
         raise HTTPException(status_code=404, detail="Avatar not found")
 
-    content, media_type = await fetch_cdn_image(competitor.profile_picture_url)
+    cache_key = competitor_avatar_cache_key(competitor_id)
+    cached = await get_cached_avatar(cache_key)
+    if cached:
+        content, media_type = cached
+    else:
+        try:
+            content, media_type = await fetch_cdn_image(competitor.profile_picture_url)
+            await set_cached_avatar(cache_key, content, media_type)
+        except HTTPException as exc:
+            if exc.status_code in (502, 504):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Avatar unavailable. Try refreshing competitor data.",
+                ) from exc
+            raise
     return Response(
         content=content,
         media_type=media_type,

@@ -17,6 +17,7 @@ from app.service.transcript_service import run_bulk_transcription_service
 from app.utils.competitor_metrics import (
     engagement_rate_to_rank,
 )
+from app.utils.cdn_image import prefetch_competitor_avatar
 
 
 # MVP limits — store up to 10, deep-fetch reels for top 5 only (saves Bright Data + Gemini analysis credits)
@@ -590,6 +591,7 @@ async def _update_existing_competitors_from_profiles(
         competitor.display_name = entry.get("display_name") or competitor.display_name
         if entry.get("profile_picture_url"):
             competitor.profile_picture_url = entry.get("profile_picture_url")
+            await prefetch_competitor_avatar(competitor.id, competitor.profile_picture_url)
         if followers > 0:
             competitor.followers_count = followers
         if media_count > 0:
@@ -662,6 +664,7 @@ async def _process_and_save_competitors(
         existing.display_name = entry.get("display_name") or existing.display_name
         if entry.get("profile_picture_url"):
             existing.profile_picture_url = entry.get("profile_picture_url")
+            await prefetch_competitor_avatar(existing.id, existing.profile_picture_url)
         if followers > existing.followers_count:
             existing.followers_count = followers
         if media_count > existing.media_count:
@@ -729,6 +732,8 @@ async def _process_and_save_competitors(
         db.add(competitor)
         await db.flush()
         saved_ids.append(competitor.id)
+        if competitor.profile_picture_url:
+            await prefetch_competitor_avatar(competitor.id, competitor.profile_picture_url)
         existing_by_handle[handle.lower()] = competitor
 
     await db.commit()
@@ -821,6 +826,7 @@ async def _enrich_competitor_from_provider_entry(
         picture = entry.get("thumbnail_url")
     if picture and is_profile_row:
         competitor.profile_picture_url = picture
+        await prefetch_competitor_avatar(competitor.id, picture)
 
     display_name = entry.get("full_name") or entry.get("display_name") or entry.get("profile_name")
     if display_name and (not competitor.display_name or competitor.display_name == competitor.handle):
