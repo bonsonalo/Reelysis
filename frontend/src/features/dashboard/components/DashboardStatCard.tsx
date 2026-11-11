@@ -1,7 +1,6 @@
-import { LucideIcon, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MetricLabel } from '@/components/shared/MetricInfoTip'
-import { Panel } from '@/components/shared/Panel'
 import type { MetricHelpContent } from '@/features/dashboard/constants/metricHelp'
 
 type DashboardStatCardProps = {
@@ -11,12 +10,13 @@ type DashboardStatCardProps = {
   change: string
   footerNote?: string
   footerNoteHelp?: MetricHelpContent
-  icon: LucideIcon
   pending?: boolean
   pendingHint?: string
 }
 
 function getChangeDirection(change: string) {
+  // "+0%", "0%", "+0 pts" are no change, not growth.
+  if (/^[+-]?0(\.0+)?(%| pts)?$/.test(change.trim())) return 'flat' as const
   if (change.startsWith('-')) return 'down' as const
   if (
     change.startsWith('+') ||
@@ -33,51 +33,46 @@ export function DashboardStatCard({
   change,
   footerNote,
   footerNoteHelp,
-  icon: Icon,
   pending = false,
   pendingHint,
 }: DashboardStatCardProps) {
   const direction = pending ? ('flat' as const) : getChangeDirection(change)
 
   return (
-    <Panel className="p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3 sm:gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="text-sm text-text-label">
-            <MetricLabel label={label} help={help} tipSide="top" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold leading-none tracking-tight tabular-nums text-white sm:text-3xl">
-            {pending ? '—' : value}
-          </p>
-        </div>
-        <Icon className="h-4 w-4 shrink-0 text-text-tertiary" />
+    <div className="bg-surface-card p-4 sm:p-5">
+      <div className="text-[13px] text-text-secondary">
+        <MetricLabel label={label} help={help} tipSide="top" />
       </div>
+      <p className="mt-2 text-[22px] font-semibold leading-none sm:text-[26px] tracking-[-0.02em] tabular-nums text-foreground">
+        {pending ? '—' : value}
+      </p>
 
       {pending ? (
-        <p className="mt-4 text-xs leading-relaxed text-text-secondary sm:text-sm">
-          {pendingHint}
-        </p>
+        <p className="mt-3 text-[13px] leading-relaxed text-text-tertiary">{pendingHint}</p>
       ) : (
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p
             className={cn(
-              'inline-flex items-center gap-1 text-sm font-medium',
-              direction === 'up' && 'text-emerald-400',
-              direction === 'down' && 'text-red-400',
+              'inline-flex items-center gap-0.5 whitespace-nowrap text-[13px] font-medium tabular-nums',
+              direction === 'up' && 'text-success',
+              direction === 'down' && 'text-danger',
               direction === 'flat' && 'text-text-secondary',
             )}
           >
-            {direction === 'up' && <TrendingUp className="h-3 w-3" />}
-            {direction === 'down' && <TrendingDown className="h-3 w-3" />}
+            {direction === 'up' && <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />}
+            {direction === 'down' && <ArrowDownRight className="h-3.5 w-3.5" aria-hidden />}
             <span>{change}</span>
+            {change.endsWith('%') && (
+              <span className="ml-1 font-normal text-text-tertiary">vs. last sync</span>
+            )}
           </p>
           {footerNote && (
-            <span className="shrink-0 text-sm tabular-nums text-text-secondary">
+            <span className="shrink-0 text-[13px] tabular-nums text-text-tertiary">
               <MetricLabel label={footerNote} help={footerNoteHelp} tipSide="top" />
             </span>
           )}
         </div>
       )}
-    </Panel>
+    </div>
   )
 }

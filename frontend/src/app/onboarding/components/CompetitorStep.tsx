@@ -6,6 +6,7 @@ import { Panel } from '@/components/shared/Panel'
 import { CompetitorAccount } from '@/features/competitors/api'
 import { AddCompetitorForm } from '@/features/competitors/components/AddCompetitorForm'
 import { CompetitorAvatar } from '@/features/competitors/components/CompetitorAvatar'
+import { X } from 'lucide-react'
 import { OnboardingStepFrame } from './OnboardingStepFrame'
 
 interface CompetitorStepProps {
@@ -28,12 +29,12 @@ export function CompetitorStep({
   isFinishing,
 }: CompetitorStepProps) {
   return (
-    <OnboardingStepFrame className="!items-start sm:!items-center">
+    <OnboardingStepFrame className="!items-start sm:!items-center" stage="competitors">
       <div className="w-full max-w-2xl">
         <header className="mb-6 text-center sm:mb-8">
-          <h2 className="text-lg font-semibold text-white sm:text-xl">
+          <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">
             Review accounts to track
-          </h2>
+          </h1>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-text-secondary">
             {competitors.length > 0
               ? 'These accounts will be your benchmarks. Remove any that don’t fit, or add more by handle below.'
@@ -43,7 +44,7 @@ export function CompetitorStep({
 
         <Panel className="mb-6 overflow-hidden">
           <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
-            <h3 className="text-sm font-semibold text-white">Add competitor</h3>
+            <h3 className="text-sm font-semibold text-foreground">Add competitor</h3>
             <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
               Track any public account by handle.
             </p>
@@ -56,7 +57,7 @@ export function CompetitorStep({
         {competitors.length > 0 && (
           <Panel className="mb-8 overflow-hidden">
             <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
-              <h3 className="text-sm font-semibold text-white">Suggested accounts</h3>
+              <h3 className="text-sm font-semibold text-foreground">Suggested accounts</h3>
               <p className="mt-0.5 text-xs text-text-secondary sm:text-sm">
                 {competitors.length} {competitors.length === 1 ? 'account' : 'accounts'} tracked
               </p>
@@ -75,7 +76,7 @@ export function CompetitorStep({
                   />
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">@{comp.handle}</p>
+                    <p className="truncate text-sm font-medium text-foreground">@{comp.handle}</p>
                     <p className="text-xs text-text-secondary">
                       {formatFollowers(comp.followers_count)} followers
                     </p>
@@ -84,9 +85,11 @@ export function CompetitorStep({
                   <button
                     type="button"
                     onClick={() => onRemove(comp.id)}
-                    className="shrink-0 text-xs text-text-secondary transition-colors duration-150 hover:text-red-400 focus:outline-none focus-visible:text-red-400"
+                    className="shrink-0 rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-danger-tint hover:text-danger"
+                    aria-label={`Remove @${comp.handle}`}
+                    title="Remove"
                   >
-                    Remove
+                    <X className="h-4 w-4" />
                   </button>
                 </li>
               ))}

@@ -6,7 +6,7 @@ import { landingShellClass } from '@/components/landing/landingContent'
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col bg-surface-page text-white">
+    <div className="flex min-h-screen flex-col bg-surface-page text-foreground">
       <header className="border-b border-border-subtle">
         <div className={`flex h-14 items-center ${landingShellClass}`}>
           <BrandLogo href="/" size="md" />
@@ -15,7 +15,7 @@ export default function NotFound() {
 
       <main className={`flex flex-1 flex-col items-center justify-center px-4 py-16 text-center ${landingShellClass}`}>
         <p className="text-sm font-medium tabular-nums text-text-tertiary">404</p>
-        <h1 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
+        <h1 className="mt-3 text-xl font-semibold text-foreground sm:text-2xl">
           Page not found
         </h1>
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-text-secondary">

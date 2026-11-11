@@ -19,7 +19,7 @@ export function AiInsightsPending({
     return (
       <p className={cn('text-xs leading-relaxed text-text-secondary md:text-sm', className)}>
         {AI_INSIGHTS_EMPTY.primary}{' '}
-        <Link href="/reports" className="text-primary underline-offset-2 hover:underline">
+        <Link href="/reports" className="text-brand-text underline-offset-2 hover:underline">
           {AI_INSIGHTS_EMPTY.cta}
         </Link>
       </p>

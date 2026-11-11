@@ -34,13 +34,13 @@ export default function VerifyEmailStatus() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-white sm:text-xl">Verify your email</h1>
+      <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">Verify your email</h1>
 
       {!token ? (
         <AuthNotice tone="error">This verification link is incomplete.</AuthNotice>
       ) : isPending || (!isSuccess && !error) ? (
         <p className="flex items-center gap-2 text-sm text-text-secondary">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" />
           Verifying…
         </p>
       ) : isSuccess ? (

@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type AuthFieldProps = {
@@ -11,10 +15,13 @@ type AuthFieldProps = {
   autoComplete?: string
   required?: boolean
   className?: string
+  /** Rendered at the right end of the label row, e.g. a "Forgot password?" link. */
+  labelAction?: React.ReactNode
 }
 
-const inputClassName =
-  'w-full h-10 rounded-[10px] bg-surface-input border border-border-subtle px-4 text-sm text-white placeholder:text-text-tertiary transition-[border-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11'
+/** Shared text input style: white field, hairline border, brand focus halo. */
+export const inputClassName =
+  'h-10 w-full rounded-md border border-input bg-white px-3 text-sm text-foreground shadow-raised transition-[border-color,box-shadow] duration-150 placeholder:text-text-placeholder hover:border-border-strong focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:opacity-70'
 
 export function AuthField({
   id,
@@ -27,23 +34,46 @@ export function AuthField({
   autoComplete,
   required,
   className,
+  labelAction,
 }: AuthFieldProps) {
+  const [revealed, setRevealed] = useState(false)
+  const isPassword = type === 'password'
+
   return (
-    <div className={cn('space-y-2.5', className)}>
-      <label htmlFor={id} className="block text-xs font-medium text-text-label md:text-sm">
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        required={required}
-        className={inputClassName}
-      />
+    <div className={cn('space-y-1.5', className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="block text-[13px] font-medium text-text-label">
+          {label}
+        </label>
+        {labelAction}
+      </div>
+      <div className="relative">
+        <input
+          id={id}
+          name={id}
+          type={isPassword && revealed ? 'text' : type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          required={required}
+          spellCheck={type === 'email' || isPassword ? false : undefined}
+          className={cn(inputClassName, isPassword && 'pr-10')}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setRevealed((v) => !v)}
+            disabled={disabled}
+            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-text-tertiary transition-colors duration-150 hover:text-foreground"
+            aria-label={revealed ? 'Hide password' : 'Show password'}
+            aria-pressed={revealed}
+          >
+            {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

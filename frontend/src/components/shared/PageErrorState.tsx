@@ -26,8 +26,8 @@ export function PageErrorState({
       )}
       role="alert"
     >
-      <AlertCircle className="mb-4 h-10 w-10 text-red-400/80" />
-      <h2 className="text-base font-semibold text-white">{title}</h2>
+      <AlertCircle className="mb-4 h-10 w-10 text-danger" />
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-text-secondary">{message}</p>
       {onRetry ? (
         <Button className="mt-6" variant="outline" onClick={onRetry} disabled={retrying}>

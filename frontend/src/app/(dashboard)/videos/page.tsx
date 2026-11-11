@@ -3,6 +3,7 @@
 import { useAllVideos } from '@/features/dashboard/hooks/useDashboardVideos'
 import { ReelCard } from '@/features/dashboard/components/ReelCard'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
+import { PageHeader } from '@/components/shared/Panel'
 import { PageErrorState } from '@/components/shared/PageErrorState'
 import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
 import { VideosPageSkeleton } from '@/components/shared/PageSkeletons'
@@ -47,21 +48,27 @@ export default function AllVideosPage() {
   const hasAnyAnalysis = videos.some((video) => video.has_analysis)
 
   return (
-    <div className="space-y-6 pb-16 sm:space-y-8 sm:pb-20">
-      <header className="border-b border-border-subtle pb-6 sm:pb-8">
-        <h1 className="text-xl font-semibold text-white sm:text-2xl">Your Reels</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          All synced Reels from your account, with views, engagement, and hook scores.
-        </p>
-        {reelCount > 0 && (
-          <p className="mt-3 text-sm text-text-tertiary">
-            {total} {total === 1 ? 'reel' : 'reels'}
-          </p>
-        )}
-        {reelCount > 0 && !hasAnyAnalysis && (
-          <AiInsightsPending variant="inline" className="mt-3" />
-        )}
-      </header>
+    <div className="space-y-6 pb-16 sm:space-y-8">
+      <PageHeader
+        title="Reels"
+        description={
+          <>
+            <p>
+              Every synced Reel with its views, engagement and hook score
+              {reelCount > 0 && (
+                <span className="text-text-tertiary">
+                  {' '}
+                  ({total} {total === 1 ? 'Reel' : 'Reels'})
+                </span>
+              )}
+              .
+            </p>
+            {reelCount > 0 && !hasAnyAnalysis && (
+              <AiInsightsPending variant="inline" className="mt-1.5" />
+            )}
+          </>
+        }
+      />
 
       {reelCount === 0 ? (
         <PageEmptyState
@@ -70,7 +77,7 @@ export default function AllVideosPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {videos.map((video) => (
               <ReelCard key={video.id} video={video} formatNumber={formatNumber} />
             ))}

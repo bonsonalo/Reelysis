@@ -43,8 +43,8 @@ export default function DashboardLayout({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-text-tertiary" aria-label="Loading" />
       </div>
     )
   }
@@ -52,10 +52,10 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-black text-white print:block print:h-auto print:overflow-visible print:bg-white print:text-black">
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background text-foreground print:block print:h-auto print:overflow-visible print:bg-white print:text-black">
       <div
         className={cn(
-          'print:hidden fixed inset-0 z-40 bg-black/70 transition-opacity lg:hidden',
+          'print:hidden fixed inset-0 z-40 bg-foreground/30 transition-opacity lg:hidden',
           isMobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',
@@ -66,23 +66,23 @@ export default function DashboardLayout({
 
       <aside
         className={cn(
-          'print:hidden fixed inset-y-0 left-0 z-50 w-[248px] shrink-0 border-r border-border-sidebar bg-surface-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0',
+          'print:hidden fixed inset-y-0 left-0 z-50 w-[232px] shrink-0 border-r border-border-sidebar bg-surface-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <Sidebar />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-black print:block print:bg-white">
+      <div className="flex min-w-0 flex-1 flex-col bg-background print:block print:bg-white">
         {(currentUser ?? user)?.email_verified === false && (
           <EmailVerificationBanner email={user?.email} />
         )}
-        <header className="print:hidden flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 lg:hidden">
+        <header className="print:hidden flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-4 sm:px-6 lg:hidden">
           <BrandLogo size="sm" />
           <button
             type="button"
             onClick={() => dispatch(openMobileSidebar())}
-            className="rounded-md p-2 text-text-secondary transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            className="rounded-md p-2 text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground "
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />

@@ -1,10 +1,6 @@
-/**
- * Marketing shell — matches common SaaS marketing gutters:
- * - max width ~1080px (Linear, Vercel marketing)
- * - 16px side padding on mobile, 24px from sm+ (Stripe, Apple product pages)
- */
+/** Marketing gutters: 1160px column, 16px sides on phones, 32px from sm. */
 export const landingShellClass =
-  'mx-auto w-full max-w-[1080px] px-4 sm:px-6'
+  'mx-auto w-full max-w-[1160px] px-4 sm:px-8'
 
 export const insightCards = [
   {
@@ -87,60 +83,6 @@ export const capabilities = [
   },
 ]
 
-export const dashboardMetrics = [
-  {
-    label: 'Growth',
-    metric: 'Views',
-    title: 'Total reach over time',
-    description:
-      'Cumulative plays across synced Reels, tracked at each sync so you can spot momentum, not just a single snapshot.',
-  },
-  {
-    label: 'Engagement',
-    metric: '4.2%',
-    title: 'Interaction rate',
-    description:
-      'Likes and comments relative to views, averaged across your library. See whether people watch or actually respond.',
-  },
-  {
-    label: 'Hooks',
-    metric: '87/100',
-    title: 'Top hook score',
-    description:
-      'Your best opening rated out of 100. Compare Reels to find which intros consistently stop the scroll.',
-  },
-  {
-    label: 'Themes',
-    metric: 'Pillars',
-    title: 'Content themes',
-    description:
-      'Topics grouped and ranked by engagement so you know which themes to repeat and which to retire.',
-  },
-]
-
-export const syncAnalysis = [
-  {
-    title: 'Reel import',
-    description: 'Pulls your recent Reels, captions, and public metrics from Instagram.',
-    bullets: ['Thumbnail and caption for every Reel', 'Views, reach, likes, and comments', 'Posted date and media metadata'],
-  },
-  {
-    title: 'Transcription',
-    description: 'Audio is transcribed when available so analysis goes beyond the caption alone.',
-    bullets: ['Spoken hook and script structure', 'Higher confidence scores with transcript', 'Caption-only fallback when needed'],
-  },
-  {
-    title: 'AI scoring',
-    description: 'Each Reel is scored and categorized for hooks, topics, and engagement patterns.',
-    bullets: ['Hook score 0–100 per Reel', 'Content pillar assignment', 'Topic and format tagging'],
-  },
-  {
-    title: 'Competitor refresh',
-    description: 'Tracked accounts are updated before reports so benchmarks reflect current market data.',
-    bullets: ['Follower and Reel counts', 'Engagement benchmarks by niche', 'Used in strategy report generation'],
-  },
-]
-
 export const reportIncludes = [
   {
     label: 'Overview',
@@ -180,24 +122,6 @@ export const competitorBenefits = [
     title: 'Market-backed strategy',
     description:
       'Competitor Reels feed directly into strategy reports so recommendations reference real examples.',
-  },
-]
-
-export const audiences = [
-  {
-    title: 'Creators',
-    description:
-      'Posting Reels weekly and want clarity on what to film next, not another views screenshot.',
-  },
-  {
-    title: 'Coaches & educators',
-    description:
-      'Teaching on Instagram and need to know which formats and hooks retain your audience.',
-  },
-  {
-    title: 'Brands on Reels',
-    description:
-      'Running short-form content and benchmarking against competitors in the same category.',
   },
 ]
 

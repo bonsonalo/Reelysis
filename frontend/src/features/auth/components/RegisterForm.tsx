@@ -36,22 +36,18 @@ export default function RegisterForm() {
 
   return (
     <>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg font-semibold text-white sm:text-xl">Create your account</h1>
-        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-          Already have an account?{' '}
-          <Link
-            href="/login"
-            className="text-primary transition-colors duration-150 hover:text-orange-400"
-          >
-            Sign in
-          </Link>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">
+          Create your account
+        </h1>
+        <p className="mt-1.5 text-sm text-text-secondary">
+          After this, you&apos;ll connect your Instagram account.
         </p>
       </div>
 
-      <form onSubmit={handleRegister} className="space-y-5 sm:space-y-6">
+      <form onSubmit={handleRegister} className="space-y-4">
         {error && (
-          <div className="rounded-[10px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <div className="rounded-md border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
             {error}
           </div>
         )}
@@ -90,26 +86,33 @@ export default function RegisterForm() {
           disabled={isPending}
           required
         />
-        {password ? <PasswordRuleList value={password} className="-mt-2" /> : null}
+        <PasswordRuleList value={password} className="-mt-1.5" />
 
-        <Button type="submit" className="mt-1 w-full sm:mt-2" size="lg" disabled={isPending}>
+        <Button type="submit" className="mt-2 h-10 w-full" disabled={isPending}>
           <ButtonLoadingLabel loading={isPending} loadingLabel="Creating account…">
-            Get started
+            Create account
           </ButtonLoadingLabel>
         </Button>
 
         <p className="pt-1 text-center text-xs leading-relaxed text-text-tertiary sm:pt-2">
           By creating an account, you agree to our{' '}
-          <Link href="/terms" className="text-text-secondary transition-colors hover:text-white">
+          <Link href="/terms" className="text-text-secondary underline underline-offset-2 hover:text-foreground">
             Terms
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="text-text-secondary transition-colors hover:text-white">
+          <Link href="/privacy" className="text-text-secondary underline underline-offset-2 hover:text-foreground">
             Privacy Policy
           </Link>
           .
         </p>
       </form>
+
+      <p className="mt-6 border-t border-border-subtle pt-5 text-center text-sm text-text-secondary">
+        Already have an account?{' '}
+        <Link href="/login" className="font-medium text-brand-text hover:underline">
+          Sign in
+        </Link>
+      </p>
     </>
   )
 }

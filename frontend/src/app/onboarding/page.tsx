@@ -27,7 +27,7 @@ import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { OnboardingPageSkeleton } from '@/components/shared/PageSkeletons'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { OnboardingStepFrame } from './components/OnboardingStepFrame'
+import { OnboardingCard, OnboardingStepFrame } from './components/OnboardingStepFrame'
 
 type OnboardingStep = 
   | 'CONNECT' 
@@ -277,6 +277,7 @@ function OnboardingContent() {
       const needsReconnect = isSyncFailed && Boolean(account?.needs_reconnect)
       return (
         <AnalyzingStep
+          stage="connect"
           variant="shimmer"
           statusText={syncUi.description}
           errorMessage={isSyncFailed ? syncJob?.error_message : undefined}
@@ -313,6 +314,7 @@ function OnboardingContent() {
       const isDiscoveryFailed = discoveryJob?.status === 'failed'
       return (
         <AnalyzingStep
+          stage="competitors"
           statusText={
             isDiscoveryFailed
               ? discoveryUi.description
@@ -380,6 +382,7 @@ function OnboardingContent() {
       const roadmapUi = getReportGenerationUi(roadmapJob?.progress ?? 0, roadmapJob?.status)
       return (
         <AnalyzingStep
+          stage="report"
           statusText={roadmapUi.description}
           tasks={isRoadmapFailed ? undefined : roadmapUi.tasks}
           errorMessage={isRoadmapFailed ? roadmapJob?.error_message : undefined}
@@ -418,11 +421,11 @@ function OnboardingContent() {
     case 'COMPLETED':
       return (
         <OnboardingStepFrame narrow>
-          <div className="text-center">
-            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-surface-card">
-              <Check className="h-6 w-6 text-primary" strokeWidth={2} />
+          <OnboardingCard className="text-center">
+            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-green-200 bg-success-tint">
+              <Check className="h-6 w-6 text-success" strokeWidth={2} />
             </div>
-            <h1 className="text-lg font-semibold text-white sm:text-xl">
+            <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">
               {skippedReport ? 'You’re all set' : 'Your strategy report is ready'}
             </h1>
             <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-text-secondary">
@@ -434,7 +437,6 @@ function OnboardingContent() {
               <Button
                 onClick={() => router.push('/dashboard')}
                 className="w-full sm:w-auto"
-                size="lg"
               >
                 Go to dashboard
               </Button>
@@ -442,12 +444,11 @@ function OnboardingContent() {
                 onClick={handleOpenReport}
                 variant="outline"
                 className="w-full sm:w-auto"
-                size="lg"
               >
                 {skippedReport ? 'Go to reports' : 'Read the report'}
               </Button>
             </div>
-          </div>
+          </OnboardingCard>
         </OnboardingStepFrame>
       )
 

@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { Panel } from '@/components/shared/Panel'
 import { cn } from '@/lib/utils'
+import { inputClassName } from '@/components/auth/AuthField'
 
 export function SettingsPanelHeader({
   title,
@@ -11,7 +12,7 @@ export function SettingsPanelHeader({
 }) {
   return (
     <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
-      <h2 className="text-base font-semibold text-white">{title}</h2>
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
       {description ? (
         <p className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</p>
       ) : null}
@@ -28,7 +29,7 @@ export function SettingsSectionHeader({
 }) {
   return (
     <div className="mb-4 sm:mb-5">
-      <h3 className="text-sm font-semibold text-white">{title}</h3>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {description ? (
         <p className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</p>
       ) : null}
@@ -50,24 +51,24 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        'grid gap-1 py-4 sm:grid-cols-[minmax(0,11rem)_1fr] sm:items-start sm:gap-x-8',
+        'flex flex-col gap-1 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8',
         className,
       )}
     >
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-white">{label}</p>
+      <div className="min-w-0 sm:max-w-md">
+        <p className="text-sm font-medium text-foreground">{label}</p>
         {description ? (
           <p className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</p>
         ) : null}
       </div>
-      <div className="min-w-0 text-sm text-text-label">{children}</div>
+      <div className="min-w-0 shrink-0 text-sm text-text-label sm:text-right">{children}</div>
     </div>
   )
 }
 
 export function SettingsComingSoon() {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-md bg-white/[0.04] px-2 py-0.5 text-xs text-text-tertiary">
+    <span className="inline-flex shrink-0 items-center rounded-md bg-surface-hover px-2 py-0.5 text-xs text-text-tertiary">
       Coming soon
     </span>
   )
@@ -96,7 +97,7 @@ export function SettingsField({
 }) {
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="block text-sm font-medium text-white">
+      <label htmlFor={id} className="block text-sm font-medium text-foreground">
         {label}
       </label>
       {description ? (
@@ -110,7 +111,7 @@ export function SettingsField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input px-4 text-sm text-white placeholder:text-text-tertiary transition-[border-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60 sm:h-11"
+        className={inputClassName}
       />
     </div>
   )
@@ -128,8 +129,8 @@ export function SettingsNotice({
       className={cn(
         'rounded-[10px] border px-3 py-2.5 text-sm leading-relaxed sm:px-4',
         tone === 'success'
-          ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400/90'
-          : 'border-red-500/20 bg-red-500/5 text-red-400',
+          ? 'border-green-200 bg-success-tint text-success'
+          : 'border-red-200 bg-danger-tint text-danger',
       )}
       role={tone === 'error' ? 'alert' : 'status'}
     >
@@ -157,6 +158,32 @@ export function SettingsSection({
     </Panel>
   )
 }
+
+/** Irreversible actions, kept apart from the forms above them. */
+export function SettingsDangerZone({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-[10px] border border-red-200 bg-surface-card">
+      <div className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <div className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</div>
+        </div>
+        <div className="shrink-0">{children}</div>
+      </div>
+    </section>
+  )
+}
+
+export const dangerButtonClass =
+  'w-full border-red-200 text-danger hover:border-red-300 hover:bg-danger-tint sm:w-auto'
 
 export function getUserInitials(name?: string | null, email?: string | null) {
   if (name?.trim()) {

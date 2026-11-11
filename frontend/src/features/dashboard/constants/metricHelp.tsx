@@ -9,7 +9,7 @@ function Tip({ what, aim }: { what: string; aim: string }) {
   return (
     <>
       <span className="block">{what}</span>
-      <span className="mt-1.5 block text-zinc-400">{aim}</span>
+      <span className="mt-1.5 block text-text-tertiary">{aim}</span>
     </>
   )
 }

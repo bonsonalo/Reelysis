@@ -26,18 +26,18 @@ export function EmailVerificationBanner({ email }: { email?: string }) {
 
   return (
     <div
-      className="print:hidden flex flex-col gap-3 border-b border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+      className="print:hidden flex flex-col gap-3 border-b border-amber-200 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
       role="status"
     >
       <div className="flex min-w-0 gap-3 text-sm leading-relaxed">
-        <MailWarning className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+        <MailWarning className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <div className="min-w-0">
-          <p className="text-amber-100">
-            Verify your email{email ? <> (<span className="text-white">{email}</span>)</> : null} to
+          <p className="text-amber-950">
+            Verify your email{email ? <> (<span className="text-foreground">{email}</span>)</> : null} to
             keep your account recoverable.
           </p>
           {notice ? (
-            <p className={notice.tone === 'success' ? 'text-emerald-400' : 'text-red-400'}>
+            <p className={notice.tone === 'success' ? 'text-success' : 'text-danger'}>
               {notice.text}
             </p>
           ) : null}

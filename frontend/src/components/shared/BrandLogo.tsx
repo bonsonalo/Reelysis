@@ -9,9 +9,20 @@ type BrandLogoProps = {
 }
 
 const sizeClasses = {
-  sm: 'text-base tracking-tighter',
-  md: 'text-lg tracking-tighter',
-  lg: 'text-xl tracking-tighter',
+  sm: { text: 'text-[15px]', mark: 'h-5 w-5' },
+  md: { text: 'text-base', mark: 'h-[22px] w-[22px]' },
+  lg: { text: 'text-lg', mark: 'h-6 w-6' },
+}
+
+/** A Reel frame with its opening seconds marked: the part Reelysis scores. */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#ea580c" />
+      <rect x="7.5" y="4.5" width="9" height="15" rx="2" fill="none" stroke="#fff" strokeWidth="1.75" />
+      <rect x="9.5" y="7" width="5" height="2.25" rx="0.75" fill="#fff" />
+    </svg>
+  )
 }
 
 export function BrandLogo({
@@ -21,20 +32,27 @@ export function BrandLogo({
   onClick,
 }: BrandLogoProps) {
   const mark = (
-    <span
-      className={cn(
-        'font-semibold text-white',
-        sizeClasses[size],
-        className,
-      )}
-    >
-      REEL<span className="text-primary">YSIS</span>
+    <span className={cn('inline-flex items-center gap-2', className)} translate="no">
+      <BrandMark className={sizeClasses[size].mark} />
+      <span
+        className={cn(
+          'font-semibold tracking-[-0.02em] text-foreground',
+          sizeClasses[size].text,
+        )}
+      >
+        Reelysis
+      </span>
     </span>
   )
 
   if (href) {
     return (
-      <Link href={href} onClick={onClick} className="inline-flex shrink-0 rounded-md transition-opacity duration-150 hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20">
+      <Link
+        href={href}
+        onClick={onClick}
+        aria-label="Reelysis home"
+        className="inline-flex shrink-0 rounded-md"
+      >
         {mark}
       </Link>
     )

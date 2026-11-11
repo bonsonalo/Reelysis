@@ -41,8 +41,8 @@ export function CompetitorAvatar({
 
   if (!src || isError || failed) {
     return (
-      <div className={cn('flex items-center justify-center bg-zinc-800', className)}>
-        <Users2 className={cn('text-zinc-600', iconClassName)} />
+      <div className={cn('flex items-center justify-center bg-surface-pressed', className)}>
+        <Users2 className={cn('text-text-placeholder', iconClassName)} />
       </div>
     )
   }

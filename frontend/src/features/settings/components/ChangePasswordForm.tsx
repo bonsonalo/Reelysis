@@ -65,7 +65,7 @@ export function ChangePasswordForm() {
         onChange={setNewPassword}
         disabled={isPending}
       />
-      {newPassword ? <PasswordRuleList value={newPassword} /> : null}
+      <PasswordRuleList value={newPassword} />
       <SettingsField
         id="confirm-new-password"
         label="Confirm new password"

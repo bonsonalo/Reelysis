@@ -44,7 +44,7 @@ export function MetricInfoTip({ content, side = 'bottom', className }: MetricInf
         onFocus={show}
         onBlur={hide}
         className={cn(
-          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors duration-150 hover:bg-white/[0.08] hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-text-tertiary transition-colors duration-150 hover:bg-surface-pressed hover:text-foreground ',
           className,
         )}
         aria-label={`About ${content.title}`}
@@ -65,9 +65,9 @@ export function MetricInfoTip({ content, side = 'bottom', className }: MetricInf
                 side === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
               zIndex: 9999,
             }}
-            className="pointer-events-none w-56 rounded-md border border-white/10 bg-zinc-900 px-3 py-2.5 text-xs leading-relaxed text-zinc-300 shadow-xl"
+            className="pointer-events-none w-56 rounded-md border border-border-subtle bg-surface-hover px-3 py-2.5 text-xs leading-relaxed text-zinc-300 shadow-xl"
           >
-            <span className="mb-1 block text-xs font-semibold text-white">
+            <span className="mb-1 block text-xs font-semibold text-foreground">
               {content.title}
             </span>
             {content.body}

@@ -27,7 +27,7 @@ function ThinkingDots({ className }: { className?: string }) {
 function TaskStatusIcon({ status }: { status: ProgressTaskStatus }) {
   if (status === 'completed') {
     return (
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.04]">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-hover">
         <Check className="h-3 w-3 text-text-tertiary" strokeWidth={2.5} />
       </span>
     )
@@ -76,7 +76,7 @@ export function ProcessStatus({
               key={task.label}
               className={cn(
                 'flex items-center gap-3 rounded-md px-2 py-2 transition-colors duration-200',
-                task.status === 'running' && 'bg-white/[0.03]',
+                task.status === 'running' && 'bg-surface-hover',
               )}
             >
               <TaskStatusIcon status={task.status} />
@@ -84,7 +84,7 @@ export function ProcessStatus({
                 className={cn(
                   'text-sm leading-snug transition-colors duration-200',
                   task.status === 'completed' && 'text-text-tertiary',
-                  task.status === 'running' && 'font-medium text-white',
+                  task.status === 'running' && 'font-medium text-foreground',
                   task.status === 'pending' && 'text-text-tertiary/70',
                 )}
               >
@@ -96,7 +96,7 @@ export function ProcessStatus({
       )}
 
       {errorMessage && (
-        <p className="mt-4 rounded-[10px] border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
+        <p className="mt-4 rounded-[10px] border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
           {errorMessage}
         </p>
       )}

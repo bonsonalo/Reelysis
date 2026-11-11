@@ -4,6 +4,7 @@ import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/shared/Panel'
 import { OnboardingStepFrame } from './OnboardingStepFrame'
+import { inputClassName } from '@/components/auth/AuthField'
 
 interface NicheStepProps {
   niche: string
@@ -14,10 +15,10 @@ interface NicheStepProps {
 
 export function NicheStep({ niche, setNiche, onConfirm, isConfirming }: NicheStepProps) {
   return (
-    <OnboardingStepFrame narrow>
-      <Panel className="overflow-hidden">
+    <OnboardingStepFrame narrow stage="niche">
+      <Panel className="overflow-hidden shadow-overlay">
         <div className="border-b border-border-subtle px-4 py-4 sm:px-6 md:py-5">
-          <h2 className="text-sm font-semibold text-white md:text-base">Your niche</h2>
+          <h2 className="text-sm font-semibold text-foreground md:text-base">Your niche</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-text-secondary md:text-sm">
             We grouped your synced Reels and suggest this category. Edit it if
             something looks off.
@@ -25,8 +26,8 @@ export function NicheStep({ niche, setNiche, onConfirm, isConfirming }: NicheSte
         </div>
 
         <div className="space-y-6 px-4 py-5 sm:px-6 md:py-6">
-          <div className="space-y-2">
-            <label htmlFor="niche" className="block text-xs font-medium text-text-label md:text-sm">
+          <div className="space-y-1.5">
+            <label htmlFor="niche" className="block text-[13px] font-medium text-text-label">
               Content niche
             </label>
             <input
@@ -34,15 +35,14 @@ export function NicheStep({ niche, setNiche, onConfirm, isConfirming }: NicheSte
               type="text"
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
-              className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input px-4 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 sm:h-11"
+              className={inputClassName}
             />
           </div>
 
           <Button
             onClick={onConfirm}
             disabled={isConfirming || !niche.trim()}
-            className="w-full"
-            size="lg"
+            className="h-10 w-full"
           >
             <ButtonLoadingLabel loading={isConfirming} loadingLabel="Saving…">
               Confirm niche

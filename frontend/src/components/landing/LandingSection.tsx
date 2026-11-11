@@ -16,7 +16,8 @@ type LandingSectionProps = {
   description?: string
   children: React.ReactNode
   className?: string
-  bordered?: boolean
+  /** Grey band behind the section, used to separate neighbours without rules. */
+  tinted?: boolean
 }
 
 export function LandingSection({
@@ -25,24 +26,44 @@ export function LandingSection({
   description,
   children,
   className,
-  bordered = true,
+  tinted = false,
 }: LandingSectionProps) {
   return (
     <section
       id={id}
-      className={cn(bordered && 'border-t border-border-subtle', 'py-12 sm:py-14 md:py-20', className)}
+      className={cn(
+        'scroll-mt-16 py-16 sm:py-20 md:py-24',
+        tinted && 'border-y border-border-subtle bg-surface-subtle',
+        className,
+      )}
     >
       <LandingShell>
-        <div className="mb-8 max-w-2xl sm:mb-10 md:mb-12">
-          <h2 className="text-lg font-semibold text-white sm:text-xl md:text-2xl">{title}</h2>
-          {description && (
-            <p className="mt-3 text-sm leading-relaxed text-text-secondary sm:text-base">
-              {description}
-            </p>
-          )}
-        </div>
+        <LandingHeading title={title} description={description} />
         {children}
       </LandingShell>
     </section>
+  )
+}
+
+export function LandingHeading({
+  title,
+  description,
+  className,
+}: {
+  title: string
+  description?: string
+  className?: string
+}) {
+  return (
+    <div className={cn('mb-10 max-w-[640px] md:mb-14', className)}>
+      <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground md:text-[36px]">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-4 text-base leading-relaxed text-text-secondary md:text-[17px]">
+          {description}
+        </p>
+      )}
+    </div>
   )
 }

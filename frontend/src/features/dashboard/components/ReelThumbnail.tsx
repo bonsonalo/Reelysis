@@ -15,8 +15,8 @@ export function ReelThumbnail({ thumbnailUrl, alt, className }: ReelThumbnailPro
 
   if (!thumbnailUrl || failed) {
     return (
-      <div className={cn('flex items-center justify-center bg-zinc-900', className)}>
-        <Play className="h-8 w-8 text-zinc-600" />
+      <div className={cn('flex items-center justify-center bg-surface-hover', className)}>
+        <Play className="h-6 w-6 text-text-placeholder" aria-hidden />
       </div>
     )
   }
@@ -26,6 +26,8 @@ export function ReelThumbnail({ thumbnailUrl, alt, className }: ReelThumbnailPro
       src={thumbnailUrl}
       alt={alt}
       className={cn('object-cover', className)}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
     />

@@ -85,8 +85,8 @@ export default function ReportDetailPage() {
   if (!report) {
     return (
       <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center p-4 text-center">
-        <AlertCircle className="mb-4 h-12 w-12 text-zinc-600" />
-        <h2 className="text-base font-semibold text-white">Report not found</h2>
+        <AlertCircle className="mb-4 h-12 w-12 text-text-placeholder" />
+        <h2 className="text-base font-semibold text-foreground">Report not found</h2>
         <Link href="/reports" className="mt-6">
           <Button>Back to reports</Button>
         </Link>
@@ -115,7 +115,7 @@ export default function ReportDetailPage() {
       <header className="border-b border-border-subtle pb-6 md:pb-8">
         <Link
           href="/reports"
-          className="print:hidden mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+          className="print:hidden mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           All reports
@@ -124,7 +124,7 @@ export default function ReportDetailPage() {
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
           <div className="min-w-0 max-w-3xl">
             <p className="text-xs text-text-tertiary md:text-sm">{reportDate}</p>
-            <h1 className="mt-1 text-lg font-semibold text-white md:text-2xl">{report.title}</h1>
+            <h1 className="mt-1 text-lg font-semibold text-foreground md:text-2xl">{report.title}</h1>
             <p className="mt-2 text-xs leading-relaxed text-text-secondary md:mt-4 md:text-sm md:leading-relaxed lg:text-base">
               {report.summary}
             </p>
@@ -178,16 +178,16 @@ export default function ReportDetailPage() {
         </div>
       )}
 
-      <div className="grid print:block grid-cols-1 gap-5 md:gap-8 xl:grid-cols-5 xl:gap-10">
-        <section className="space-y-3 md:space-y-5 xl:col-span-3">
+      <div className="max-w-[860px] space-y-10 print:block">
+        <section className="space-y-3 md:space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-white md:text-base">Action items</h2>
+              <h2 className="text-sm font-semibold text-foreground md:text-base">Action items</h2>
               <p className="mt-0.5 text-xs text-text-secondary md:mt-1 md:text-sm">
-                {pendingCount} to do · {completedCount} done
+                {pendingCount} to do, {completedCount} done
               </p>
             </div>
-            <div className="print:hidden inline-flex max-w-full overflow-x-auto rounded-[10px] border border-border-subtle bg-surface-input p-0.5 md:overflow-visible">
+            <div className="print:hidden inline-flex max-w-full overflow-x-auto rounded-lg bg-surface-hover p-0.5 md:overflow-visible">
               {FILTER_OPTIONS.map((value) => (
                 <button
                   key={value}
@@ -196,8 +196,8 @@ export default function ReportDetailPage() {
                   className={cn(
                     'rounded-md px-2.5 py-1 text-xs capitalize transition-colors duration-150 md:px-3 md:py-1.5 md:text-sm',
                     filter === value
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-text-secondary hover:text-white',
+                      ? 'bg-white font-medium text-foreground shadow-raised'
+                      : 'text-text-secondary hover:text-foreground',
                   )}
                 >
                   {value}
@@ -209,7 +209,7 @@ export default function ReportDetailPage() {
           <Panel className="overflow-hidden">
             {filteredRecommendations.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <Check className="mb-3 h-8 w-8 text-zinc-600" />
+                <Check className="mb-3 h-8 w-8 text-text-placeholder" />
                 <p className="text-sm text-text-secondary">
                   No recommendations match this filter.
                 </p>
@@ -225,7 +225,7 @@ export default function ReportDetailPage() {
                       key={item.id}
                       className={cn(
                         'print-avoid-break flex gap-3 px-3.5 py-3 transition-colors duration-150 md:gap-4 md:px-5 md:py-5 lg:px-6',
-                        isCompleted && 'bg-white/[0.01]',
+                        isCompleted && 'bg-surface-hover',
                       )}
                     >
                       <button
@@ -236,8 +236,8 @@ export default function ReportDetailPage() {
                         className={cn(
                           'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-[color,background-color,border-color] duration-150',
                           isCompleted
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:border-emerald-500/60'
-                            : 'border-zinc-600 bg-transparent text-transparent hover:border-zinc-500 hover:bg-white/[0.04]',
+                            ? 'border-green-300 bg-success-tint text-success hover:border-green-400'
+                            : 'border-border-strong bg-transparent text-transparent hover:border-border-strong hover:bg-surface-hover',
                         )}
                       >
                         {isUpdatingThis ? (
@@ -253,13 +253,13 @@ export default function ReportDetailPage() {
                             {formatRecommendationType(item.recommedation_type)}
                           </span>
                           {item.priority >= 4 && !isCompleted && (
-                            <span className="text-xs text-red-400">High priority</span>
+                            <span className="text-xs text-danger">High priority</span>
                           )}
                         </div>
                         <h3
                           className={cn(
                             'mt-1 text-xs font-semibold leading-snug md:text-base',
-                            isCompleted ? 'text-text-secondary line-through' : 'text-white',
+                            isCompleted ? 'text-text-secondary line-through' : 'text-foreground',
                           )}
                         >
                           {item.title}
@@ -269,7 +269,7 @@ export default function ReportDetailPage() {
                         </p>
                         {item.evidence && (
                           <p className="mt-2 text-xs leading-relaxed text-text-tertiary md:mt-3 md:text-sm">
-                            <span className="text-text-label">Evidence · </span>
+                            <span className="text-text-label">Evidence: </span>
                             {item.evidence}
                           </p>
                         )}
@@ -282,15 +282,15 @@ export default function ReportDetailPage() {
           </Panel>
         </section>
 
-        <section className="space-y-3 md:space-y-5 xl:col-span-2 print:mt-8">
+        <section className="space-y-3 md:space-y-4 print:mt-8">
           <div>
-            <h2 className="text-sm font-semibold text-white md:text-base">Full report</h2>
+            <h2 className="text-sm font-semibold text-foreground md:text-base">Full report</h2>
             <p className="mt-0.5 text-xs text-text-secondary md:mt-1 md:text-sm">
               Complete strategy write-up
             </p>
           </div>
-          <Panel className="print-scroll-reset max-h-[min(720px,calc(100dvh-10rem))] overflow-y-auto p-3.5 custom-scrollbar md:max-h-[min(720px,calc(100vh-12rem))] md:p-6 xl:sticky xl:top-8">
-            <div className="prose prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:text-white prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-primary">
+          <Panel className="print-scroll-reset p-5 md:p-8">
+            <div className="prose prose-sm max-w-[68ch] md:prose-base prose-headings:font-semibold prose-headings:tracking-[-0.01em] prose-h1:text-xl prose-h1:mb-3 prose-h2:text-base prose-h3:text-[15px] prose-li:marker:text-text-placeholder prose-headings:text-foreground prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-brand-text">
               <Markdown>{report.report_markdown}</Markdown>
             </div>
           </Panel>

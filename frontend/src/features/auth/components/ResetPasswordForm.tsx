@@ -37,7 +37,7 @@ export default function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="space-y-6">
-        <h1 className="text-lg font-semibold text-white sm:text-xl">Invalid reset link</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">Invalid reset link</h1>
         <AuthNotice tone="error">
           This link is missing its reset token. Request a new one below.
         </AuthNotice>
@@ -52,14 +52,14 @@ export default function ResetPasswordForm() {
 
   return (
     <>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg font-semibold text-white sm:text-xl">Choose a new password</h1>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">Choose a new password</h1>
         <p className="mt-2 text-sm leading-relaxed text-text-secondary">
           You&apos;ll be signed out everywhere and can sign in with the new password.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {message ? (
           <AuthNotice tone="error">
             {message}
@@ -84,7 +84,7 @@ export default function ResetPasswordForm() {
           disabled={isPending}
           required
         />
-        {password ? <PasswordRuleList value={password} className="-mt-2" /> : null}
+        <PasswordRuleList value={password} className="-mt-1.5" />
 
         <AuthField
           id="confirm-password"
@@ -97,7 +97,7 @@ export default function ResetPasswordForm() {
           required
         />
 
-        <Button type="submit" className="w-full" size="lg" disabled={isPending}>
+        <Button type="submit" className="h-10 w-full" disabled={isPending}>
           <ButtonLoadingLabel loading={isPending} loadingLabel="Updating…">
             Update password
           </ButtonLoadingLabel>

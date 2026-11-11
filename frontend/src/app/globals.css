@@ -3,42 +3,60 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #121212;
-  --card-foreground: #ffffff;
-  --popover: #000000;
-  --popover-foreground: #ffffff;
-  --primary: #f97316;
+  color-scheme: light;
+
+  /* Ink + paper. Stripe-style: white canvas, cool grey chrome, hairline borders. */
+  --background: #ffffff;
+  --foreground: #17191f;
+  --card: #ffffff;
+  --card-foreground: #17191f;
+  --popover: #ffffff;
+  --popover-foreground: #17191f;
+  /* Brand orange: marks, chart series, focus. Text on white uses --brand-text for contrast. */
+  --primary: #ea580c;
   --primary-foreground: #ffffff;
-  --secondary: #27272a;
-  --secondary-foreground: #ffffff;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
+  --brand-text: #c2410c;
+  --brand-tint: #fff4ec;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #17191f;
+  --muted: #f3f4f6;
+  --muted-foreground: #4b5160;
+  --accent: #f3f4f6;
+  --accent-foreground: #17191f;
+  --destructive: #b91c1c;
   --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #f97316;
-  --radius: 0.75rem;
+  --border: #e6e7eb;
+  --input: #d9dbe0;
+  --ring: #ea580c;
+  --radius: 0.625rem;
 
-  /* Elevation — page darkest, then sidebar, then cards/inputs */
-  --surface-page: #000000;
-  --surface-sidebar: #0a0a0a;
-  --surface-card: #121212;
-  --surface-input: #18181b;
-  --surface-hover: #1a1a1e;
+  /* Surfaces — page white, chrome a step grey, raised things white with a border */
+  --surface-page: #ffffff;
+  --surface-sidebar: #f7f7f8;
+  --surface-subtle: #f7f7f8;
+  --surface-card: #ffffff;
+  --surface-input: #ffffff;
+  --surface-hover: #f2f3f5;
+  --surface-pressed: #eaebee;
 
-  /* Borders — structural chrome slightly stronger than cards */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-sidebar: rgba(255, 255, 255, 0.1);
+  --border-subtle: #e6e7eb;
+  --border-sidebar: #e6e7eb;
+  --border-strong: #d4d6dc;
 
-  /* Text — secondary tuned per surface */
-  --text-secondary: #a1a1aa;
-  --text-label: #d4d4d8;
-  --text-tertiary: #71717a;
+  --text-secondary: #4b5160;
+  --text-label: #2f333c;
+  --text-tertiary: #6b7180;
+  --text-placeholder: #8b909a;
+
+  --success: #15803d;
+  --success-tint: #f0fdf4;
+  --warning: #b45309;
+  --warning-tint: #fffbeb;
+  --danger: #b91c1c;
+  --danger-tint: #fef2f2;
+
+  --shadow-raised: 0 1px 2px rgba(23, 25, 31, 0.05);
+  --shadow-overlay: 0 1px 2px rgba(23, 25, 31, 0.06), 0 8px 24px -6px rgba(23, 25, 31, 0.12);
 }
 
 @theme inline {
@@ -68,6 +86,24 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-label: var(--text-label);
   --color-text-tertiary: var(--text-tertiary);
+  --color-text-placeholder: var(--text-placeholder);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-pressed: var(--surface-pressed);
+  --color-border-strong: var(--border-strong);
+  --color-brand-text: var(--brand-text);
+  --color-brand-tint: var(--brand-tint);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-destructive: var(--destructive);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -83,6 +119,35 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-placeholder);
+  }
+
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 button:not(:disabled) {
@@ -94,7 +159,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(249, 115, 22, 0.25);
+  background: rgba(234, 88, 12, 0.16);
 }
 
 @keyframes shimmer-sweep {
@@ -111,7 +176,7 @@ button:disabled {
     100deg,
     var(--text-tertiary) 0%,
     var(--text-tertiary) 40%,
-    #ffffff 50%,
+    var(--foreground) 50%,
     var(--text-tertiary) 60%,
     var(--text-tertiary) 100%
   );
@@ -124,6 +189,12 @@ button:disabled {
 }
 
 /* Report "Export PDF" uses the browser print dialog; keep the printout readable on white. */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+  }
+}
+
 @media print {
   @page {
     margin: 16mm;

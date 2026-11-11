@@ -38,28 +38,24 @@ export default function LoginForm() {
 
   return (
     <>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg font-semibold text-white sm:text-xl">Sign in</h1>
-        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/register"
-            className="text-primary transition-colors duration-150 hover:text-orange-400"
-          >
-            Sign up
-          </Link>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">
+          Sign in to Reelysis
+        </h1>
+        <p className="mt-1.5 text-sm text-text-secondary">
+          Pick up where your last sync left off.
         </p>
       </div>
 
-      <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
+      <form onSubmit={handleLogin} className="space-y-4">
         {justReset && !error && (
-          <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-400/90">
+          <div className="rounded-md border border-green-200 bg-success-tint px-3 py-2.5 text-sm text-success">
             Password updated. Please sign in with your new password.
           </div>
         )}
 
         {error && (
-          <div className="rounded-[10px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <div className="rounded-md border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
             {error}
           </div>
         )}
@@ -76,34 +72,38 @@ export default function LoginForm() {
           required
         />
 
-        <div>
-          <AuthField
-            id="password"
-            label="Password"
-            type="password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="current-password"
-            placeholder="Your password"
-            disabled={isPending}
-            required
-          />
-          <div className="mt-3 text-right">
+        <AuthField
+          id="password"
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          disabled={isPending}
+          required
+          labelAction={
             <Link
               href="/forgot-password"
-              className="text-sm text-text-tertiary transition-colors duration-150 hover:text-text-secondary"
+              className="text-[13px] text-brand-text hover:underline"
             >
               Forgot password?
             </Link>
-          </div>
-        </div>
+          }
+        />
 
-        <Button type="submit" className="mt-1 w-full sm:mt-2" size="lg" disabled={isPending}>
+        <Button type="submit" className="mt-2 h-10 w-full" disabled={isPending}>
           <ButtonLoadingLabel loading={isPending} loadingLabel="Signing in…">
             Sign in
           </ButtonLoadingLabel>
         </Button>
       </form>
+
+      <p className="mt-6 border-t border-border-subtle pt-5 text-center text-sm text-text-secondary">
+        New to Reelysis?{' '}
+        <Link href="/register" className="font-medium text-brand-text hover:underline">
+          Create an account
+        </Link>
+      </p>
     </>
   )
 }

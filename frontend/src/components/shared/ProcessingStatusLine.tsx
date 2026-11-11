@@ -30,7 +30,7 @@ export function ProcessingStatusLine({
         aria-live="polite"
         className={className ?? 'max-w-2xl py-2 md:py-4'}
       >
-        <p className="text-sm leading-relaxed text-red-400 md:text-[15px]">{errorMessage}</p>
+        <p className="text-sm leading-relaxed text-danger md:text-[15px]">{errorMessage}</p>
       </section>
     )
   }

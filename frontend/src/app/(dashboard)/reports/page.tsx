@@ -11,6 +11,7 @@ import { ReportsList } from '@/features/reports/components/ReportsList'
 import { ReportsEmptyState } from '@/features/reports/components/ReportsEmptyState'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { ReportsPageSkeleton } from '@/components/shared/PageSkeletons'
+import { PageHeader } from '@/components/shared/Panel'
 import { PageErrorState } from '@/components/shared/PageErrorState'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -92,36 +93,39 @@ export default function ReportsPage() {
     lastJobTime >= latestReportTime
 
   return (
-    <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
-      <header className="flex flex-col justify-between gap-4 border-b border-border-subtle pb-6 md:flex-row md:items-end md:gap-6 md:pb-8">
-        <div className="min-w-0 max-w-2xl">
-          <h1 className="text-lg font-semibold text-white md:text-2xl">Reports</h1>
-          <p className="mt-1.5 text-xs leading-relaxed text-text-secondary md:mt-2 md:text-sm">
-            Strategy write-ups from your Reels and competitor data. Each report compares
-            your content, surfaces gaps, and suggests what to post next.
+    <div className="space-y-6 pb-16 sm:space-y-8">
+      <PageHeader
+        title="Reports"
+        description={
+          <p className="max-w-2xl">
+            Written strategy from your Reels and competitor data: what&apos;s working, where the
+            gaps are, and what to post next.
+            {reportCount > 0 && (
+              <span className="text-text-tertiary">
+                {' '}
+                {reportCount} {reportCount === 1 ? 'report' : 'reports'} so far.
+              </span>
+            )}
           </p>
-          {reportCount > 0 && (
-            <p className="mt-2 text-xs text-text-tertiary md:mt-3 md:text-sm">
-              {reportCount} {reportCount === 1 ? 'report' : 'reports'} generated
-            </p>
-          )}
-        </div>
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating || isStarting}
-          className="w-full shrink-0 md:w-auto"
-        >
-          <ButtonLoadingLabel
-            loading={isGenerating || isStarting}
-            loadingLabel="Generating…"
+        }
+        actions={
+          <Button
+            onClick={handleGenerate}
+            disabled={isGenerating || isStarting}
+            className="w-full shrink-0 sm:w-auto"
           >
-            <>
-              <Plus className="h-4 w-4" />
-              Generate report
-            </>
-          </ButtonLoadingLabel>
-        </Button>
-      </header>
+            <ButtonLoadingLabel
+              loading={isGenerating || isStarting}
+              loadingLabel="Generating…"
+            >
+              <>
+                <Plus className="h-4 w-4" />
+                Generate report
+              </>
+            </ButtonLoadingLabel>
+          </Button>
+        }
+      />
 
       {generating && (
         <ReportGenerationPanel

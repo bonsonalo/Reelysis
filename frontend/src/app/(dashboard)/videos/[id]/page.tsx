@@ -4,13 +4,13 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useVideoAnalysis } from '@/features/dashboard/hooks/useVideoAnalysis'
 import { ReelThumbnail } from '@/features/dashboard/components/ReelThumbnail'
-import { ArrowLeft, ArrowUpRight, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, AlertCircle, Check, CornerDownRight, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MetricLabel } from '@/components/shared/MetricInfoTip'
 import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
 import { Panel } from '@/components/shared/Panel'
 import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
-import { cn, isNotFoundError } from '@/lib/utils'
+import { cn, isNotFoundError, stripTrailingHashtags } from '@/lib/utils'
 import { PageErrorState } from '@/components/shared/PageErrorState'
 
 function formatNumber(num: number) {
@@ -20,9 +20,9 @@ function formatNumber(num: number) {
 }
 
 function hookScoreTone(score: number) {
-  if (score >= 80) return 'text-emerald-400'
+  if (score >= 80) return 'text-success'
   if (score < 50) return 'text-text-secondary'
-  return 'text-white'
+  return 'text-foreground'
 }
 
 function StatCell({
@@ -44,7 +44,7 @@ function StatCell({
       <p
         className={cn(
           'mt-1.5 text-xl font-semibold tabular-nums tracking-tight sm:text-2xl',
-          valueClassName ?? 'text-white',
+          valueClassName ?? 'text-foreground',
         )}
       >
         {value}
@@ -57,16 +57,20 @@ function InsightSection({
   title,
   description,
   items,
+  icon: Icon,
+  iconClassName,
 }: {
   title: string
   description: string
   items: string[]
+  icon: LucideIcon
+  iconClassName: string
 }) {
   return (
     <Panel className="overflow-hidden">
       <div className="border-b border-border-subtle px-4 py-4 sm:px-6 md:py-5">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-sm font-semibold text-white md:text-base">{title}</h2>
+          <h2 className="text-sm font-semibold text-foreground md:text-base">{title}</h2>
           {items.length > 0 && (
             <span className="shrink-0 text-xs tabular-nums text-text-tertiary">
               {items.length}
@@ -83,24 +87,19 @@ function InsightSection({
           Nothing noted for this reel.
         </p>
       ) : (
-        <ol className="divide-y divide-border-subtle">
+        <ul className="divide-y divide-border-subtle">
           {items.map((item, index) => (
             <li
               key={index}
               className="flex gap-3.5 px-4 py-4 sm:gap-4 sm:px-6 sm:py-[1.125rem] md:py-5"
             >
-              <span
-                className="mt-[0.55rem] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-input text-[10px] font-medium tabular-nums text-text-tertiary"
-                aria-hidden
-              >
-                {index + 1}
-              </span>
-              <p className="min-w-0 flex-1 text-sm leading-[1.7] text-text-secondary md:text-[15px] md:leading-[1.75]">
+              <Icon className={cn('mt-1 h-4 w-4 shrink-0', iconClassName)} aria-hidden />
+              <p className="min-w-0 flex-1 text-sm leading-relaxed text-text-label md:text-[15px]">
                 {item}
               </p>
             </li>
           ))}
-        </ol>
+        </ul>
       )}
     </Panel>
   )
@@ -116,11 +115,11 @@ export default function VideoDetailPage() {
     return (
       <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
         <div className="border-b border-border-subtle pb-6 md:pb-8">
-          <div className="mb-5 h-4 w-24 animate-pulse rounded bg-white/[0.06]" />
-          <div className="h-7 w-2/3 max-w-lg animate-pulse rounded bg-white/[0.06]" />
-          <div className="mt-3 h-4 w-40 animate-pulse rounded bg-white/[0.04]" />
+          <div className="mb-5 h-4 w-24 animate-pulse rounded bg-surface-pressed" />
+          <div className="h-7 w-2/3 max-w-lg animate-pulse rounded bg-surface-pressed" />
+          <div className="mt-3 h-4 w-40 animate-pulse rounded bg-surface-hover" />
         </div>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,300px)_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,232px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,248px)_1fr]">
           <div className="mx-auto aspect-[9/16] w-full max-w-[220px] animate-pulse rounded-[10px] bg-surface-card sm:max-w-[260px] lg:mx-0 lg:max-w-none" />
           <div className="space-y-4">
             <div className="h-[120px] animate-pulse rounded-[10px] bg-surface-card" />
@@ -146,7 +145,7 @@ export default function VideoDetailPage() {
     return (
       <div className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center p-4 text-center">
         <AlertCircle className="mb-4 h-12 w-12 text-text-tertiary" />
-        <h2 className="text-base font-semibold text-white">Reel not found</h2>
+        <h2 className="text-base font-semibold text-foreground">Reel not found</h2>
         <p className="mt-2 max-w-sm text-sm text-text-secondary">
           This reel may have been removed or is no longer synced to your account.
         </p>
@@ -169,15 +168,17 @@ export default function VideoDetailPage() {
       : (analysis?.engagement_score ?? 0)
   const confidence = analysis?.confidence ?? 0
   const caption = media.caption?.trim()
+  // Trailing hashtags are noise in a page title; the full caption is shown further down.
+  const title = stripTrailingHashtags(caption)
   const hasTranscript =
     Boolean(media.transcript_text) && media.transcript_source !== 'none'
 
   return (
     <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
-      <header className="border-b border-border-subtle pb-6 md:pb-8">
+      <header>
         <Link
           href="/videos"
-          className="mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+          className="mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           All Reels
@@ -185,8 +186,8 @@ export default function VideoDetailPage() {
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold leading-snug text-white md:text-2xl">
-              {caption || 'Untitled reel'}
+            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.015em] text-foreground md:text-2xl">
+              {title || caption || 'Untitled reel'}
             </h1>
             {analysis && (
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
@@ -207,7 +208,7 @@ export default function VideoDetailPage() {
             href={media.permalink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+            className="inline-flex shrink-0 items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 hover:text-foreground"
           >
             Open on Instagram
             <ArrowUpRight className="h-4 w-4" />
@@ -215,13 +216,13 @@ export default function VideoDetailPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,300px)_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,232px)_1fr] lg:gap-8 xl:grid-cols-[minmax(0,248px)_1fr]">
         <aside className="lg:sticky lg:top-8 lg:self-start">
           <a
             href={media.permalink}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative mx-auto block aspect-[9/16] w-full max-w-[220px] overflow-hidden rounded-[10px] border border-border-subtle bg-surface-card transition-[border-color] duration-150 hover:border-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 sm:max-w-[260px] lg:mx-0 lg:max-w-none"
+            className="group relative mx-auto block aspect-[9/16] w-full max-w-[220px] overflow-hidden rounded-[10px] border border-border-subtle bg-surface-card transition-[border-color] duration-150 hover:border-border-strong sm:max-w-[260px] lg:mx-0 lg:max-w-none"
           >
             <ReelThumbnail
               thumbnailUrl={media.thumbnail_url}
@@ -236,37 +237,61 @@ export default function VideoDetailPage() {
         </aside>
 
         <div className="min-w-0 space-y-4 md:space-y-6">
-          <Panel className="grid grid-cols-2 divide-x divide-y divide-border-subtle sm:grid-cols-4 sm:divide-y-0">
+          <Panel className="grid grid-cols-3 divide-x divide-border-subtle">
             <StatCell
               label="Views"
               help={METRIC_HELP.videoViews}
               value={formatNumber(views)}
             />
+            <StatCell label="Reach" value={formatNumber(reach)} />
             <StatCell
               label="Engagement"
               help={METRIC_HELP.videoEngagement}
               value={`${engagement}%`}
             />
-            <StatCell
-              label="Hook score"
-              help={METRIC_HELP.hookScore}
-              value={analysis ? `${hookScore}/100` : '-'}
-              valueClassName={analysis ? hookScoreTone(hookScore) : undefined}
-            />
-            <StatCell
-              label="Confidence"
-              help={METRIC_HELP.aiConfidence}
-              value={analysis ? `${confidence}%` : '-'}
-            />
           </Panel>
 
-          {detail?.hook && (
-            <blockquote className="border-l-2 border-primary/30 py-0.5 pl-4 text-sm leading-[1.7] text-text-secondary md:text-[15px] md:leading-[1.75]">
-              <span className="mb-1.5 block text-xs font-medium text-text-label md:text-sm">
-                Opening hook
-              </span>
-              &ldquo;{detail.hook}&rdquo;
-            </blockquote>
+          {analysis && (
+            <Panel className="grid gap-5 p-4 sm:grid-cols-[1fr_200px] sm:gap-8 sm:p-6">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-text-label">Opening hook</p>
+                <p className="mt-2 border-l-2 border-primary pl-3 text-[15px] leading-relaxed text-foreground">
+                  {detail?.hook ? <>&ldquo;{detail.hook}&rdquo;</> : 'No spoken or on-screen hook was detected.'}
+                </p>
+              </div>
+              <div className="sm:border-l sm:border-border-subtle sm:pl-8">
+                <div className="text-[13px] text-text-secondary">
+                  <MetricLabel label="Hook score" help={METRIC_HELP.hookScore} tipSide="top" />
+                </div>
+                <p className="mt-1.5 flex items-baseline gap-1">
+                  <span
+                    className={cn(
+                      'text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums',
+                      hookScoreTone(hookScore),
+                    )}
+                  >
+                    {hookScore}
+                  </span>
+                  <span className="text-sm text-text-tertiary">/100</span>
+                </p>
+                <div className="mt-3 h-1.5 rounded-full bg-surface-hover" aria-hidden>
+                  <div
+                    className={cn(
+                      'h-full rounded-full',
+                      hookScore >= 80 ? 'bg-green-600' : hookScore < 50 ? 'bg-text-placeholder' : 'bg-amber-500',
+                    )}
+                    style={{ width: `${Math.min(100, Math.max(0, hookScore))}%` }}
+                  />
+                </div>
+                <div className="mt-2.5 text-xs tabular-nums text-text-tertiary">
+                  <MetricLabel
+                    label={`${confidence}% confidence`}
+                    help={METRIC_HELP.aiConfidence}
+                    tipSide="top"
+                  />
+                </div>
+              </div>
+            </Panel>
           )}
 
           {analysis ? (
@@ -275,11 +300,15 @@ export default function VideoDetailPage() {
                 title="What worked"
                 description="Patterns that helped this reel perform"
                 items={detail?.strengths ?? []}
+                icon={Check}
+                iconClassName="text-success"
               />
               <InsightSection
                 title="Try next time"
                 description="Small tweaks for your next post"
                 items={detail?.weaknesses ?? []}
+                icon={CornerDownRight}
+                iconClassName="text-text-tertiary"
               />
             </div>
           ) : (
@@ -290,7 +319,7 @@ export default function VideoDetailPage() {
 
           <Panel className="overflow-hidden">
             <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
-              <h2 className="text-sm font-semibold text-white md:text-base">Caption</h2>
+              <h2 className="text-sm font-semibold text-foreground md:text-base">Caption</h2>
             </div>
             <div className="px-4 py-4 sm:px-6 sm:py-5">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary md:text-base">
@@ -300,7 +329,7 @@ export default function VideoDetailPage() {
 
             <div className="border-t border-border-subtle px-4 py-4 sm:px-6">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold text-white md:text-base">Transcript</h2>
+                <h2 className="text-sm font-semibold text-foreground md:text-base">Transcript</h2>
                 {hasTranscript && media.transcript_source && (
                   <span className="text-xs text-text-tertiary">via {media.transcript_source}</span>
                 )}

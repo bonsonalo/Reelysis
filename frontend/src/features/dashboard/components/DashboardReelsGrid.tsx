@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { buttonStyles } from '@/components/ui/button'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
 import { ReelCard } from '@/features/dashboard/components/ReelCard'
 import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
@@ -31,12 +30,18 @@ export function DashboardReelsGrid({
 }: DashboardReelsGridProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="aspect-[9/16] animate-pulse rounded-[10px] bg-surface-card"
-          />
+            className="overflow-hidden rounded-[10px] border border-border-subtle bg-surface-card"
+          >
+            <div className="aspect-[4/5] animate-pulse bg-surface-hover" />
+            <div className="space-y-2 p-3">
+              <div className="h-3 w-4/5 animate-pulse rounded bg-surface-hover" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
+            </div>
+          </div>
         ))}
       </div>
     )
@@ -53,7 +58,7 @@ export function DashboardReelsGrid({
   }
 
   return (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {videos.map((video) => (
         <ReelCard
           key={video.id}
@@ -75,23 +80,19 @@ export function DashboardReelsSection({
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-white">Recent Reels</h2>
-          <p className="mt-1 text-sm text-text-secondary">
+          <h2 className="text-[15px] font-semibold text-foreground">Recent Reels</h2>
+          <p className="mt-0.5 text-[13px] text-text-tertiary">
             Latest Reels from your account, with views and engagement
           </p>
           {showAiPendingHint && (
             <AiInsightsPending variant="inline" className="mt-2" />
           )}
         </div>
-        <Link href="/videos">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="group px-3 text-sm text-primary hover:bg-primary/10 hover:text-primary"
-          >
-            View all
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
-          </Button>
+        <Link
+          href="/videos"
+          className={buttonStyles({ variant: 'outline', size: 'sm', className: 'self-start sm:self-auto' })}
+        >
+          View all Reels
         </Link>
       </div>
       <DashboardReelsGrid

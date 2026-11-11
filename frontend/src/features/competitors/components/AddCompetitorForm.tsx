@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
 import { useAddCompetitor } from '../hooks/useCompetitors'
+import { inputClassName } from '@/components/auth/AuthField'
+import { cn } from '@/lib/utils'
 
 interface AddCompetitorFormProps {
   className?: string
@@ -49,7 +51,7 @@ export function AddCompetitorForm({ className, onAdded }: AddCompetitorFormProps
             onChange={(e) => setHandle(e.target.value)}
             placeholder="competitor_handle"
             disabled={isPending}
-            className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input pl-8 pr-3 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            className={cn(inputClassName, 'pl-8')}
           />
         </div>
         <Button type="submit" size="sm" disabled={isPending} className="shrink-0">
@@ -58,7 +60,7 @@ export function AddCompetitorForm({ className, onAdded }: AddCompetitorFormProps
           </ButtonLoadingLabel>
         </Button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </form>
   )
 }

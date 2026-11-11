@@ -13,6 +13,7 @@ import { SettingsNav, isSettingsTab, type SettingsTab } from '@/features/setting
 import { SettingsProfileTab } from '@/features/settings/components/SettingsProfileTab'
 import { SettingsAccountTab } from '@/features/settings/components/SettingsAccountTab'
 import { SettingsSecurityTab } from '@/features/settings/components/SettingsSecurityTab'
+import { PageHeader } from '@/components/shared/Panel'
 
 export default function SettingsPage() {
   return (
@@ -122,13 +123,11 @@ function SettingsContent() {
   }
 
   return (
-    <div className="space-y-6 pb-16 sm:space-y-8 sm:pb-20">
-      <header className="border-b border-border-subtle pb-6 sm:pb-8">
-        <h1 className="text-xl font-semibold text-white sm:text-2xl">Settings</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Manage your Reelysis account, Instagram connection, and sign-in preferences.
-        </p>
-      </header>
+    <div className="space-y-6 pb-16 sm:space-y-8">
+      <PageHeader
+        title="Settings"
+        description="Your Reelysis account, Instagram connection and sign-in."
+      />
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
         <SettingsNav activeTab={activeTab} onTabChange={handleTabChange} />

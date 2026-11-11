@@ -69,7 +69,7 @@ function DeleteAccountDialogBody({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/70"
+        className="absolute inset-0 bg-foreground/30"
         aria-label="Close dialog"
         disabled={isPending}
         onClick={() => {
@@ -81,7 +81,7 @@ function DeleteAccountDialogBody({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 w-full max-w-md overflow-hidden"
+        className="relative z-10 w-full max-w-md overflow-hidden shadow-overlay"
       >
         <form
           onSubmit={(e) => {
@@ -91,7 +91,7 @@ function DeleteAccountDialogBody({
         >
           <div className="flex items-start justify-between gap-4 border-b border-border-subtle px-4 py-4 sm:px-6">
             <div className="min-w-0">
-              <h2 id={titleId} className="text-base font-semibold text-white">
+              <h2 id={titleId} className="text-base font-semibold text-foreground">
                 Delete account
               </h2>
               <p className="mt-1 text-sm leading-relaxed text-text-secondary">
@@ -102,7 +102,7 @@ function DeleteAccountDialogBody({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="shrink-0 rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:opacity-50"
+              className="shrink-0 rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
@@ -125,7 +125,7 @@ function DeleteAccountDialogBody({
             />
             {error ? (
               <p
-                className="rounded-[10px] border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-sm leading-relaxed text-red-400"
+                className="rounded-[10px] border border-red-200 bg-danger-tint px-3 py-2.5 text-sm leading-relaxed text-danger"
                 role="alert"
               >
                 {error}

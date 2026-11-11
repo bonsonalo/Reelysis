@@ -106,16 +106,16 @@ export function ReportGenerationError({
         <span
           className={cn(
             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full',
-            info.tone === 'limit' ? 'bg-amber-500/10' : 'bg-red-500/10',
+            info.tone === 'limit' ? 'bg-warning-tint' : 'bg-danger-tint',
           )}
           aria-hidden
         >
           <Icon
-            className={cn('h-3 w-3', info.tone === 'limit' ? 'text-amber-400' : 'text-red-400')}
+            className={cn('h-3 w-3', info.tone === 'limit' ? 'text-warning' : 'text-danger')}
           />
         </span>
         <div className="min-w-0 space-y-2">
-          <p className="text-sm font-medium text-white md:text-[15px]">{info.title}</p>
+          <p className="text-sm font-medium text-foreground md:text-[15px]">{info.title}</p>
           <p className="text-sm leading-relaxed text-text-secondary">{info.description}</p>
           {info.canRetry && (
             <div className="pt-1">

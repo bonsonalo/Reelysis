@@ -96,3 +96,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 export function isNotFoundError(error: unknown): boolean {
   return (error as ApiErrorLike | null)?.response?.status === 404
 }
+
+/** Caption without its trailing hashtag block, for titles and card labels. */
+export function stripTrailingHashtags(caption?: string | null) {
+  return caption?.replace(/(\s+#[\p{L}\p{N}_]+)+\s*$/u, '').trim() ?? ''
+}

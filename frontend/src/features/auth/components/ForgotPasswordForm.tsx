@@ -21,8 +21,8 @@ export default function ForgotPasswordForm() {
 
   return (
     <>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg font-semibold text-white sm:text-xl">Reset your password</h1>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">Reset your password</h1>
         <p className="mt-2 text-sm leading-relaxed text-text-secondary">
           Enter the email you signed up with and we&apos;ll send you a reset link.
         </p>
@@ -31,7 +31,7 @@ export default function ForgotPasswordForm() {
       {isSuccess ? (
         <div className="space-y-6">
           <AuthNotice tone="success">
-            If an account exists for <span className="text-white">{email}</span>, a reset link is
+            If an account exists for <span className="text-foreground">{email}</span>, a reset link is
             on its way. The link expires in 30 minutes.
           </AuthNotice>
           <Link href="/login" className="block">
@@ -41,7 +41,7 @@ export default function ForgotPasswordForm() {
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error ? (
             <AuthNotice tone="error">
               {getApiErrorMessage(error, 'Could not send the reset email. Try again.')}
@@ -60,7 +60,7 @@ export default function ForgotPasswordForm() {
             required
           />
 
-          <Button type="submit" className="w-full" size="lg" disabled={isPending || !email}>
+          <Button type="submit" className="h-10 w-full" disabled={isPending || !email}>
             <ButtonLoadingLabel loading={isPending} loadingLabel="Sending…">
               Send reset link
             </ButtonLoadingLabel>
@@ -70,7 +70,7 @@ export default function ForgotPasswordForm() {
             Remembered it?{' '}
             <Link
               href="/login"
-              className="text-primary transition-colors duration-150 hover:text-orange-400"
+              className="text-brand-text transition-colors duration-150 hover:underline"
             >
               Sign in
             </Link>

@@ -1,6 +1,5 @@
+import Link from 'next/link'
 import { BrandLogo } from '@/components/shared/BrandLogo'
-import { Panel } from '@/components/shared/Panel'
-import { landingShellClass } from '@/components/landing/landingContent'
 
 type AuthShellProps = {
   children: React.ReactNode
@@ -8,16 +7,26 @@ type AuthShellProps = {
 
 export function AuthShell({ children }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-surface-page text-white">
-      <header className="shrink-0 border-b border-border-subtle">
-        <div className={`flex h-14 items-center ${landingShellClass}`}>
-          <BrandLogo href="/" size="md" />
-        </div>
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-surface-subtle text-foreground">
+      <header className="shrink-0 px-4 pt-6 sm:px-8 sm:pt-8">
+        <BrandLogo href="/" size="md" />
       </header>
 
-      <main className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-8 sm:px-6 sm:py-12 md:py-16">
-        <Panel className="w-full max-w-[400px] p-5 sm:p-8 md:p-10">{children}</Panel>
+      <main className="flex flex-1 items-start justify-center px-4 pb-10 pt-10 sm:items-center sm:px-6 sm:pt-6">
+        <div className="w-full max-w-[400px] rounded-xl border border-border-subtle bg-white p-6 shadow-overlay sm:p-8">
+          {children}
+        </div>
       </main>
+
+      <footer className="flex shrink-0 justify-center gap-5 pb-6 text-[13px] text-text-tertiary">
+        <span>© {new Date().getFullYear()} Reelysis</span>
+        <Link href="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+        <Link href="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
+      </footer>
     </div>
   )
 }

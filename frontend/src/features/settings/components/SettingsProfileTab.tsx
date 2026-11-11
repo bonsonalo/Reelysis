@@ -11,7 +11,8 @@ import {
   SettingsPanelHeader,
   SettingsRow,
   SettingsSection,
-  SettingsSectionHeader,
+  SettingsDangerZone,
+  dangerButtonClass,
 } from './settingsUi'
 
 type SettingsProfileTabProps = {
@@ -37,49 +38,51 @@ export function SettingsProfileTab({ name, email, emailVerified }: SettingsProfi
   }
 
   return (
-    <SettingsSection>
-      <SettingsPanelHeader
-        title="Profile"
-        description="Your Reelysis login and account details."
-      />
+    <div className="space-y-6">
+      <SettingsSection>
+        <SettingsPanelHeader
+          title="Profile"
+          description="Your Reelysis login and account details."
+        />
 
-      <div className="px-4 py-5 sm:px-6 sm:py-6">
-        <div className="flex items-center gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-medium text-primary">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{displayName}</p>
-            <p className="mt-0.5 truncate text-sm text-text-secondary">{email || '—'}</p>
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-white">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+              <p className="mt-0.5 truncate text-sm text-text-secondary">{email || '—'}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="divide-y divide-border-subtle border-t border-border-subtle px-4 sm:px-6">
-        <SettingsRow label="Email status">
-          {emailVerified ? (
-            <span className="text-emerald-400">Verified</span>
-          ) : (
-            <span className="text-amber-300">Not verified</span>
-          )}
-        </SettingsRow>
-        <SettingsRow
-          label="Plan"
-          description="Paid plans are not available yet. Everyone starts on Free."
-        >
-          <span className="text-text-secondary">Free</span>
-        </SettingsRow>
-      </div>
+        <div className="divide-y divide-border-subtle border-t border-border-subtle px-4 sm:px-6">
+          <SettingsRow label="Email status">
+            {emailVerified ? (
+              <span className="text-success">Verified</span>
+            ) : (
+              <span className="text-warning">Not verified</span>
+            )}
+          </SettingsRow>
+          <SettingsRow
+            label="Plan"
+            description="Paid plans are not available yet. Everyone starts on Free."
+          >
+            <span className="text-text-secondary">Free</span>
+          </SettingsRow>
+        </div>
 
-      <div className="border-t border-border-subtle px-4 py-5 sm:px-6 sm:py-6">
-        <SettingsSectionHeader
-          title="Delete account"
-          description="Permanently remove your Reelysis account and all of its data."
-        />
+      </SettingsSection>
+
+      <SettingsDangerZone
+        title="Delete account"
+        description="Permanently removes your Reelysis account and all of its data."
+      >
         <Button
           type="button"
-          variant="destructive"
-          className="w-full sm:w-auto"
+          variant="outline"
+          className={dangerButtonClass}
           onClick={() => {
             setDeleteError(null)
             setDialogOpen(true)
@@ -88,17 +91,17 @@ export function SettingsProfileTab({ name, email, emailVerified }: SettingsProfi
         >
           Delete account
         </Button>
-      </div>
+      </SettingsDangerZone>
 
-      <DeleteAccountDialog
-        open={dialogOpen}
-        isPending={isDeleting}
-        error={deleteError}
-        onClose={() => {
-          if (!isDeleting) setDialogOpen(false)
-        }}
-        onConfirm={handleDelete}
-      />
-    </SettingsSection>
+        <DeleteAccountDialog
+          open={dialogOpen}
+          isPending={isDeleting}
+          error={deleteError}
+          onClose={() => {
+            if (!isDeleting) setDialogOpen(false)
+          }}
+          onConfirm={handleDelete}
+        />
+    </div>
   )
 }

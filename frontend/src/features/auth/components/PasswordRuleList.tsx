@@ -12,7 +12,7 @@ export function PasswordRuleList({ value, className }: { value: string; classNam
             key={rule.label}
             className={cn(
               'flex items-center gap-2 transition-colors duration-150',
-              met ? 'text-emerald-400' : 'text-text-tertiary',
+              met ? 'text-success' : 'text-text-tertiary',
             )}
           >
             <Check className={cn('h-3.5 w-3.5 shrink-0', !met && 'opacity-30')} />

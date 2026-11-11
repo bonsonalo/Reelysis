@@ -11,13 +11,13 @@ type LegalDocumentShellProps = {
 
 export function LegalDocumentShell({ title, updated, children }: LegalDocumentShellProps) {
   return (
-    <div className="min-h-screen bg-surface-page text-white">
+    <div className="min-h-screen bg-surface-page text-foreground">
       <header className="border-b border-border-subtle">
         <div className={`flex h-14 items-center justify-between ${landingShellClass}`}>
           <BrandLogo href="/" size="md" />
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+            className="inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Home
@@ -28,10 +28,10 @@ export function LegalDocumentShell({ title, updated, children }: LegalDocumentSh
       <main className={`py-10 sm:py-14 md:py-16 ${landingShellClass}`}>
         <div className="mx-auto max-w-2xl">
           <p className="text-xs text-text-tertiary sm:text-sm">Last updated {updated}</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             {title}
           </h1>
-          <div className="prose prose-invert prose-sm mt-8 max-w-none sm:prose-base prose-headings:font-semibold prose-headings:text-white prose-headings:tracking-tight prose-p:text-text-secondary prose-p:leading-relaxed prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+          <div className="prose prose-sm mt-8 max-w-none sm:prose-base prose-headings:font-semibold prose-headings:text-foreground prose-headings:tracking-tight prose-p:text-text-secondary prose-p:leading-relaxed prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-brand-text prose-a:no-underline hover:prose-a:underline">
             {children}
           </div>
         </div>
@@ -43,10 +43,10 @@ export function LegalDocumentShell({ title, updated, children }: LegalDocumentSh
         >
           <p>© {new Date().getFullYear()} Reelysis</p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="transition-colors duration-150 hover:text-white">
+            <Link href="/privacy" className="transition-colors duration-150 hover:text-foreground">
               Privacy
             </Link>
-            <Link href="/terms" className="transition-colors duration-150 hover:text-white">
+            <Link href="/terms" className="transition-colors duration-150 hover:text-foreground">
               Terms
             </Link>
           </div>

@@ -11,14 +11,42 @@ import { CompetitorsPageSkeleton } from '@/components/shared/PageSkeletons'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
 import { ProcessStatus } from '@/components/shared/ProcessStatus'
 import { Button } from '@/components/ui/button'
-import { Panel } from '@/components/shared/Panel'
+import { Panel, PageHeader } from '@/components/shared/Panel'
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { inputClassName } from '@/components/auth/AuthField'
+import { cn } from '@/lib/utils'
+import { Trash2 } from 'lucide-react'
 
 function formatNumber(num: number) {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
   return num.toString()
+}
+
+function RemoveCompetitorButton({
+  handle,
+  onRemove,
+  className,
+}: {
+  handle: string
+  onRemove: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className={cn(
+        'shrink-0 rounded-md p-1.5 text-text-tertiary transition-[color,background-color,opacity] duration-150 hover:bg-danger-tint hover:text-danger',
+        className,
+      )}
+      aria-label={`Stop tracking @${handle}`}
+      title="Stop tracking"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  )
 }
 
 export default function CompetitorsPage() {
@@ -86,21 +114,26 @@ export default function CompetitorsPage() {
   const filteredCount = filteredCompetitors?.length ?? 0
 
   return (
-    <div className="space-y-6 pb-16 sm:space-y-8 sm:pb-20">
-      <header className="border-b border-border-subtle pb-6 sm:pb-8">
-        <h1 className="text-xl font-semibold text-white sm:text-2xl">Competitors</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Public Instagram accounts you track for benchmarking content and engagement.
-        </p>
-        {competitorCount > 0 && (
-          <p className="mt-3 text-sm text-text-tertiary">
-            {competitorCount} {competitorCount === 1 ? 'account' : 'accounts'} tracked
-          </p>
-        )}
-        {pendingJob?.status === 'failed' && pendingJob.error_message && !jobInProgress && (
-          <p className="mt-3 text-sm text-red-400">{pendingJob.error_message}</p>
-        )}
-      </header>
+    <div className="space-y-6 pb-16 sm:space-y-8">
+      <PageHeader
+        title="Competitors"
+        description={
+          <>
+            <p>
+              Public Instagram accounts you track to benchmark content and engagement.
+              {competitorCount > 0 && (
+                <span className="text-text-tertiary">
+                  {' '}
+                  {competitorCount} of 10 tracked.
+                </span>
+              )}
+            </p>
+            {pendingJob?.status === 'failed' && pendingJob.error_message && !jobInProgress && (
+              <p className="mt-1.5 text-danger">{pendingJob.error_message}</p>
+            )}
+          </>
+        }
+      />
 
       {jobInProgress && (
         <ProcessStatus
@@ -115,7 +148,7 @@ export default function CompetitorsPage() {
       <Panel className="overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h2 className="text-base font-semibold text-white">Add competitor</h2>
+            <h2 className="text-[15px] font-semibold text-foreground">Add competitor</h2>
             <p className="mt-1 text-sm text-text-secondary">
               Track any public account by handle (max 10).
             </p>
@@ -140,7 +173,7 @@ export default function CompetitorsPage() {
       <Panel className="overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h2 className="text-base font-semibold text-white">Tracked accounts</h2>
+            <h2 className="text-[15px] font-semibold text-foreground">Tracked accounts</h2>
             {searchQuery && filteredCount !== competitorCount && (
               <p className="mt-1 text-sm text-text-secondary">
                 {filteredCount} of {competitorCount} shown
@@ -152,7 +185,7 @@ export default function CompetitorsPage() {
             placeholder="Search by handle or name…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 w-full rounded-[10px] border border-border-subtle bg-surface-input px-4 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 sm:max-w-xs"
+            className={cn(inputClassName, 'sm:max-w-xs')}
           />
         </div>
 
@@ -173,6 +206,7 @@ export default function CompetitorsPage() {
                   comp.followers_count,
                   comp.engagement_rank,
                 )
+                const notSynced = !comp.followers_count && !comp.media_count
 
                 return (
                   <div
@@ -192,25 +226,27 @@ export default function CompetitorsPage() {
                         href={`https://instagram.com/${comp.handle}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="truncate font-medium text-white transition-colors duration-150 hover:text-primary"
+                        className="truncate font-medium text-foreground transition-colors duration-150 hover:text-brand-text"
                       >
                         @{comp.handle}
                       </a>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        {formatNumber(comp.followers_count)} followers
-                        {' · '}
-                        {comp.media_count ?? 0} reels
-                        {showEngagement &&
-                          ` · ${formatCompetitorEngagement(comp.engagement_rank)}% eng.`}
+                      <p className="mt-1 text-xs tabular-nums text-text-secondary">
+                        {notSynced ? (
+                          'Profile not synced yet'
+                        ) : (
+                          <>
+                            {formatNumber(comp.followers_count)} followers, {comp.media_count ?? 0}{' '}
+                            Reels
+                            {showEngagement &&
+                              `, ${formatCompetitorEngagement(comp.engagement_rank)}% engagement`}
+                          </>
+                        )}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeCompetitor(comp.id)}
-                      className="shrink-0 text-xs text-text-secondary transition-colors duration-150 hover:text-red-400"
-                    >
-                      Remove
-                    </button>
+                    <RemoveCompetitorButton
+                      handle={comp.handle}
+                      onRemove={() => removeCompetitor(comp.id)}
+                    />
                   </div>
                 )
               })}
@@ -219,12 +255,14 @@ export default function CompetitorsPage() {
             <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-border-subtle text-left text-xs font-medium text-text-tertiary">
+                <tr className="border-b border-border-subtle bg-surface-subtle text-left text-xs font-medium text-text-tertiary">
                   <th className="py-3 pl-6 pr-4 font-medium">Account</th>
                   <th className="w-28 px-4 py-3 text-right font-medium">Followers</th>
                   <th className="w-24 px-4 py-3 text-right font-medium">Reels</th>
                   <th className="w-36 px-4 py-3 text-right font-medium">Avg. engagement</th>
-                  <th className="w-28 py-3 pl-4 pr-6 text-right font-medium">Manage</th>
+                  <th className="w-16 py-3 pl-4 pr-6 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -233,11 +271,12 @@ export default function CompetitorsPage() {
                     comp.followers_count,
                     comp.engagement_rank,
                   )
+                  const notSynced = !comp.followers_count && !comp.media_count
 
                   return (
                     <tr
                       key={comp.id}
-                      className="transition-colors duration-150 hover:bg-white/[0.03]"
+                      className="group transition-colors duration-150 hover:bg-surface-subtle"
                     >
                       <td className="py-4 pl-6 pr-4">
                         <div className="flex items-center gap-3">
@@ -254,37 +293,42 @@ export default function CompetitorsPage() {
                               href={`https://instagram.com/${comp.handle}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="truncate font-medium text-white transition-colors duration-150 hover:text-primary"
+                              className="truncate font-medium text-foreground transition-colors duration-150 hover:text-brand-text"
                             >
                               @{comp.handle}
                             </a>
-                            {comp.display_name && comp.display_name !== comp.handle && (
-                              <p className="truncate text-xs text-text-secondary">
-                                {comp.display_name}
+                            {notSynced ? (
+                              <p className="truncate text-xs text-text-tertiary">
+                                Profile not synced yet
                               </p>
+                            ) : (
+                              comp.display_name &&
+                              comp.display_name !== comp.handle && (
+                                <p className="truncate text-xs text-text-secondary">
+                                  {comp.display_name}
+                                </p>
+                              )
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-right tabular-nums text-text-label">
-                        {formatNumber(comp.followers_count)}
+                        {notSynced ? '—' : formatNumber(comp.followers_count)}
                       </td>
                       <td className="px-4 py-4 text-right tabular-nums text-text-label">
-                        {comp.media_count ?? '-'}
+                        {notSynced ? '—' : (comp.media_count ?? '—')}
                       </td>
-                      <td className="px-4 py-4 text-right tabular-nums text-white">
+                      <td className="px-4 py-4 text-right tabular-nums text-foreground">
                         {showEngagement
                           ? `${formatCompetitorEngagement(comp.engagement_rank)}%`
-                          : '-'}
+                          : '—'}
                       </td>
                       <td className="py-4 pl-4 pr-6 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeCompetitor(comp.id)}
-                          className="text-sm text-text-secondary transition-colors duration-150 hover:text-red-400 focus:outline-none focus-visible:text-red-400"
-                        >
-                          Remove
-                        </button>
+                        <RemoveCompetitorButton
+                          handle={comp.handle}
+                          onRemove={() => removeCompetitor(comp.id)}
+                          className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                        />
                       </td>
                     </tr>
                   )

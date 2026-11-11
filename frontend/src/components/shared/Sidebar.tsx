@@ -20,10 +20,10 @@ import { useAuth, useAppDispatch } from '@/store/hook'
 import { closeMobileSidebar } from '@/store/slices/sidebarSlice'
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'My Videos', href: '/videos', icon: Video },
+  { name: 'Overview', href: '/dashboard', icon: Home },
+  { name: 'Reels', href: '/videos', icon: Video },
   { name: 'Competitors', href: '/competitors', icon: Users2 },
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
 ]
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -60,10 +60,10 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
   const displayName = currentUser.name?.trim() || currentUser.email?.split('@')[0] || 'Account'
 
   return (
-    <div ref={rootRef} className="relative border-t border-border-sidebar p-3">
+    <div ref={rootRef} className="relative p-3">
       {open && (
         <div
-          className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[10px] border border-border-subtle bg-surface-input py-1"
+          className="absolute bottom-full left-3 right-3 mb-1.5 overflow-hidden rounded-lg border border-border-subtle bg-popover p-1 shadow-overlay"
           role="menu"
         >
           <Link
@@ -74,8 +74,8 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
               onNavigate()
             }}
             className={cn(
-              'flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors duration-150 hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
-              pathname === '/settings' ? 'text-white' : 'text-text-label hover:text-white',
+              'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-text-label transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
+              pathname === '/settings' && 'text-foreground',
             )}
           >
             <Settings className="h-4 w-4 shrink-0 text-text-tertiary" />
@@ -88,7 +88,7 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
               setOpen(false)
               logout()
             }}
-            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium text-text-label transition-colors duration-150 hover:bg-white/[0.06] hover:text-red-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-text-label transition-colors duration-150 hover:bg-surface-hover hover:text-danger"
           >
             <LogOut className="h-4 w-4 shrink-0 text-text-tertiary" />
             Log out
@@ -102,16 +102,16 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
         aria-expanded={open}
         aria-haspopup="menu"
         className={cn(
-          'flex w-full items-center gap-3 rounded-[10px] px-2 py-2.5 text-left transition-[background-color,transform] duration-150 hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
-          open && 'bg-white/[0.06]',
+          'flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-surface-hover',
+          open && 'bg-surface-pressed',
         )}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-white">
           {getInitials(currentUser.name, currentUser.email)}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">{displayName}</p>
-          <p className="truncate text-xs text-text-secondary">{currentUser.email}</p>
+          <p className="truncate text-[13px] font-medium leading-tight text-foreground">{displayName}</p>
+          <p className="truncate text-xs leading-tight text-text-tertiary">{currentUser.email}</p>
         </div>
         <ChevronsUpDown
           className={cn(
@@ -134,19 +134,19 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border-sidebar px-6">
+      <div className="flex h-14 shrink-0 items-center justify-between px-5">
         <BrandLogo size="md" onClick={handleNavClick} />
         <button
           type="button"
           onClick={() => dispatch(closeMobileSidebar())}
-          className="rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 lg:hidden"
+          className="rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground lg:hidden"
           aria-label="Close menu"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-4 py-4">
+      <nav className="flex-1 space-y-px px-3 py-2" aria-label="Main">
         {navigation.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -158,18 +158,18 @@ export function Sidebar() {
               href={item.href}
               onClick={handleNavClick}
               className={cn(
-                'group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+                'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
                 isActive
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-text-secondary hover:bg-white/[0.06] hover:text-white',
+                  ? 'bg-white font-medium text-foreground shadow-[0_0_0_1px_var(--border-subtle),var(--shadow-raised)]'
+                  : 'text-text-secondary hover:bg-[#eeeff2] hover:text-foreground',
               )}
             >
               <item.icon
                 className={cn(
-                  'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
+                  'h-4 w-4 shrink-0 transition-colors duration-150',
                   isActive
                     ? 'text-primary'
-                    : 'text-text-tertiary group-hover:text-text-label',
+                    : 'text-text-tertiary group-hover:text-text-secondary',
                 )}
               />
               {item.name}
@@ -178,6 +178,23 @@ export function Sidebar() {
         })}
       </nav>
 
+      <div className="px-3 pb-1">
+        <Link
+          href="/settings"
+          onClick={handleNavClick}
+          className={cn(
+            'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
+            pathname?.startsWith('/settings')
+              ? 'bg-white font-medium text-foreground shadow-[0_0_0_1px_var(--border-subtle),var(--shadow-raised)]'
+              : 'text-text-secondary hover:bg-[#eeeff2] hover:text-foreground',
+          )}
+        >
+          <Settings className="h-4 w-4 shrink-0 text-text-tertiary group-hover:text-text-secondary" />
+          Settings
+        </Link>
+      </div>
+
+      <div className="mx-3 border-t border-border-subtle" />
       <SidebarUserMenu onNavigate={handleNavClick} />
     </div>
   )

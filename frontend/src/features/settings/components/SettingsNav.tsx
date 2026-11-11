@@ -22,7 +22,7 @@ type SettingsNavProps = {
 export function SettingsNav({ activeTab, onTabChange }: SettingsNavProps) {
   return (
     <nav
-      className="flex gap-1 overflow-x-auto rounded-[10px] border border-border-subtle bg-surface-input p-1 lg:w-52 lg:shrink-0 lg:flex-col lg:overflow-visible lg:self-start"
+      className="flex gap-1 overflow-x-auto border-b border-border-subtle pb-px lg:w-48 lg:shrink-0 lg:flex-col lg:self-start lg:overflow-visible lg:border-b-0 lg:pb-0"
       aria-label="Settings sections"
     >
       {SETTINGS_TABS.map((tab) => {
@@ -35,10 +35,9 @@ export function SettingsNav({ activeTab, onTabChange }: SettingsNavProps) {
             aria-current={active ? 'page' : undefined}
             className={cn(
               'shrink-0 rounded-md px-3 py-2 text-left text-sm transition-colors duration-150',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
               active
-                ? 'bg-white/[0.08] font-medium text-white'
-                : 'text-text-secondary hover:bg-white/[0.04] hover:text-white',
+                ? 'bg-surface-hover font-medium text-foreground'
+                : 'text-text-secondary hover:bg-surface-hover hover:text-foreground',
             )}
           >
             {tab.label}

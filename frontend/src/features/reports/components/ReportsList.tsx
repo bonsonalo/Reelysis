@@ -39,7 +39,7 @@ export function ReportsList({ reports }: ReportsListProps) {
       <Panel className="overflow-hidden">
         <Link
           href={`/reports/${latest.id}`}
-          className="group block p-3.5 transition-colors duration-150 hover:bg-white/[0.03] focus:outline-none focus-visible:bg-white/[0.03] md:p-6"
+          className="group block p-3.5 transition-colors duration-150 hover:bg-surface-hover focus-visible:bg-surface-hover md:p-6"
         >
           {/* Mobile: compact row layout */}
           <div className="flex items-start justify-between gap-3 md:hidden">
@@ -48,13 +48,13 @@ export function ReportsList({ reports }: ReportsListProps) {
                 <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
                 Latest report
               </div>
-              <h2 className="mt-1.5 text-base font-semibold leading-snug text-white">
+              <h2 className="mt-1.5 text-base font-semibold leading-snug text-foreground">
                 {latest.title}
               </h2>
               <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-secondary">
                 {latest.summary}
               </p>
-              <span className="mt-2 inline-flex items-center gap-1 text-xs text-text-secondary transition-colors duration-150 group-hover:text-white">
+              <span className="mt-2 inline-flex items-center gap-1 text-xs text-text-secondary transition-colors duration-150 group-hover:text-foreground">
                 View report
                 <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
               </span>
@@ -74,14 +74,14 @@ export function ReportsList({ reports }: ReportsListProps) {
                 Latest report
               </div>
               <div>
-                <h2 className="text-xl font-semibold leading-snug text-white">
+                <h2 className="text-xl font-semibold leading-snug text-foreground">
                   {latest.title}
                 </h2>
                 <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-text-secondary">
                   {latest.summary}
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 group-hover:text-white">
+              <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 group-hover:text-foreground">
                 View report
                 <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
               </span>
@@ -99,7 +99,7 @@ export function ReportsList({ reports }: ReportsListProps) {
       {previous.length > 0 && (
         <Panel className="overflow-hidden">
           <div className="border-b border-border-subtle px-3.5 py-3 md:px-6 md:py-4">
-            <h2 className="text-sm font-semibold text-white md:text-base">Previous reports</h2>
+            <h2 className="text-sm font-semibold text-foreground md:text-base">Previous reports</h2>
             <p className="mt-0.5 text-xs text-text-secondary md:mt-1 md:text-sm">
               {previous.length} earlier {previous.length === 1 ? 'report' : 'reports'}
             </p>
@@ -117,12 +117,12 @@ export function ReportsList({ reports }: ReportsListProps) {
               <Link
                 key={report.id}
                 href={`/reports/${report.id}`}
-                className="group block transition-colors duration-150 hover:bg-white/[0.03] focus:outline-none focus-visible:bg-white/[0.03]"
+                className="group block transition-colors duration-150 hover:bg-surface-hover focus-visible:bg-surface-hover"
               >
                 {/* Mobile: compact row */}
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 md:hidden">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">{report.title}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{report.title}</p>
                     <p className="mt-0.5 line-clamp-1 text-xs text-text-secondary">
                       {report.summary}
                     </p>
@@ -131,7 +131,7 @@ export function ReportsList({ reports }: ReportsListProps) {
                     <p className="text-xs tabular-nums text-text-tertiary">
                       {formatDate(report.created_at)}
                     </p>
-                    <ArrowRight className="h-3.5 w-3.5 text-text-tertiary transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-white" />
+                    <ArrowRight className="h-3.5 w-3.5 text-text-tertiary transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-foreground" />
                   </div>
                 </div>
 
@@ -139,7 +139,7 @@ export function ReportsList({ reports }: ReportsListProps) {
                 <div className="hidden grid-cols-[minmax(220px,1.2fr)_minmax(0,2fr)_120px_28px] items-center gap-4 px-6 py-4 md:grid">
                   <div className="flex min-w-0 items-center gap-3">
                     <FileText className="h-4 w-4 shrink-0 text-text-tertiary" />
-                    <p className="truncate font-medium text-white">{report.title}</p>
+                    <p className="truncate font-medium text-foreground">{report.title}</p>
                   </div>
                   <p className="line-clamp-1 text-sm text-text-secondary md:pr-4">
                     {report.summary}
@@ -150,7 +150,7 @@ export function ReportsList({ reports }: ReportsListProps) {
                   <ArrowRight
                     className={cn(
                       'h-4 w-4 text-text-tertiary transition-[color,transform] duration-150',
-                      'group-hover:translate-x-0.5 group-hover:text-white',
+                      'group-hover:translate-x-0.5 group-hover:text-foreground',
                     )}
                   />
                 </div>
