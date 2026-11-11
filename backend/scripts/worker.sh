@@ -30,8 +30,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [ -n "${PORT:-}" ]; then
-  # Render Web Services require an open HTTP port; Celery does not expose one.
-  exec python -m http.server "$PORT" --bind 0.0.0.0
+  # Render Web Services require an open HTTP port; Celery does not expose one. Serve an empty
+  # directory: http.server lists its working directory, which would publish the source tree.
+  HEALTH_DIR=$(mktemp -d)
+  echo ok > "$HEALTH_DIR/index.html"
+  exec python -m http.server "$PORT" --bind 0.0.0.0 --directory "$HEALTH_DIR"
 fi
 
 # Exit (and let the platform restart us) as soon as either worker dies.
