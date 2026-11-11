@@ -1,7 +1,6 @@
 import asyncio
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import create_engine
 from sqlmodel import Session
@@ -13,7 +12,7 @@ from app.core.db_url import (
     requires_pgbouncer_compat,
 )
 
-_async_url, _async_connect_args, _via_pooler = build_async_engine_url_and_connect_args(
+_async_url, _async_connect_args, _ = build_async_engine_url_and_connect_args(
     settings.DB_URL,
 )
 
@@ -25,19 +24,16 @@ if requires_pgbouncer_compat(settings.DB_URL):
     # PgBouncer (especially port 6543) breaks named prepared statements.
     _common_async_engine_kwargs["query_cache_size"] = 0
 
-if _via_pooler:
-    engine = create_async_engine(
-        _async_url,
-        poolclass=NullPool,
-        **_common_async_engine_kwargs,
-    )
-else:
-    engine = create_async_engine(
-        _async_url,
-        pool_size=5,
-        max_overflow=5,
-        **_common_async_engine_kwargs,
-    )
+# Pooled even behind the Supabase transaction pooler: no session state is kept and prepared
+# statements get unique names, so reuse is safe. Opening a fresh TLS connection per request
+# costs several cross-region round trips (~2-3s per API call in production).
+engine = create_async_engine(
+    _async_url,
+    pool_size=5,
+    max_overflow=5,
+    pool_recycle=300,
+    **_common_async_engine_kwargs,
+)
 
 sync_db_url, sync_connect_args = build_sync_engine_url_and_connect_args(settings.DB_URL)
 

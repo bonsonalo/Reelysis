@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ssl
+from uuid import uuid4
 
 from sqlalchemy.engine import make_url
 
@@ -54,6 +55,9 @@ def asyncpg_pgbouncer_connect_args() -> dict:
     return {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
+        # asyncpg numbers statements per connection; pooled client connections share server
+        # connections behind PgBouncer, so numbered names can collide.
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
     }
 
 
