@@ -14,6 +14,7 @@ import {
   dangerButtonClass,
 } from './settingsUi'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 type SettingsProfileTabProps = {
   name?: string | null
@@ -72,6 +73,12 @@ export function SettingsProfileTab({
             ) : (
               <span className="text-warning">Not verified</span>
             )}
+          </SettingsRow>
+          <SettingsRow
+            label="Appearance"
+            description="System follows your device’s light or dark setting."
+          >
+            <ThemeToggle />
           </SettingsRow>
           <SettingsRow
             label="Plan"

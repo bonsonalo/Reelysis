@@ -25,6 +25,7 @@ import {
   steps,
 } from '@/components/landing/landingContent'
 import { buttonStyles } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useAuth } from '@/store/hook'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { postAuthDestination } from '@/features/instagram/utils'
@@ -59,11 +60,11 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow-overlay"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-surface-card focus:px-3 focus:py-2 focus:text-sm focus:shadow-overlay"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-50 border-b border-border-subtle bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border-subtle bg-background/85 backdrop-blur-md">
         <div className={`flex h-16 items-center justify-between gap-3 ${landingShellClass}`}>
           <div className="flex items-center gap-10">
             <BrandLogo href="/" size="md" />
@@ -106,7 +107,7 @@ export default function LandingPage() {
           </div>
         </div>
         {mobileNavOpen && (
-          <div className="border-t border-border-subtle bg-white lg:hidden">
+          <div className="border-t border-border-subtle bg-background lg:hidden">
             <nav className={`flex flex-col gap-1 py-3 ${landingShellClass}`} aria-label="Sections">
               {navLinks.map((link) => (
                 <a
@@ -257,7 +258,8 @@ export default function LandingPage() {
             <BrandLogo href="/" size="sm" />
             <span>© {new Date().getFullYear()} Reelysis</span>
           </div>
-          <div className="flex gap-6">
+          <div className="flex items-center gap-6">
+            <ThemeToggle compact />
             <Link href="/privacy" className="transition-colors duration-150 hover:text-foreground">
               Privacy
             </Link>

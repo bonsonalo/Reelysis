@@ -13,11 +13,11 @@ import { GrowthDataPoint } from "@/features/dashboard/api"
 const chartConfig = {
   views: {
     label: "Views",
-    color: "#e0612a",
+    color: "var(--chart-views)",
   },
   reach: {
     label: "Reach",
-    color: "#9aa0ab",
+    color: "var(--chart-reach)",
   },
 } satisfies ChartConfig
 
@@ -80,7 +80,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
       >
         <CartesianGrid
           vertical={false}
-          stroke="#eef0f2"
+          stroke="var(--chart-grid)"
           strokeWidth={1}
         />
 
@@ -90,7 +90,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
           axisLine={false}
           tickMargin={12}
           minTickGap={24}
-          tick={{ fill: "#6b7180", fontSize: 11 }}
+          tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
         />
 
         <YAxis
@@ -100,15 +100,15 @@ export function GrowthChart({ data }: GrowthChartProps) {
           width={48}
           domain={[0, yMax]}
           allowDataOverflow={false}
-          tick={{ fill: "#6b7180", fontSize: 11 }}
+          tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
           tickFormatter={formatAxisValue}
         />
 
         <ChartTooltip
-          cursor={{ stroke: "#d4d6dc", strokeWidth: 1, strokeDasharray: "4 4" }}
+          cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1, strokeDasharray: "4 4" }}
           content={
             <ChartTooltipContent
-              className="border-border-subtle bg-white shadow-overlay"
+              className="border-border-subtle bg-popover shadow-overlay"
               indicator="dot"
               labelFormatter={(label) => label}
               formatter={(value, name) => [
@@ -126,12 +126,12 @@ export function GrowthChart({ data }: GrowthChartProps) {
           strokeWidth={1.5}
           dot={
             showDots
-              ? { r: 3, fill: "#ffffff", stroke: "var(--color-reach)", strokeWidth: 2 }
+              ? { r: 3, fill: "var(--surface-card)", stroke: "var(--color-reach)", strokeWidth: 2 }
               : false
           }
           activeDot={{
             r: 4,
-            fill: "#ffffff",
+            fill: "var(--surface-card)",
             stroke: "var(--color-reach)",
             strokeWidth: 2,
           }}
@@ -154,13 +154,13 @@ export function GrowthChart({ data }: GrowthChartProps) {
           strokeWidth={2}
           dot={
             showDots
-              ? { r: 3.5, fill: "#ffffff", stroke: "var(--color-views)", strokeWidth: 2 }
+              ? { r: 3.5, fill: "var(--surface-card)", stroke: "var(--color-views)", strokeWidth: 2 }
               : false
           }
           activeDot={{
             r: 5,
-            fill: "#e0612a",
-            stroke: "#ffffff",
+            fill: "var(--chart-views)",
+            stroke: "var(--surface-card)",
             strokeWidth: 2,
           }}
           isAnimationActive={false}
@@ -170,7 +170,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
               dataKey="viewsLabel"
               position="right"
               offset={8}
-              className="fill-[#b04a20] text-[10px] font-semibold"
+              className="fill-brand-text text-[10px] font-semibold"
             />
           )}
         </Line>

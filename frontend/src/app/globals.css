@@ -1,66 +1,146 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @plugin "@tailwindcss/typography";
 
 :root {
   color-scheme: light;
 
-  /* Ink + paper. Stripe-style: white canvas, cool grey chrome, hairline borders. */
-  --background: #ffffff;
+  /* Light: a grey canvas with soft off-white cards, so nothing glares. */
+  --background: #ebedf0;
   --foreground: #17191f;
-  --card: #ffffff;
+  --card: #f8f9fa;
   --card-foreground: #17191f;
-  --popover: #ffffff;
+  --popover: #f8f9fa;
   --popover-foreground: #17191f;
-  /* Brand orange, toned down a step: marks, chart series, focus. Text on white uses --brand-text. */
+  /* Brand orange: marks, chart series, focus. Text uses --brand-text for contrast. */
   --primary: #e0612a;
   --primary-foreground: #ffffff;
-  --brand-text: #b04a20;
-  --brand-tint: #fbeee6;
-  /* Primary buttons: a soft charcoal rather than near-black, so they don't punch holes in the page. */
+  --brand-text: #a8471f;
+  --brand-tint: #f1dfd4;
+  /* Primary buttons: soft charcoal with white text. */
   --ink: #30343d;
+  --ink-foreground: #ffffff;
   --ink-hover: #3b404a;
   --ink-active: #262930;
-  --secondary: #f3f4f6;
+  --secondary: #e3e5e9;
   --secondary-foreground: #17191f;
-  --muted: #f3f4f6;
-  --muted-foreground: #4b5160;
-  --accent: #f3f4f6;
+  --muted: #e3e5e9;
+  --muted-foreground: #454b59;
+  --accent: #e3e5e9;
   --accent-foreground: #17191f;
   --destructive: #b91c1c;
   --destructive-foreground: #ffffff;
-  --border: #e6e7eb;
-  --input: #d9dbe0;
+  --border: #dcdfe4;
+  --input: #cfd3d9;
   --ring: #e0612a;
   --radius: 0.625rem;
 
-  /* Surfaces — page white, chrome a step grey, raised things white with a border */
-  --surface-page: #ffffff;
-  --surface-sidebar: #f7f7f8;
-  --surface-subtle: #f7f7f8;
-  --surface-card: #ffffff;
-  --surface-input: #ffffff;
-  --surface-hover: #f2f3f5;
-  --surface-pressed: #eaebee;
+  --surface-page: #ebedf0;
+  --surface-sidebar: #e3e5e9;
+  --surface-subtle: #eef0f2;
+  --surface-card: #f8f9fa;
+  --surface-input: #fbfbfc;
+  --surface-hover: #e9ebee;
+  --surface-pressed: #dfe2e6;
+  --nav-hover: #d9dce1;
+  --video: #1d2026;
 
-  --border-subtle: #e6e7eb;
-  --border-sidebar: #e6e7eb;
-  --border-strong: #d4d6dc;
+  --border-subtle: #dcdfe4;
+  --border-sidebar: #d4d7dd;
+  --border-strong: #c6cad1;
 
-  --text-secondary: #4b5160;
+  --text-secondary: #454b59;
   --text-label: #2f333c;
-  --text-tertiary: #6b7180;
+  --text-tertiary: #5f6572;
   --text-placeholder: #8b909a;
 
   --success: #15803d;
-  --success-tint: #f0fdf4;
+  --success-tint: #e8f5ec;
   --warning: #b45309;
-  --warning-tint: #fffbeb;
+  --warning-tint: #fbf1e1;
   --danger: #b91c1c;
-  --danger-tint: #fef2f2;
+  --danger-tint: #fbeaea;
+  --danger-solid: #b91c1c;
+  --danger-solid-hover: #9f1818;
+  --danger-solid-active: #861414;
+
+  --chart-views: #e0612a;
+  --chart-reach: #9aa0ab;
+  --chart-grid: #e1e4e8;
+  --chart-cursor: #c6cad1;
 
   --shadow-raised: 0 1px 2px rgba(23, 25, 31, 0.05);
   --shadow-overlay: 0 1px 2px rgba(23, 25, 31, 0.06), 0 8px 24px -6px rgba(23, 25, 31, 0.12);
+}
+
+/* Dark: charcoal rather than the old pure black, with orange carrying the brand and the primary action. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #131418;
+  --foreground: #ebecef;
+  --card: #1b1c21;
+  --card-foreground: #ebecef;
+  --popover: #1f2026;
+  --popover-foreground: #ebecef;
+  --primary: #ec6f36;
+  --primary-foreground: #1a0f09;
+  --brand-text: #f39062;
+  --brand-tint: #2b1e17;
+  --ink: #ec6f36;
+  --ink-foreground: #1a0f09;
+  --ink-hover: #f27f4a;
+  --ink-active: #dc6129;
+  --secondary: #24252b;
+  --secondary-foreground: #ebecef;
+  --muted: #24252b;
+  --muted-foreground: #b0b4bd;
+  --accent: #24252b;
+  --accent-foreground: #ebecef;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #2a2c33;
+  --input: #383a42;
+  --ring: #ec6f36;
+
+  --surface-page: #131418;
+  --surface-sidebar: #0f1013;
+  --surface-subtle: #18191e;
+  --surface-card: #1b1c21;
+  --surface-input: #16171b;
+  --surface-hover: #24252b;
+  --surface-pressed: #2c2e35;
+  --nav-hover: #1d1e23;
+  --video: #0b0c0e;
+
+  --border-subtle: #2a2c33;
+  --border-sidebar: #202227;
+  --border-strong: #3a3d45;
+
+  --text-secondary: #b0b4bd;
+  --text-label: #d4d6db;
+  --text-tertiary: #8a8f9a;
+  --text-placeholder: #6a6f79;
+
+  --success: #4ade80;
+  --success-tint: #12261b;
+  --warning: #f5b544;
+  --warning-tint: #2a2112;
+  --danger: #f87171;
+  --danger-tint: #2d1717;
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #e23b3b;
+  --danger-solid-active: #c51f1f;
+
+  --chart-views: #ec6f36;
+  --chart-reach: #6b717c;
+  --chart-grid: #26282e;
+  --chart-cursor: #3a3d45;
+
+  --shadow-raised: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -97,6 +177,14 @@
   --color-brand-text: var(--brand-text);
   --color-brand-tint: var(--brand-tint);
   --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-nav-hover: var(--nav-hover);
+  --color-video: var(--video);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
+  --color-danger-solid-active: var(--danger-solid-active);
+  --color-chart-views: var(--chart-views);
+  --color-chart-reach: var(--chart-reach);
   --color-ink-hover: var(--ink-hover);
   --color-ink-active: var(--ink-active);
   --color-success: var(--success);
@@ -151,6 +239,11 @@ body {
     touch-action: manipulation;
   }
 
+  /* One icon weight across the app, a touch lighter than lucide's default. */
+  svg.lucide[stroke-width="2"] {
+    stroke-width: 1.75;
+  }
+
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -166,7 +259,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(224, 97, 42, 0.16);
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 @keyframes shimmer-sweep {

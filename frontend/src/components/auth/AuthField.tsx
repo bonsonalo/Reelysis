@@ -21,7 +21,7 @@ type AuthFieldProps = {
 
 /** Shared text input style: white field, hairline border, brand focus halo. */
 export const inputClassName =
-  'h-10 w-full rounded-md border border-input bg-white px-3 text-sm text-foreground shadow-raised transition-[border-color,box-shadow] duration-150 placeholder:text-text-placeholder hover:border-border-strong focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:opacity-70'
+  'h-10 w-full rounded-md border border-input bg-surface-input px-3 text-sm text-foreground shadow-raised transition-[border-color,box-shadow] duration-150 placeholder:text-text-placeholder hover:border-border-strong focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:opacity-70'
 
 export function AuthField({
   id,

@@ -129,8 +129,8 @@ export function SettingsNotice({
       className={cn(
         'rounded-[10px] border px-3 py-2.5 text-sm leading-relaxed sm:px-4',
         tone === 'success'
-          ? 'border-green-200 bg-success-tint text-success'
-          : 'border-red-200 bg-danger-tint text-danger',
+          ? 'border-success/25 bg-success-tint text-success'
+          : 'border-danger/25 bg-danger-tint text-danger',
       )}
       role={tone === 'error' ? 'alert' : 'status'}
     >
@@ -170,7 +170,7 @@ export function SettingsDangerZone({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-[10px] border border-red-200 bg-surface-card">
+    <section className="rounded-[10px] border border-danger/25 bg-surface-card">
       <div className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -183,7 +183,7 @@ export function SettingsDangerZone({
 }
 
 export const dangerButtonClass =
-  'w-full border-red-200 text-danger hover:border-red-300 hover:bg-danger-tint sm:w-auto'
+  'w-full border-danger/25 text-danger hover:border-danger/40 hover:bg-danger-tint sm:w-auto'
 
 export function getDisplayName(name?: string | null, email?: string | null) {
   if (name?.trim()) return name.trim()

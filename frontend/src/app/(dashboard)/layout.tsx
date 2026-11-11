@@ -55,7 +55,7 @@ export default function DashboardLayout({
     <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background text-foreground print:block print:h-auto print:overflow-visible print:bg-white print:text-black">
       <div
         className={cn(
-          'print:hidden fixed inset-0 z-40 bg-foreground/30 transition-opacity lg:hidden',
+          'print:hidden fixed inset-0 z-40 bg-black/40 transition-opacity lg:hidden',
           isMobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',

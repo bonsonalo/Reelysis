@@ -4,12 +4,12 @@ import { useState } from 'react'
 import {
   BarChart3,
   Check,
+  Clapperboard,
   ChevronDown,
   FileText,
   Layers,
   ListChecks,
-  Target,
-  Users2,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -52,7 +52,7 @@ export function LandingStepsRow({
       {steps.map((item) => (
         <li key={item.step} className="relative">
           <div className="flex items-center gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-strong bg-white text-[13px] font-semibold tabular-nums text-foreground">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-card text-[13px] font-semibold tabular-nums text-foreground">
               {item.step}
             </span>
             <span className="hidden h-px flex-1 bg-border-subtle md:block" aria-hidden />
@@ -69,9 +69,9 @@ export function LandingStepsRow({
 
 const capabilityIcons: Record<string, LucideIcon> = {
   Dashboard: BarChart3,
-  Reels: Target,
+  Reels: Clapperboard,
   Themes: Layers,
-  Competitors: Users2,
+  Competitors: UsersRound,
   Reports: FileText,
   Roadmap: ListChecks,
 }
@@ -83,7 +83,7 @@ export function LandingFeatureGrid({
   items: { tag: string; title: string; description: string }[]
 }) {
   return (
-    <div className="grid overflow-hidden rounded-xl border border-border-subtle bg-white sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid overflow-hidden rounded-xl border border-border-subtle bg-surface-card sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => {
         const Icon = capabilityIcons[item.tag] ?? BarChart3
         return (
@@ -91,8 +91,10 @@ export function LandingFeatureGrid({
             key={item.title}
             className="-mb-px -mr-px border-b border-r border-border-subtle p-6 md:p-7"
           >
-            <Icon className="h-[18px] w-[18px] text-primary" aria-hidden />
-            <h3 className="mt-4 text-[15px] font-semibold text-foreground">{item.title}</h3>
+            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
+              <Icon className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden />
+              {item.title}
+            </h3>
             <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">
               {item.description}
             </p>
@@ -136,7 +138,7 @@ function ReportExcerpt() {
 
   return (
     <figure
-      className="rounded-xl border border-border-subtle bg-white p-6 shadow-overlay sm:p-8"
+      className="rounded-xl border border-border-subtle bg-surface-card p-6 shadow-overlay sm:p-8"
       aria-label="Excerpt from an example strategy report"
     >
       <p className="text-[12px] text-text-tertiary">Example report for a fitness account, based on 30 Reels</p>
@@ -157,8 +159,8 @@ function ReportExcerpt() {
               className={cn(
                 'mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded border',
                 action.done
-                  ? 'border-foreground bg-foreground text-white'
-                  : 'border-border-strong bg-white',
+                  ? 'border-ink bg-ink text-ink-foreground'
+                  : 'border-border-strong bg-surface-card',
               )}
               aria-hidden
             >
@@ -190,7 +192,7 @@ export function LandingBenchmarkSplit({
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-start lg:gap-16">
       <div
-        className="overflow-hidden rounded-xl border border-border-subtle bg-white shadow-overlay"
+        className="overflow-hidden rounded-xl border border-border-subtle bg-surface-card shadow-overlay"
         role="img"
         aria-label="Example competitor benchmark table"
       >
@@ -211,7 +213,7 @@ export function LandingBenchmarkSplit({
               <span
                 className={cn(
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-                  row.you ? 'bg-primary text-white' : 'bg-surface-hover text-text-secondary',
+                  row.you ? 'bg-primary text-primary-foreground' : 'bg-surface-hover text-text-secondary',
                 )}
               >
                 {row.handle.slice(0, 1).toUpperCase()}

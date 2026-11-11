@@ -314,7 +314,7 @@ export default function DashboardPage() {
                 Views
               </span>
               <span className="inline-flex items-center gap-2 text-[13px] text-text-label">
-                <span className="h-0.5 w-3 rounded-full bg-[#9aa0ab]" />
+                <span className="h-0.5 w-3 rounded-full bg-chart-reach" />
                 Reach
               </span>
             </div>
@@ -358,7 +358,7 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : isCompetitorsError ? (
-              <p className="rounded-md border border-amber-200 bg-warning-tint px-3 py-2 text-sm text-warning">
+              <p className="rounded-md border border-warning/30 bg-warning-tint px-3 py-2 text-sm text-warning">
                 Couldn&apos;t load competitors right now.
               </p>
             ) : (competitors || []).length > 0 ? (

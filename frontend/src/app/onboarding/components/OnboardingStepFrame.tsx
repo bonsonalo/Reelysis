@@ -37,9 +37,9 @@ function OnboardingProgress({ stage }: { stage: OnboardingStage }) {
             <span
               className={cn(
                 'flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums',
-                done && 'bg-ink text-white',
-                active && 'bg-primary text-white',
-                !done && !active && 'border border-border-strong bg-white text-text-tertiary',
+                done && 'bg-foreground text-background',
+                active && 'bg-primary text-primary-foreground',
+                !done && !active && 'border border-border-strong bg-surface-card text-text-tertiary',
               )}
               aria-hidden
             >
@@ -88,7 +88,7 @@ export function OnboardingCard({ children, className }: { children: React.ReactN
   return (
     <div
       className={cn(
-        'rounded-xl border border-border-subtle bg-white p-6 shadow-overlay sm:p-8',
+        'rounded-xl border border-border-subtle bg-surface-card p-6 shadow-overlay sm:p-8',
         className,
       )}
     >

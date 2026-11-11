@@ -422,7 +422,7 @@ function OnboardingContent() {
       return (
         <OnboardingStepFrame narrow>
           <OnboardingCard className="text-center">
-            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-green-200 bg-success-tint">
+            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-success/25 bg-success-tint">
               <Check className="h-6 w-6 text-success" strokeWidth={2} />
             </div>
             <h1 className="text-xl font-semibold tracking-[-0.015em] text-foreground">

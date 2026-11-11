@@ -49,13 +49,13 @@ export default function LoginForm() {
 
       <form onSubmit={handleLogin} className="space-y-4">
         {justReset && !error && (
-          <div className="rounded-md border border-green-200 bg-success-tint px-3 py-2.5 text-sm text-success">
+          <div className="rounded-md border border-success/25 bg-success-tint px-3 py-2.5 text-sm text-success">
             Password updated. Please sign in with your new password.
           </div>
         )}
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
+          <div className="rounded-md border border-danger/25 bg-danger-tint px-3 py-2.5 text-sm text-danger">
             {error}
           </div>
         )}

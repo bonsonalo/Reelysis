@@ -196,7 +196,7 @@ export default function ReportDetailPage() {
                   className={cn(
                     'rounded-md px-2.5 py-1 text-xs capitalize transition-colors duration-150 md:px-3 md:py-1.5 md:text-sm',
                     filter === value
-                      ? 'bg-white font-medium text-foreground shadow-raised'
+                      ? 'bg-surface-card font-medium text-foreground shadow-raised'
                       : 'text-text-secondary hover:text-foreground',
                   )}
                 >
@@ -236,7 +236,7 @@ export default function ReportDetailPage() {
                         className={cn(
                           'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-[color,background-color,border-color] duration-150',
                           isCompleted
-                            ? 'border-green-300 bg-success-tint text-success hover:border-green-400'
+                            ? 'border-success/35 bg-success-tint text-success hover:border-success/50'
                             : 'border-border-strong bg-transparent text-transparent hover:border-border-strong hover:bg-surface-hover',
                         )}
                       >
@@ -290,7 +290,7 @@ export default function ReportDetailPage() {
             </p>
           </div>
           <Panel className="print-scroll-reset p-5 md:p-8">
-            <div className="prose prose-sm max-w-[68ch] md:prose-base prose-headings:font-semibold prose-headings:tracking-[-0.01em] prose-h1:text-xl prose-h1:mb-3 prose-h2:text-base prose-h3:text-[15px] prose-li:marker:text-text-placeholder prose-headings:text-foreground prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-brand-text">
+            <div className="prose dark:prose-invert prose-sm max-w-[68ch] md:prose-base prose-headings:font-semibold prose-headings:tracking-[-0.01em] prose-h1:text-xl prose-h1:mb-3 prose-h2:text-base prose-h3:text-[15px] prose-li:marker:text-text-placeholder prose-headings:text-foreground prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-brand-text">
               <Markdown>{report.report_markdown}</Markdown>
             </div>
           </Panel>

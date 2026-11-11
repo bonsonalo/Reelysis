@@ -96,7 +96,7 @@ export function ProcessStatus({
       )}
 
       {errorMessage && (
-        <p className="mt-4 rounded-[10px] border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
+        <p className="mt-4 rounded-[10px] border border-danger/25 bg-danger-tint px-3 py-2.5 text-sm text-danger">
           {errorMessage}
         </p>
       )}

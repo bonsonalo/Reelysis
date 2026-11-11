@@ -12,8 +12,8 @@ export function AuthNotice({
       className={cn(
         'rounded-[10px] border px-4 py-3 text-sm leading-relaxed',
         tone === 'success'
-          ? 'border-green-200 bg-success-tint text-success'
-          : 'border-red-200 bg-danger-tint text-danger',
+          ? 'border-success/25 bg-success-tint text-success'
+          : 'border-danger/25 bg-danger-tint text-danger',
       )}
       role={tone === 'error' ? 'alert' : 'status'}
     >

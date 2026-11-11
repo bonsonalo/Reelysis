@@ -26,7 +26,9 @@ export function PageErrorState({
       )}
       role="alert"
     >
-      <AlertCircle className="mb-4 h-10 w-10 text-danger" />
+      <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-danger-tint">
+        <AlertCircle className="h-5 w-5 text-danger" aria-hidden />
+      </span>
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-text-secondary">{message}</p>
       {onRetry ? (

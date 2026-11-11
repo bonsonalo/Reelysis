@@ -104,8 +104,8 @@ export function SettingsAccountTab({
                   <span
                     className={
                       account.needs_reconnect
-                        ? 'h-1.5 w-1.5 rounded-full bg-amber-500'
-                        : 'h-1.5 w-1.5 rounded-full bg-green-600'
+                        ? 'h-1.5 w-1.5 rounded-full bg-warning'
+                        : 'h-1.5 w-1.5 rounded-full bg-success'
                     }
                     aria-hidden
                   />

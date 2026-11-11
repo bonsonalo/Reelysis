@@ -31,7 +31,7 @@ function scoreTone(score: number) {
 /** The first seconds of the Reel, marked on its timeline: the window a hook score rates. */
 function ReelFrame() {
   return (
-    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-[#1d2026]">
+    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-video">
       <p className="absolute inset-x-2.5 top-[38%] text-center">
         <span className="box-decoration-clone rounded-[3px] bg-white px-1.5 py-0.5 text-[12px] font-bold leading-[1.7] text-[#17191f] sm:text-[13px]">
           {reel.caption}
@@ -55,7 +55,7 @@ export function LandingPreview() {
   return (
     <div className="rounded-2xl border border-border-subtle bg-surface-subtle p-2 sm:p-3">
       <div
-        className="overflow-hidden rounded-xl border border-border-subtle bg-white shadow-overlay"
+        className="overflow-hidden rounded-xl border border-border-subtle bg-surface-card shadow-overlay"
         aria-label="Example Reel analysis in Reelysis"
         role="img"
       >

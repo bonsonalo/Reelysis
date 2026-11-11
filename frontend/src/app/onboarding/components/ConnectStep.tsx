@@ -40,7 +40,7 @@ export function ConnectStep({ onConnect, isConnecting, errorMessage }: ConnectSt
 
         {errorMessage ? (
           <p
-            className="mt-6 rounded-md border border-red-200 bg-danger-tint px-3 py-2.5 text-sm leading-relaxed text-danger"
+            className="mt-6 rounded-md border border-danger/25 bg-danger-tint px-3 py-2.5 text-sm leading-relaxed text-danger"
             role="alert"
           >
             {errorMessage}

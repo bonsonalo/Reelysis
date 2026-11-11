@@ -44,7 +44,7 @@ export function ContentPillarsChart({ data }: ContentPillarsChartProps) {
                 <div className="flex items-center justify-end gap-3">
                   <div className="hidden h-1.5 w-full max-w-[160px] rounded-full bg-surface-hover sm:block" aria-hidden>
                     <div
-                      className={cn('h-full rounded-full', i === 0 ? 'bg-primary' : 'bg-[#9aa0ab]')}
+                      className={cn('h-full rounded-full', i === 0 ? 'bg-primary' : 'bg-chart-reach')}
                       style={{ width: `${top > 0 ? (row.engagement / top) * 100 : 0}%` }}
                     />
                   </div>

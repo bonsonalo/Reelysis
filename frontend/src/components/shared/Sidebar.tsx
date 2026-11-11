@@ -4,17 +4,18 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  BarChart3,
   ChevronsUpDown,
-  Home,
+  Clapperboard,
+  FileText,
+  House,
   LogOut,
   Settings,
-  Users2,
-  Video,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { cn } from '@/lib/utils'
 import { useLogout } from '@/features/auth/hooks/useLogout'
@@ -22,10 +23,10 @@ import { useAuth, useAppDispatch } from '@/store/hook'
 import { closeMobileSidebar } from '@/store/slices/sidebarSlice'
 
 const navigation = [
-  { name: 'Overview', href: '/dashboard', icon: Home },
-  { name: 'Reels', href: '/videos', icon: Video },
-  { name: 'Competitors', href: '/competitors', icon: Users2 },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Overview', href: '/dashboard', icon: House },
+  { name: 'Reels', href: '/videos', icon: Clapperboard },
+  { name: 'Competitors', href: '/competitors', icon: UsersRound },
+  { name: 'Reports', href: '/reports', icon: FileText },
 ]
 
 function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
@@ -59,6 +60,11 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
           className="absolute bottom-full left-3 right-3 mb-1.5 overflow-hidden rounded-lg border border-border-subtle bg-popover p-1 shadow-overlay"
           role="menu"
         >
+          <div className="flex items-center justify-between gap-3 px-2.5 py-1.5">
+            <span className="text-[13px] text-text-secondary">Theme</span>
+            <ThemeToggle compact />
+          </div>
+          <div className="my-1 border-t border-border-subtle" />
           <Link
             href="/settings"
             role="menuitem"
@@ -157,7 +163,7 @@ export function Sidebar() {
                 'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
                 isActive
                   ? 'bg-brand-tint font-medium text-foreground'
-                  : 'text-text-secondary hover:bg-[#eeeff1] hover:text-foreground',
+                  : 'text-text-secondary hover:bg-nav-hover hover:text-foreground',
               )}
             >
               <item.icon
@@ -182,7 +188,7 @@ export function Sidebar() {
             'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
             pathname?.startsWith('/settings')
               ? 'bg-brand-tint font-medium text-foreground'
-              : 'text-text-secondary hover:bg-[#eeeff1] hover:text-foreground',
+              : 'text-text-secondary hover:bg-nav-hover hover:text-foreground',
           )}
         >
           <Settings

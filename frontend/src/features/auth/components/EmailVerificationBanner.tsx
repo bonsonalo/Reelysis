@@ -26,13 +26,13 @@ export function EmailVerificationBanner({ email }: { email?: string }) {
 
   return (
     <div
-      className="print:hidden flex flex-col gap-3 border-b border-amber-200 bg-amber-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+      className="print:hidden flex flex-col gap-3 border-b border-warning/30 bg-warning-tint px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
       role="status"
     >
       <div className="flex min-w-0 gap-3 text-sm leading-relaxed">
         <MailWarning className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <div className="min-w-0">
-          <p className="text-amber-950">
+          <p className="text-foreground">
             Verify your email{email ? <> (<span className="text-foreground">{email}</span>)</> : null} to
             keep your account recoverable.
           </p>

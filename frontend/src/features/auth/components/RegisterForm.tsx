@@ -47,7 +47,7 @@ export default function RegisterForm() {
 
       <form onSubmit={handleRegister} className="space-y-4">
         {error && (
-          <div className="rounded-md border border-red-200 bg-danger-tint px-3 py-2.5 text-sm text-danger">
+          <div className="rounded-md border border-danger/25 bg-danger-tint px-3 py-2.5 text-sm text-danger">
             {error}
           </div>
         )}

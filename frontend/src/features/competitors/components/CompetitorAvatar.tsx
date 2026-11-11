@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Users2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/axios'
 
@@ -10,6 +9,7 @@ type CompetitorAvatarProps = {
   competitorId: string
   handle: string
   className?: string
+  /** @deprecated The fallback is now the handle's initial; kept so callers compile. */
   iconClassName?: string
 }
 
@@ -34,15 +34,20 @@ export function CompetitorAvatar({
   competitorId,
   handle,
   className,
-  iconClassName,
 }: CompetitorAvatarProps) {
   const { data: src, isError } = useCompetitorAvatarUrl(competitorId)
   const [failed, setFailed] = useState(false)
 
   if (!src || isError || failed) {
     return (
-      <div className={cn('flex items-center justify-center bg-surface-pressed', className)}>
-        <Users2 className={cn('text-text-placeholder', iconClassName)} />
+      <div
+        className={cn(
+          'flex items-center justify-center bg-surface-hover text-xs font-medium uppercase text-text-secondary',
+          className,
+        )}
+        aria-hidden
+      >
+        {handle.replace(/^@/, '').slice(0, 1) || '?'}
       </div>
     )
   }

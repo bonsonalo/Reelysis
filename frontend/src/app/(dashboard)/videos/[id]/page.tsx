@@ -278,7 +278,7 @@ export default function VideoDetailPage() {
                   <div
                     className={cn(
                       'h-full rounded-full',
-                      hookScore >= 80 ? 'bg-green-600' : hookScore < 50 ? 'bg-text-placeholder' : 'bg-amber-500',
+                      hookScore >= 80 ? 'bg-success' : hookScore < 50 ? 'bg-text-placeholder' : 'bg-warning',
                     )}
                     style={{ width: `${Math.min(100, Math.max(0, hookScore))}%` }}
                   />

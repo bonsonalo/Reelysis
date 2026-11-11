@@ -47,7 +47,7 @@ export function UserAvatar({ name, email, imageUrl, className }: UserAvatarProps
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-white font-medium tracking-[0.02em] text-text-secondary ring-1 ring-border-strong',
+        'flex shrink-0 items-center justify-center rounded-full bg-surface-card font-medium tracking-[0.02em] text-text-secondary ring-1 ring-border-strong',
         className,
       )}
       aria-hidden

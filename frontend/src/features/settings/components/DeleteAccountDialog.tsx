@@ -69,7 +69,7 @@ function DeleteAccountDialogBody({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-foreground/30"
+        className="absolute inset-0 bg-black/40"
         aria-label="Close dialog"
         disabled={isPending}
         onClick={() => {
@@ -125,7 +125,7 @@ function DeleteAccountDialogBody({
             />
             {error ? (
               <p
-                className="rounded-[10px] border border-red-200 bg-danger-tint px-3 py-2.5 text-sm leading-relaxed text-danger"
+                className="rounded-[10px] border border-danger/25 bg-danger-tint px-3 py-2.5 text-sm leading-relaxed text-danger"
                 role="alert"
               >
                 {error}
