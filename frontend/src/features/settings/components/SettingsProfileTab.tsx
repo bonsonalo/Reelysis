@@ -7,23 +7,28 @@ import { useDeleteAccount } from '@/features/auth/hooks/useAccountSecurity'
 import { DeleteAccountDialog } from './DeleteAccountDialog'
 import {
   getDisplayName,
-  getUserInitials,
   SettingsPanelHeader,
   SettingsRow,
   SettingsSection,
   SettingsDangerZone,
   dangerButtonClass,
 } from './settingsUi'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 
 type SettingsProfileTabProps = {
   name?: string | null
   email?: string
   emailVerified?: boolean
+  avatarUrl?: string | null
 }
 
-export function SettingsProfileTab({ name, email, emailVerified }: SettingsProfileTabProps) {
+export function SettingsProfileTab({
+  name,
+  email,
+  emailVerified,
+  avatarUrl,
+}: SettingsProfileTabProps) {
   const displayName = getDisplayName(name, email)
-  const initials = getUserInitials(name, email)
   const { mutate: deleteAccount, isPending: isDeleting } = useDeleteAccount()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -47,9 +52,12 @@ export function SettingsProfileTab({ name, email, emailVerified }: SettingsProfi
 
         <div className="px-4 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-white">
-              {initials}
-            </div>
+            <UserAvatar
+              name={name}
+              email={email}
+              imageUrl={avatarUrl}
+              className="h-11 w-11 text-sm"
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
               <p className="mt-0.5 truncate text-sm text-text-secondary">{email || '—'}</p>

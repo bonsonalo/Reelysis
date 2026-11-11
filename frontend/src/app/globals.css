@@ -12,11 +12,15 @@
   --card-foreground: #17191f;
   --popover: #ffffff;
   --popover-foreground: #17191f;
-  /* Brand orange: marks, chart series, focus. Text on white uses --brand-text for contrast. */
-  --primary: #ea580c;
+  /* Brand orange, toned down a step: marks, chart series, focus. Text on white uses --brand-text. */
+  --primary: #e0612a;
   --primary-foreground: #ffffff;
-  --brand-text: #c2410c;
-  --brand-tint: #fff4ec;
+  --brand-text: #b04a20;
+  --brand-tint: #fbeee6;
+  /* Primary buttons: a soft charcoal rather than near-black, so they don't punch holes in the page. */
+  --ink: #30343d;
+  --ink-hover: #3b404a;
+  --ink-active: #262930;
   --secondary: #f3f4f6;
   --secondary-foreground: #17191f;
   --muted: #f3f4f6;
@@ -27,7 +31,7 @@
   --destructive-foreground: #ffffff;
   --border: #e6e7eb;
   --input: #d9dbe0;
-  --ring: #ea580c;
+  --ring: #e0612a;
   --radius: 0.625rem;
 
   /* Surfaces — page white, chrome a step grey, raised things white with a border */
@@ -92,6 +96,9 @@
   --color-border-strong: var(--border-strong);
   --color-brand-text: var(--brand-text);
   --color-brand-tint: var(--brand-tint);
+  --color-ink: var(--ink);
+  --color-ink-hover: var(--ink-hover);
+  --color-ink-active: var(--ink-active);
   --color-success: var(--success);
   --color-success-tint: var(--success-tint);
   --color-warning: var(--warning);
@@ -159,7 +166,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(234, 88, 12, 0.16);
+  background: rgba(224, 97, 42, 0.16);
 }
 
 @keyframes shimmer-sweep {

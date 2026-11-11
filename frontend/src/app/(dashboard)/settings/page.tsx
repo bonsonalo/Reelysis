@@ -138,6 +138,7 @@ function SettingsContent() {
               name={currentUser?.name}
               email={currentUser?.email}
               emailVerified={currentUser?.email_verified}
+              avatarUrl={account?.profile_picture_url}
             />
           )}
 

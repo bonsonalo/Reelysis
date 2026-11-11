@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
+import { UserAvatar } from '@/components/shared/UserAvatar'
+import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { cn } from '@/lib/utils'
 import { useLogout } from '@/features/auth/hooks/useLogout'
 import { useAuth, useAppDispatch } from '@/store/hook'
@@ -26,21 +28,12 @@ const navigation = [
   { name: 'Reports', href: '/reports', icon: BarChart3 },
 ]
 
-function getInitials(name?: string | null, email?: string | null) {
-  if (name?.trim()) {
-    const parts = name.trim().split(/\s+/)
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    }
-    return name.trim().slice(0, 2).toUpperCase()
-  }
-  return (email?.[0] ?? 'U').toUpperCase()
-}
-
 function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname()
   const { currentUser } = useAuth()
   const { mutate: logout } = useLogout()
+  const { data: accounts } = useInstagramAccounts()
+  const account = accounts?.[0]
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -106,9 +99,12 @@ function SidebarUserMenu({ onNavigate }: { onNavigate: () => void }) {
           open && 'bg-surface-pressed',
         )}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-white">
-          {getInitials(currentUser.name, currentUser.email)}
-        </div>
+        <UserAvatar
+          name={currentUser.name}
+          email={currentUser.email}
+          imageUrl={account?.profile_picture_url}
+          className="h-7 w-7 text-[11px]"
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium leading-tight text-foreground">{displayName}</p>
           <p className="truncate text-xs leading-tight text-text-tertiary">{currentUser.email}</p>
@@ -160,8 +156,8 @@ export function Sidebar() {
               className={cn(
                 'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
                 isActive
-                  ? 'bg-white font-medium text-foreground shadow-[0_0_0_1px_var(--border-subtle),var(--shadow-raised)]'
-                  : 'text-text-secondary hover:bg-[#eeeff2] hover:text-foreground',
+                  ? 'bg-brand-tint font-medium text-foreground'
+                  : 'text-text-secondary hover:bg-[#eeeff1] hover:text-foreground',
               )}
             >
               <item.icon
@@ -185,11 +181,18 @@ export function Sidebar() {
           className={cn(
             'group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-150',
             pathname?.startsWith('/settings')
-              ? 'bg-white font-medium text-foreground shadow-[0_0_0_1px_var(--border-subtle),var(--shadow-raised)]'
-              : 'text-text-secondary hover:bg-[#eeeff2] hover:text-foreground',
+              ? 'bg-brand-tint font-medium text-foreground'
+              : 'text-text-secondary hover:bg-[#eeeff1] hover:text-foreground',
           )}
         >
-          <Settings className="h-4 w-4 shrink-0 text-text-tertiary group-hover:text-text-secondary" />
+          <Settings
+            className={cn(
+              'h-4 w-4 shrink-0',
+              pathname?.startsWith('/settings')
+                ? 'text-primary'
+                : 'text-text-tertiary group-hover:text-text-secondary',
+            )}
+          />
           Settings
         </Link>
       </div>

@@ -10,7 +10,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 // not a button fill, so white-on-orange never has to carry 14px text.
 const buttonVariants = {
   default:
-    "bg-foreground text-white shadow-raised hover:bg-[#2b2e36] active:bg-[#0f1014]",
+    "bg-ink text-white shadow-raised hover:bg-ink-hover active:bg-ink-active",
   destructive:
     "bg-danger text-white shadow-raised hover:bg-[#9f1818] active:bg-[#861414]",
   outline:

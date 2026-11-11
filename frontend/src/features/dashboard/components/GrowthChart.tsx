@@ -13,7 +13,7 @@ import { GrowthDataPoint } from "@/features/dashboard/api"
 const chartConfig = {
   views: {
     label: "Views",
-    color: "#ea580c",
+    color: "#e0612a",
   },
   reach: {
     label: "Reach",
@@ -159,7 +159,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
           }
           activeDot={{
             r: 5,
-            fill: "#ea580c",
+            fill: "#e0612a",
             stroke: "#ffffff",
             strokeWidth: 2,
           }}
@@ -170,7 +170,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
               dataKey="viewsLabel"
               position="right"
               offset={8}
-              className="fill-[#c2410c] text-[10px] font-semibold"
+              className="fill-[#b04a20] text-[10px] font-semibold"
             />
           )}
         </Line>

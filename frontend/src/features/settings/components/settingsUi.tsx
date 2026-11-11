@@ -185,17 +185,6 @@ export function SettingsDangerZone({
 export const dangerButtonClass =
   'w-full border-red-200 text-danger hover:border-red-300 hover:bg-danger-tint sm:w-auto'
 
-export function getUserInitials(name?: string | null, email?: string | null) {
-  if (name?.trim()) {
-    const parts = name.trim().split(/\s+/)
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    }
-    return name.trim().slice(0, 2).toUpperCase()
-  }
-  return (email?.[0] ?? 'U').toUpperCase()
-}
-
 export function getDisplayName(name?: string | null, email?: string | null) {
   if (name?.trim()) return name.trim()
   if (email) return email.split('@')[0]

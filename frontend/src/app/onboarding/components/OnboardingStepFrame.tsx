@@ -37,7 +37,7 @@ function OnboardingProgress({ stage }: { stage: OnboardingStage }) {
             <span
               className={cn(
                 'flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums',
-                done && 'bg-foreground text-white',
+                done && 'bg-ink text-white',
                 active && 'bg-primary text-white',
                 !done && !active && 'border border-border-strong bg-white text-text-tertiary',
               )}
