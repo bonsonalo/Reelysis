@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, FileText } from 'lucide-react'
 import { Panel } from '@/components/shared/Panel'
-import { cn } from '@/lib/utils'
+import { cn, parseApiDate } from '@/lib/utils'
 import type { ReportListItem } from '@/features/reports/api'
 
 type ReportsListProps = {
@@ -11,7 +11,7 @@ type ReportsListProps = {
 }
 
 function formatDate(createdAt: string) {
-  return new Date(createdAt).toLocaleDateString(undefined, {
+  return parseApiDate(createdAt).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -19,7 +19,7 @@ function formatDate(createdAt: string) {
 }
 
 function formatRelativeDate(createdAt: string) {
-  const date = new Date(createdAt)
+  const date = parseApiDate(createdAt)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))

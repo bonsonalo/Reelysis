@@ -27,7 +27,7 @@
 
 ## 2. Bugs found and fixed (Nov 2026)
 
-Every fix below is covered by the backend test suite (`backend/tests`, 46 tests) or was checked in the browser, unless marked *(not testable without real API keys)*.
+Every fix below is covered by the backend test suite (`backend/tests`, 58 tests) or was checked in the browser, unless marked *(not testable without real API keys)*.
 
 ### 2.1 Background jobs & timing
 | Sev | Bug | Fix | Where |
@@ -94,7 +94,26 @@ Every fix below is covered by the backend test suite (`backend/tests`, 46 tests)
 | 🟡 | Lint: 11 errors. | 0 errors: four effects converted to derived state, one scoped exception on onboarding's sticky-step effect, shadcn `ui/**` exempt from `no-explicit-any`. | `eslint.config.mjs` |
 | 🟡 | Dead code and two lockfiles. | Duplicate report hooks, legacy roadmap hooks, `ui/spinner.tsx`, `package-lock.json` removed. | — |
 
-### 2.6 Missing features now built
+### 2.6 Found by the end-to-end run (Nov 2026)
+A full browser run (Playwright) against the real API, Celery workers, Postgres and Redis, with a local fake Instagram API (`IG_*_URL` overrides) and `AI_SIMULATION_MODE=true`, found these:
+
+| Sev | Bug | Fix | Where |
+|---|---|---|---|
+| 🔴 | **Every timestamp was off by the viewer's UTC offset**: the API sends naive UTC (`2026-11-11T03:16:45`) and `new Date()` reads it as local time, so a fresh sync showed "8 hours ago" in UTC+8. | `parseApiDate()` treats offset-less values as UTC; used everywhere API dates are parsed. | `lib/utils.ts`, reports pages |
+| 🟠 | **Onboarding showed "Competitor accounts found" over an empty list**: the last competitors poll could land just before the discovery task saved them, and polling stopped when the job finished. | Refetch competitors when discovery succeeds; the message only claims "found" when there are accounts. | `app/onboarding/page.tsx` |
+| 🟠 | **Reconnecting an expired account dropped the user into onboarding** and did not resync, so "Sync failed" stayed up until the next daily run. | Callback returns `reconnected` for an onboarded account, queues a sync and redirects to `/dashboard?reconnected=true`; the dashboard follows any active sync job, not only ones it started. | `instagram_service.py`, `endpoints/instagram.py`, dashboard |
+| 🟠 | **Connecting a different Instagram account mixed its data with the old account's** Reels, competitors and reports. | A different `instagram_user_id` purges the old data first. | `handle_oauth_callback_service` |
+| 🟠 | Any text was accepted as a competitor handle (`@Bad Handle!` was saved and scraped). | `normalize_handle()`: lowercase, `@`/profile URL stripped, `[a-z0-9._]{1,30}`; 422 with a clear message. | `utils/instagram_handle.py`, `competitor_schema.py` |
+| 🟠 | A manually added competitor got another account's profile (followers, name) because the profile refresh took `profiles[0]` without checking the handle. | Use the row whose handle matches (or the only row of a by-URL scrape). | `_refresh_competitor_profiles` |
+| 🟡 | The same Reel showed 13.7% engagement in the list and 11% on its page (interactions/reach vs. a frozen interactions/views score). | Detail page uses interactions/reach from the latest sync, like everywhere else. | `videos/[id]/page.tsx` |
+| 🟡 | First sync showed "+100%" on every stat (no previous sync to compare). | "New" when there is no baseline. | `dashboard_service._format_percent_change`, dashboard |
+| 🟡 | "New Analysis" without a connected account sent a request that 400'd silently. | Shows "Connect Instagram" instead. | dashboard |
+| 🟡 | After verifying email, "Go to dashboard" skipped onboarding; "Read the report" opened the list instead of the new report. | "Continue setup" → `/onboarding` until onboarded; opens `/reports/{newest id}`. | `VerifyEmailStatus.tsx`, onboarding |
+| ⚪ | No favicon (404 on every page). | `app/icon.svg`. | — |
+
+Not a code bug: `next build` failed on this machine fetching Google Fonts over IPv6; `NODE_OPTIONS=--dns-result-order=ipv4first` fixes it (or self-host the fonts with the `geist` package to remove the build-time network call).
+
+### 2.7 Missing features now built
 Password reset, email verification (soft — banner, not a block), change password, delete account, daily auto-sync, Instagram token auto-refresh + reconnect banner, PDF export (browser print), tests + CI. See `PRD.md`.
 
 ---

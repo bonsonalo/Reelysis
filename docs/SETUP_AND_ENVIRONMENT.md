@@ -55,6 +55,7 @@ Optional (defaults shown):
 | `CORS_ORIGINS` | `""` | comma-separated allowed browser origins; also used by the CSRF origin check |
 | `RUN_MIGRATIONS_ON_STARTUP` | `true` | set `false` in production (Render runs migrations pre-deploy) |
 | `LOG_LEVEL` | `INFO` | app log level (read from the environment directly) |
+| `IG_OAUTH_AUTHORIZE_URL` / `IG_OAUTH_TOKEN_URL` / `IG_GRAPH_BASE_URL` | Instagram's real endpoints | override only to point at a local fake Instagram API for end-to-end runs |
 | `TRUSTED_PROXY_HOPS` | `1` | proxies that append to `X-Forwarded-For` (Render = 1; local without a proxy can be 0) |
 | `BRIGHT_DATA_API_KEY` | `""` | empty → Bright Data calls are mocked |
 | `ASSEMBLYAI_API_KEY` | `""` | empty → transcripts stay empty |
@@ -172,7 +173,27 @@ docker run -d --name reelysis-test-redis -p 6380:6379 redis:7
 cd backend && python -m pytest -q
 ```
 
-46 tests (unit + integration). Override the targets with `TEST_DB_URL` / `TEST_REDIS_URL`. If Postgres isn't reachable the integration tests are skipped.
+58 tests (unit + integration). Override the targets with `TEST_DB_URL` / `TEST_REDIS_URL`. If Postgres isn't reachable the integration tests are skipped.
+
+If `next build` fails with "Failed to fetch `Geist` from Google Fonts" while the site is reachable, Node is trying IPv6 first; prefix the command with `NODE_OPTIONS=--dns-result-order=ipv4first`.
+
+### End-to-end run without a Meta app
+
+`backend/scripts/fake_instagram.py` is a local stand-in for Instagram's OAuth and Graph API (one Business account, 20 Reels + 10 photos across two pages, insights, Allow/Cancel consent page). With it and `AI_SIMULATION_MODE=true` the whole product runs offline: signup → verify → connect → sync → niche → competitors → report → dashboard.
+
+```bash
+cd backend && python scripts/fake_instagram.py
+```
+
+Start the API and worker with these extra variables, then use the app at http://localhost:3000 (or drive it with Playwright):
+
+```dotenv
+IG_OAUTH_AUTHORIZE_URL=http://localhost:8090/oauth/authorize
+IG_OAUTH_TOKEN_URL=http://localhost:8090/oauth/access_token
+IG_GRAPH_BASE_URL=http://localhost:8090
+```
+
+To test the reconnect banner, replace the stored token with an invalid one; the fake API answers it with error code 190.
 
 Frontend checks:
 

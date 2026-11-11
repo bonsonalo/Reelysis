@@ -46,7 +46,7 @@ JWT payloads: access `{"sub": email, "id": user_uuid, "token_type": "access", "e
 | Method | Path | Body / Query | Returns | Notes |
 |---|---|---|---|---|
 | GET | `/oauth/start` 🔒 | — | `{oauth_url}` | frontend does `window.location = oauth_url` |
-| GET | `/oauth/callback` | `?code&state` or `?error` (from Instagram) | **302** → `{FRONTEND_URL}/onboarding?connected=true`, or `…?connected=false&error=access_denied\|invalid_state\|connect_failed` | no cookie needed; `state` is looked up in Redis to find the user |
+| GET | `/oauth/callback` | `?code&state` or `?error` (from Instagram) | **302** → `{FRONTEND_URL}/onboarding?connected=true` (new or different account), `/dashboard?reconnected=true` (same onboarded account after its token expired; a sync is queued), or `…?connected=false&error=access_denied\|invalid_state\|connect_failed` | no cookie needed; `state` is looked up in Redis to find the user |
 | GET | `/accounts` 🔒 | — | account list (0 or 1 item) | account fields + `token_expires_at` and `needs_reconnect` (token missing or expired) |
 | DELETE | `/disconnect` 🔒 | — | `{message}` | **hard-deletes** account, token, media, competitors, analyses, reports, jobs |
 | POST | `/sync` 🔒 ⏱ ⚙️ | — | `{message, job_id, status}` | returns the existing job if one is already queued/running; imports up to 50 videos/Reels |
@@ -100,7 +100,7 @@ JWT payloads: access `{"sub": email, "id": user_uuid, "token_type": "access", "e
 | Method | Path | Body | Returns | Notes |
 |---|---|---|---|---|
 | GET | `/` 🔒 | — | `CompetitorAccount[]` | |
-| POST | `/` 🔒 | `{handle}` | `CompetitorAccount` | manual add; max 10; enqueues profile + reels fetch (no job row returned) |
+| POST | `/` 🔒 | `{handle}` (`@name`, `name` or profile URL) | `CompetitorAccount` | manual add; max 10; handle lowercased and must match `[a-z0-9._]{1,30}` (else 422); enqueues profile + reels fetch (no job row returned) |
 | POST | `/discover` 🔒 ⏱ ⚙️ | — | `{message, job_id}` | fresh Gemini suggestions, replaces auto-discovered (keeps manual) |
 | GET | `/{competitor_id}` 🔒 | — | `CompetitorAccount` | |
 | GET | `/{competitor_id}/avatar` 🔒 | — | image bytes (`Cache-Control: private, max-age=3600`) | server-side proxy because Instagram's CDN blocks hotlinking; cached in Redis 7 days |

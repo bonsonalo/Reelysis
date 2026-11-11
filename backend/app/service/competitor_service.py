@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.utils.instagram_handle import normalize_handle as _normalize_handle
 from app.core.database import AsyncSessionLocal, run_async_task
 from app.core.logger import logger
 from app.core.celery_app import celery_app
@@ -118,13 +119,6 @@ async def _purge_auto_discovered_competitors(db: AsyncSession, user_id: UUID) ->
             continue
         await db.delete(competitor)
     await db.commit()
-
-
-def _normalize_handle(handle: str) -> str:
-    cleaned = handle.strip().lstrip("@")
-    if not cleaned:
-        raise ValueError("Instagram handle is required.")
-    return cleaned
 
 
 async def add_competitor_by_handle_service(user_id: UUID, handle: str, db: AsyncSession):
@@ -906,8 +900,14 @@ async def _refresh_competitor_profiles(
                 from app.core.client.social_data import normalize_competitor_profiles
 
                 profiles = normalize_competitor_profiles(raw)
-                if profiles:
-                    await _enrich_competitor_from_provider_entry(db, comp_id, profiles[0])
+                # Only trust a row that belongs to this handle; a lone row is the by-URL scrape result.
+                wanted = competitor.handle.lower()
+                profile = next(
+                    (p for p in profiles if (p.get("handle") or "").lower() == wanted),
+                    profiles[0] if len(profiles) == 1 else None,
+                )
+                if profile:
+                    await _enrich_competitor_from_provider_entry(db, comp_id, profile)
                     competitor.last_synced_at = utc_now()
                     db.add(competitor)
             else:

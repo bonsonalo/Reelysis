@@ -350,3 +350,97 @@ async def test_expired_token_flags_reconnect_and_is_not_auto_synced(client, sent
     accounts = (await client.get("/api/v1/instagram/accounts")).json()
     assert accounts[0]["needs_reconnect"] is True and accounts[0]["username"] == "creator"
     assert scheduled_service.enqueue_due_syncs_task() == 0
+
+
+# ---------- Instagram connect / reconnect ----------
+
+def _fake_meta(monkeypatch, ig_user_id="ig1", username="creator"):
+    from app.service import instagram_service
+
+    async def exchange_code(code):
+        return {"access_token": "short"}
+
+    async def long_lived(token):
+        return {"access_token": "long", "expires_in": 5184000}
+
+    async def account(token):
+        return {"id": ig_user_id, "username": username, "account_type": "CREATOR", "followers_count": 10, "media_count": 3}
+
+    monkeypatch.setattr(instagram_service.meta_client, "exchange_code_for_access_token", exchange_code)
+    monkeypatch.setattr(instagram_service.meta_client, "exchange_for_long_lived_token", long_lived)
+    monkeypatch.setattr(instagram_service.meta_client, "get_instagram_account", account)
+
+
+async def _oauth_callback(client):
+    from urllib.parse import parse_qs, urlparse
+
+    oauth_url = (await client.get("/api/v1/instagram/oauth/start")).json()["oauth_url"]
+    state = parse_qs(urlparse(oauth_url).query)["state"][0]
+    return await client.get(f"/api/v1/instagram/oauth/callback?code=abc&state={state}")
+
+
+def _mark_onboarded(user_id):
+    from app.model.instagram_accounts import InstagramAccount
+
+    with Session(sync_engine) as db:
+        account = db.exec(select(InstagramAccount).where(InstagramAccount.user_id == user_id)).one()
+        account.niche_confirmed = "Fitness"
+        db.add(account)
+        db.add(MediaItem(user_id=user_id, external_media_id="m1", media_type="VIDEO", caption="", permalink="", thumbnail_url="", audio_url="", published_at=utc_now()))
+        db.commit()
+
+
+async def test_reconnecting_same_account_keeps_data_and_resyncs(client, sent_emails, monkeypatch):
+    from app.service import instagram_service
+
+    dispatched = []
+    monkeypatch.setattr(instagram_service, "_dispatch_sync_celery", lambda job_id, user_id: dispatched.append(job_id))
+    _fake_meta(monkeypatch)
+    await signup(client)
+    _connect_instagram(_user_id(), last_synced_days_ago=1, token_expires_in_days=-1)
+    _mark_onboarded(_user_id())
+
+    response = await _oauth_callback(client)
+
+    assert response.headers["location"].endswith("/dashboard?reconnected=true")
+    assert len(dispatched) == 1
+    with Session(sync_engine) as db:
+        assert len(db.exec(select(MediaItem)).all()) == 1
+    accounts = (await client.get("/api/v1/instagram/accounts")).json()
+    assert accounts[0]["needs_reconnect"] is False
+
+
+async def test_connecting_a_different_account_purges_old_data(client, sent_emails, monkeypatch):
+    _fake_meta(monkeypatch, ig_user_id="ig2", username="someone_else")
+    await signup(client)
+    _connect_instagram(_user_id(), last_synced_days_ago=1, token_expires_in_days=30)
+    _mark_onboarded(_user_id())
+
+    response = await _oauth_callback(client)
+
+    assert response.headers["location"].endswith("/onboarding?connected=true")
+    with Session(sync_engine) as db:
+        assert db.exec(select(MediaItem)).all() == []
+    accounts = (await client.get("/api/v1/instagram/accounts")).json()
+    assert [a["username"] for a in accounts] == ["someone_else"]
+    assert accounts[0]["niche_confirmed"] is None
+
+
+# ---------- competitors ----------
+
+async def test_add_competitor_validates_and_normalizes_handle(client, sent_emails, monkeypatch):
+    from app.service import competitor_service
+
+    monkeypatch.setattr(competitor_service.celery_app, "send_task", lambda *a, **k: None)
+    await signup(client)
+
+    bad = await client.post("/api/v1/competitors/", json={"handle": "@Bad Handle!"})
+    assert bad.status_code == 422
+    assert "valid Instagram handle" in bad.text
+
+    good = await client.post("/api/v1/competitors/", json={"handle": "https://www.instagram.com/Gym.Daily/"})
+    assert good.status_code == 200, good.text
+    assert good.json()["handle"] == "gym.daily"
+
+    duplicate = await client.post("/api/v1/competitors/", json={"handle": "@GYM.DAILY"})
+    assert duplicate.status_code == 400

@@ -12,9 +12,8 @@ from app.utils.scoring import normalize_score_0_100
 
 def _format_percent_change(current: float, previous: float) -> str:
     if previous == 0:
-        if current == 0:
-            return "0%"
-        return "+100%"
+        # No earlier sync to compare with: a percentage would be meaningless.
+        return "0%" if current == 0 else "New"
     change = ((current - previous) / previous) * 100
     rounded = round(change, 1)
     if rounded == int(rounded):

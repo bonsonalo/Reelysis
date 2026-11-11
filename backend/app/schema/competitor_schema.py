@@ -1,5 +1,7 @@
 from pydantic import BaseModel, field_validator
 
+from app.utils.instagram_handle import normalize_handle
+
 
 class AddCompetitorRequest(BaseModel):
     handle: str
@@ -7,7 +9,4 @@ class AddCompetitorRequest(BaseModel):
     @field_validator("handle")
     @classmethod
     def normalize_handle(cls, value: str) -> str:
-        cleaned = value.strip().lstrip("@")
-        if not cleaned:
-            raise ValueError("Instagram handle is required.")
-        return cleaned
+        return normalize_handle(value)

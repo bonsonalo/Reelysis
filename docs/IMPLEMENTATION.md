@@ -298,7 +298,7 @@ Instagram CDN URLs (a) refuse hotlinking from other sites and (b) **expire** aft
 - `conftest.py` sets a test environment (simulation mode, rate limits off, SMTP empty) and points at Postgres on **5433** and Redis on **6380** (override with `TEST_DB_URL` / `TEST_REDIS_URL`). It runs the real Alembic migrations once, truncates tables per test, captures outgoing email tokens with `monkeypatch`, and drives the real app through `httpx.ASGITransport`.
 - `test_units.py` — pure helpers: token decoding, SHA-256 vs a 72-byte shared prefix, password rules, score normalisation, DB URL normalisation, proxy-aware IP, Origin parsing, Reels-only filter, insight parsing, competitor media parsing, heartbeat age, report thresholds.
 - `test_api.py` — integration: signup/login, 401 not 500, refresh rotation + old-token rejection, multi-device logout, verify/resend, forgot/reset/expired link, change password, delete account, CSRF, OAuth callback errors, heartbeat reconciliation, job ownership, dashboard pagination, scheduler, reconnect flag.
-- 46 tests (with parametrisation); `pytest.ini` uses a session-scoped asyncio loop so the global async engine works across tests.
+- 58 tests (with parametrisation); `pytest.ini` uses a session-scoped asyncio loop so the global async engine works across tests.
 - CI (`.github/workflows/ci.yml`) runs them with Postgres/Redis service containers, plus frontend `tsc --noEmit`, `lint` and `build`.
 
 ---

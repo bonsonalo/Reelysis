@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     IG_APP_ID: str
     IG_APP_SECRET: str
     IG_REDIRECT_URI: str
+    # Overridable so end-to-end runs can point at a local fake Instagram API
+    IG_OAUTH_AUTHORIZE_URL: str = "https://www.instagram.com/oauth/authorize"
+    IG_OAUTH_TOKEN_URL: str = "https://api.instagram.com/oauth/access_token"
+    IG_GRAPH_BASE_URL: str = "https://graph.instagram.com"
     TOKEN_ENCRYPTION_KEY: str
     REDIS_URL: str
     GEMINI_API_KEY: str

@@ -161,7 +161,12 @@ export default function VideoDetailPage() {
   const detail = analysis?.analysis_detail
   const views = metrics?.view ?? 0
   const hookScore = analysis?.hook_score ?? 0
-  const engagement = analysis?.engagement_score ?? 0
+  // Same definition as the Reels list and dashboard: interactions / reach, from the latest sync.
+  const reach = metrics?.reach ?? 0
+  const engagement =
+    reach > 0
+      ? Math.round(((metrics?.total_interactions ?? 0) / reach) * 1000) / 10
+      : (analysis?.engagement_score ?? 0)
   const confidence = analysis?.confidence ?? 0
   const caption = media.caption?.trim()
   const hasTranscript =

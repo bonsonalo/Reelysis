@@ -18,7 +18,7 @@ import { Panel } from '@/components/shared/Panel'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, ArrowLeft, Check, Download, Loader2, Plus } from 'lucide-react'
 import Markdown from 'react-markdown'
-import { cn, isNotFoundError } from '@/lib/utils'
+import { cn, isNotFoundError, parseApiDate } from '@/lib/utils'
 
 const FILTER_OPTIONS = ['all', 'pending', 'completed'] as const
 type FilterOption = (typeof FILTER_OPTIONS)[number]
@@ -104,7 +104,7 @@ export default function ReportDetailPage() {
 
   const pendingCount = recommendations.filter((r) => r.status === 'pending').length
   const completedCount = recommendations.filter((r) => r.status === 'completed').length
-  const reportDate = new Date(report.created_at).toLocaleDateString(undefined, {
+  const reportDate = parseApiDate(report.created_at).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',

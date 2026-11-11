@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/store/hook'
+import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
+import { isOnboarded } from '@/features/instagram/utils'
 import { getApiErrorMessage } from '@/lib/utils'
 import { useVerifyEmail } from '../hooks/useAccountSecurity'
 import { AuthNotice } from './AuthNotice'
@@ -23,8 +25,12 @@ export default function VerifyEmailStatus() {
     verify(token)
   }, [token, verify])
 
-  const continueHref = isAuthenticated ? '/dashboard' : '/login'
-  const continueLabel = isAuthenticated ? 'Go to dashboard' : 'Sign in'
+  const { data: accounts } = useInstagramAccounts({ enabled: isAuthenticated })
+  const onboarded = isOnboarded(accounts?.[0])
+
+  // Users who verify before connecting Instagram still have onboarding to finish.
+  const continueHref = !isAuthenticated ? '/login' : onboarded ? '/dashboard' : '/onboarding'
+  const continueLabel = !isAuthenticated ? 'Sign in' : onboarded ? 'Go to dashboard' : 'Continue setup'
 
   return (
     <div className="space-y-6">

@@ -14,6 +14,7 @@ import { ReportsPageSkeleton } from '@/components/shared/PageSkeletons'
 import { PageErrorState } from '@/components/shared/PageErrorState'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { parseApiDate } from '@/lib/utils'
 
 export default function ReportsPage() {
   const { data: reports, isLoading, isError, isRefetching, refetch } = useReports()
@@ -78,12 +79,12 @@ export default function ReportsPage() {
   const generating = isGenerating || isStarting
 
   const latestReportTime = reports?.[0]?.created_at
-    ? new Date(reports[0].created_at).getTime()
+    ? parseApiDate(reports[0].created_at).getTime()
     : 0
   const lastJobTime = lastReportJob?.completed_at
-    ? new Date(lastReportJob.completed_at).getTime()
+    ? parseApiDate(lastReportJob.completed_at).getTime()
     : lastReportJob?.created_at
-      ? new Date(lastReportJob.created_at).getTime()
+      ? parseApiDate(lastReportJob.created_at).getTime()
       : 0
   const showFailure =
     !generating &&

@@ -164,7 +164,18 @@ async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession)
         
         existing_account_stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
         existing_account = (await db.exec(existing_account_stmt)).first()
-        
+
+        if existing_account and existing_account.instagram_user_id != instagram_account_data["id"]:
+            # A different Instagram account: never mix its Reels, competitors and reports with the old one.
+            logger.info("User %s connected a different Instagram account; purging old data", user_id)
+            await purge_user_instagram_data_service(user_id, db)
+            existing_account = None
+
+        # Same account coming back after its token expired: keep the data and resync.
+        reconnected = bool(
+            existing_account and existing_account.niche_confirmed and existing_account.last_synced_at
+        )
+
         if existing_account:
             existing_account.instagram_user_id = instagram_account_data["id"]
             existing_account.username = instagram_account_data["username"]
@@ -206,7 +217,9 @@ async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession)
             db.add(external_token)
             
         await db.commit()
-        return True
+        if reconnected:
+            await trigger_instagram_sync_service(user_id, db)
+        return "reconnected" if reconnected else "connected"
     except Exception as e:
         logger.error(f"Error handling OAuth callback: {e}")
         raise ValueError(f"Failed to handle OAuth callback: {str(e)}")

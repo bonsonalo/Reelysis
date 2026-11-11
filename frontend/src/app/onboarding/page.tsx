@@ -13,6 +13,7 @@ import { useConfirmNiche } from '@/features/instagram/hooks/useConfirmNiche'
 import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
 import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
+import { getReports } from '@/features/reports/api'
 import { getReportGenerationUi } from '@/features/reports/utils/reportGenerationProgress'
 import { getCompetitorDiscoveryUi, getInstagramSyncUi } from '@/features/jobs/utils/jobProgressUtils'
 
@@ -104,6 +105,15 @@ function OnboardingContent() {
       return false
     }
   })
+
+  // The list is polled while discovery runs, so the last poll can land just before the
+  // competitors are saved. Fetch once more when discovery finishes.
+  const discoveryStatus = discoveryJob?.status
+  useEffect(() => {
+    if (discoveryStatus === 'succeeded') {
+      queryClient.invalidateQueries({ queryKey: ['competitors'] })
+    }
+  }, [discoveryStatus, queryClient])
 
   const { data: syncJob } = useAnalysisJob('instagram_sync', {
     refetchInterval: (query: { state: { data?: { status?: string } | null } }) => {
@@ -208,6 +218,20 @@ function OnboardingContent() {
   // 4. Handlers
   const handleConnect = () => startOAuth()
 
+  const handleOpenReport = async () => {
+    if (skippedReport) {
+      router.push('/reports')
+      return
+    }
+    // Reports are listed newest first, so the first one is the report just generated.
+    try {
+      const { data } = await getReports()
+      router.push(data[0] ? `/reports/${data[0].id}` : '/reports')
+    } catch {
+      router.push('/reports')
+    }
+  }
+
   const handleRetrySync = () => {
     setHasTriggeredSync(true)
     triggerSync()
@@ -293,7 +317,9 @@ function OnboardingContent() {
             isDiscoveryFailed
               ? discoveryUi.description
               : isDiscoveryDone
-                ? 'Competitor accounts found. Review and confirm your list.'
+                ? competitors && competitors.length > 0
+                  ? 'Competitor accounts found. Review and confirm your list.'
+                  : 'We could not find matching accounts automatically. Add competitors by handle.'
                 : discoveryUi.description
           }
           tasks={isDiscoveryDone ? undefined : discoveryUi.tasks}
@@ -413,7 +439,7 @@ function OnboardingContent() {
                 Go to dashboard
               </Button>
               <Button
-                onClick={() => router.push('/reports')}
+                onClick={handleOpenReport}
                 variant="outline"
                 className="w-full sm:w-auto"
                 size="lg"

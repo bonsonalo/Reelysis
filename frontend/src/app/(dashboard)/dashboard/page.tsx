@@ -38,8 +38,9 @@ function formatNumber(num: number) {
 }
 
 function formatHookPointChange(hookChange?: string, hasScore?: boolean) {
+  // The API sends "0" when there is no earlier score to compare with, "+0" for no change.
   if (!hookChange || hookChange === '0') {
-    return hasScore ? '+0 pts' : '0 pts'
+    return hasScore ? 'New' : '0 pts'
   }
   return `${hookChange} pts`
 }
@@ -91,14 +92,20 @@ export default function DashboardPage() {
     isError: isCompetitorsError,
   } = useCompetitors()
   const { data: latestSyncJob } = useAnalysisJob('instagram_sync')
-  const { data: pendingSyncJob } = useAnalysisJobById(pendingSyncJobId, {
+  // Follow syncs started elsewhere too (reconnect, the daily scheduler, another tab).
+  const activeSyncJobId =
+    pendingSyncJobId ??
+    (latestSyncJob && (latestSyncJob.status === 'queued' || latestSyncJob.status === 'running')
+      ? String(latestSyncJob.id)
+      : null)
+  const { data: pendingSyncJob } = useAnalysisJobById(activeSyncJobId, {
     refetchInterval: pollWhileActive,
   })
 
-  const syncJob = pendingSyncJobId ? pendingSyncJob : latestSyncJob
+  const syncJob = activeSyncJobId ? pendingSyncJob : latestSyncJob
   const syncInProgress =
     isSyncing ||
-    (!!pendingSyncJobId &&
+    (!!activeSyncJobId &&
       (!pendingSyncJob ||
         pendingSyncJob.status === 'queued' ||
         pendingSyncJob.status === 'running'))
@@ -141,14 +148,14 @@ export default function DashboardPage() {
   }, [pendingSyncJobId, queryClient])
 
   useEffect(() => {
-    if (!pendingSyncJobId || !pendingSyncJob) return
+    if (!activeSyncJobId || !pendingSyncJob) return
 
     const isDone =
       pendingSyncJob.status === 'succeeded' || pendingSyncJob.status === 'failed'
     if (!isDone) return
-    if (completedJobIdRef.current === pendingSyncJobId) return
+    if (completedJobIdRef.current === activeSyncJobId) return
 
-    completedJobIdRef.current = pendingSyncJobId
+    completedJobIdRef.current = activeSyncJobId
     queryClient.invalidateQueries({ queryKey: ['analysis-job', 'instagram_sync'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard-growth'] })
@@ -157,7 +164,7 @@ export default function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['instagram-accounts'] })
     refreshDashboardData()
     setPendingSyncJobId(null)
-  }, [pendingSyncJobId, pendingSyncJob, queryClient])
+  }, [activeSyncJobId, pendingSyncJob, queryClient])
 
   const syncUi = getInstagramSyncUi(
     syncJob?.progress ?? 0,
@@ -165,11 +172,16 @@ export default function DashboardPage() {
     !!account?.niche_detected,
   )
 
+  // Accounts loaded and empty: syncing would only 400, so send the user to connect instead.
+  const needsInstagram = accounts !== undefined && !account
+
   const syncStatusLabel = syncInProgress
     ? syncUi.description
     : account?.last_synced_at
       ? `Last synced ${formatLastSynced(account.last_synced_at)}`
-      : 'Run New Analysis to import your Reels'
+      : needsInstagram
+        ? 'Connect Instagram to import your Reels'
+        : 'Run New Analysis to import your Reels'
 
   const pillarRows = pillars?.data ?? []
   const hasVideoAnalysis = stats?.has_video_analysis ?? false
@@ -210,18 +222,24 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-        <Button
-          onClick={handleSync}
-          disabled={syncInProgress}
-          className="w-full shrink-0 sm:w-auto"
-        >
-          <ButtonLoadingLabel loading={syncInProgress} loadingLabel="Syncing…">
-            <>
-              <Plus className="h-4 w-4" />
-              New Analysis
-            </>
-          </ButtonLoadingLabel>
-        </Button>
+        {needsInstagram ? (
+          <Link href="/onboarding" className="w-full shrink-0 sm:w-auto">
+            <Button className="w-full">Connect Instagram</Button>
+          </Link>
+        ) : (
+          <Button
+            onClick={handleSync}
+            disabled={syncInProgress}
+            className="w-full shrink-0 sm:w-auto"
+          >
+            <ButtonLoadingLabel loading={syncInProgress} loadingLabel="Syncing…">
+              <>
+                <Plus className="h-4 w-4" />
+                New Analysis
+              </>
+            </ButtonLoadingLabel>
+          </Button>
+        )}
       </header>
 
       {account?.needs_reconnect && <ReconnectInstagramBanner username={account.username} />}

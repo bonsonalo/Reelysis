@@ -83,7 +83,7 @@ There is no admin role.
 | ID | Requirement | Status | Code |
 |---|---|---|---|
 | FR-IG-1 | `GET /instagram/oauth/start` returns a URL-encoded authorize URL with a random `state`, stored in Redis for 600 s mapped to the user. | ✅ | `get_oauth_url_service`, `meta.get_oauth_url` |
-| FR-IG-2 | The callback validates `state` (single use), exchanges code → short-lived → long-lived token, fetches the profile, upserts the account and Fernet-encrypted token, then 302 → `/onboarding?connected=true`. | ✅ | `handle_oauth_callback_service` |
+| FR-IG-2 | The callback validates `state` (single use), exchanges code → short-lived → long-lived token, fetches the profile, upserts the account and Fernet-encrypted token, then 302 → `/onboarding?connected=true`. Reconnecting the same onboarded account keeps its data, queues a sync and redirects to `/dashboard?reconnected=true`; connecting a different account purges the old account's data first. | ✅ | `handle_oauth_callback_service` |
 | FR-IG-3 | On denial or failure the callback redirects to `/onboarding?connected=false&error=access_denied|invalid_state|connect_failed`; the frontend shows a friendly message. | ✅ 🧪 | `endpoints/instagram.oauth_callback`, `getOAuthErrorMessage` |
 | FR-IG-4 | No OAuth code or token is ever logged. | ✅ | `meta.py` |
 | FR-IG-5 | `GET /instagram/accounts` includes `token_expires_at` and `needs_reconnect`. | ✅ 🧪 | `get_connected_accounts_service` |
@@ -200,7 +200,7 @@ There is no admin role.
 | NFR-9 | Security | Revoked sessions stop working immediately | ⚠️ refresh: immediately; access JWT: until it expires (≤ `ACCESS_TOKEN_EXPIRE_MINUTES`) |
 | NFR-10 | Cost | Never exceed `GEMINI_DAILY_BUDGET`; fail closed without Redis | ✅ |
 | NFR-11 | Privacy | User can delete Instagram data (disconnect) and their whole account | ✅ |
-| NFR-12 | Maintainability | Automated tests and CI | ✅ 46 backend tests; CI runs pytest + tsc + lint + build |
+| NFR-12 | Maintainability | Automated tests and CI | ✅ 58 backend tests; CI runs pytest + tsc + lint + build |
 | NFR-13 | Observability | Error tracking and metrics | ❌ logs only (INFO by default, `LOG_LEVEL`) |
 | NFR-14 | Portability | Runs locally in simulation mode | ✅ |
 

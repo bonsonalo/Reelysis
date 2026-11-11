@@ -5,10 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * The API stores UTC timestamps without an offset ("2026-11-11T03:16:45"), which
+ * `new Date()` would read as local time. Treat offset-less values as UTC.
+ */
+export function parseApiDate(value: string): Date {
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  return new Date(hasOffset || isDateOnly ? value : `${value}Z`)
+}
+
 export function formatLastSynced(isoDate: string | null | undefined): string {
   if (!isoDate) return 'Never synced'
 
-  const date = new Date(isoDate)
+  const date = parseApiDate(isoDate)
   if (Number.isNaN(date.getTime())) return 'Unknown'
 
   const now = new Date()
@@ -58,11 +68,11 @@ export function isLatestSyncAttemptFailed(
   if (!syncJob || syncJob.status !== 'failed' || !syncJob.error_message) return false
   if (!lastSyncedAt) return true
 
-  const lastSuccess = new Date(lastSyncedAt).getTime()
+  const lastSuccess = parseApiDate(lastSyncedAt).getTime()
   const jobTimeSource = syncJob.completed_at || syncJob.created_at
   if (!jobTimeSource) return true
 
-  const jobFinished = new Date(jobTimeSource).getTime()
+  const jobFinished = parseApiDate(jobTimeSource).getTime()
   return jobFinished > lastSuccess
 }
 

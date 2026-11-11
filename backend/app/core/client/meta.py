@@ -5,7 +5,6 @@ import httpx
 from urllib.parse import urlencode
 
 META_HTTP_TIMEOUT = 30.0
-GRAPH_BASE_URL = "https://graph.instagram.com"
 MEDIA_PAGE_SIZE = 25
 
 
@@ -50,12 +49,12 @@ class MetaClient:
             'response_type': 'code',
             'scope': ','.join(scopes),
         })
-        return {'url': f'https://www.instagram.com/oauth/authorize?{query}', 'state': state}
+        return {'url': f'{settings.IG_OAUTH_AUTHORIZE_URL}?{query}', 'state': state}
 
     async def exchange_code_for_access_token(self, code: str):
         async with self._http_client() as client:
             response = await client.post(
-                'https://api.instagram.com/oauth/access_token',
+                settings.IG_OAUTH_TOKEN_URL,
                 data={
                     'client_id': self.app_id.strip(),
                     'client_secret': self.app_secret.strip(),
@@ -73,7 +72,7 @@ class MetaClient:
     async def exchange_for_long_lived_token(self, short_lived_token: str):
         async with self._http_client() as client:
             response = await client.get(
-                f'{GRAPH_BASE_URL}/access_token',
+                f'{settings.IG_GRAPH_BASE_URL}/access_token',
                 params={
                     'grant_type': 'ig_exchange_token',
                     'client_id': self.app_id.strip(),
@@ -88,7 +87,7 @@ class MetaClient:
         """Extend a long-lived token by another ~60 days (token must be ≥24h old and not expired)."""
         async with self._http_client() as client:
             response = await client.get(
-                f'{GRAPH_BASE_URL}/refresh_access_token',
+                f'{settings.IG_GRAPH_BASE_URL}/refresh_access_token',
                 params={
                     'grant_type': 'ig_refresh_token',
                     'access_token': long_lived_token,
@@ -101,7 +100,7 @@ class MetaClient:
     async def get_instagram_account(self, access_token: str):
         async with self._http_client() as client:
             response = await client.get(
-                f'{GRAPH_BASE_URL}/me',
+                f'{settings.IG_GRAPH_BASE_URL}/me',
                 params={
                     'fields': 'id,username,account_type,name,profile_picture_url,followers_count,media_count,biography',
                     'access_token': access_token
@@ -123,7 +122,7 @@ class MetaClient:
     async def get_user_media(self, ig_user_id: str, access_token: str, max_items: int = 50):
         """Follow paging.next until max_items items are collected (newest first)."""
         items: list[dict] = []
-        url = f'{GRAPH_BASE_URL}/me/media'
+        url = f'{settings.IG_GRAPH_BASE_URL}/me/media'
         params: dict | None = {
             'fields': 'id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp',
             'limit': MEDIA_PAGE_SIZE,
@@ -145,7 +144,7 @@ class MetaClient:
         async with self._http_client() as client:
             metrics = 'reach,views,likes,comments,saved,shares,total_interactions'
             response = await client.get(
-                f'{GRAPH_BASE_URL}/{ig_media_id}/insights',
+                f'{settings.IG_GRAPH_BASE_URL}/{ig_media_id}/insights',
                 params={
                     'metric': metrics,
                     'period': 'lifetime',

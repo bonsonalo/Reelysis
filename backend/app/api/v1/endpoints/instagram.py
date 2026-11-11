@@ -62,13 +62,16 @@ async def oauth_callback(
     if not state:
         return back_to_app("invalid_state")
     try:
-        await handle_oauth_callback_service(code, state, db)
+        outcome = await handle_oauth_callback_service(code, state, db)
     except OAuthStateError:
         logger.warning("Instagram OAuth callback with unknown or expired state")
         return back_to_app("invalid_state")
     except Exception:
         logger.exception("Instagram OAuth callback failed")
         return back_to_app("connect_failed")
+    if outcome == "reconnected":
+        # Already onboarded: go back to the app, where the fresh sync shows its progress.
+        return RedirectResponse(url=f"{frontend}/dashboard?reconnected=true", status_code=302)
     return RedirectResponse(url=f"{frontend}/onboarding?connected=true", status_code=302)
 
 @router.get("/accounts")

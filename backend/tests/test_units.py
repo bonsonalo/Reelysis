@@ -21,6 +21,8 @@ from app.service.auth_service import hash_token
 from app.service.instagram_service import _is_syncable, _parse_insight_metrics
 from app.service.job_utils import STALE_RUNNING_SECONDS, last_heartbeat_age
 from app.service.report_service import STRONG_HOOK_SCORE, WINNING_HOOK_SCORE
+from app.service.dashboard_service import _format_percent_change
+from app.utils.instagram_handle import normalize_handle
 from app.utils.password_strength import validate_password_strength
 from app.utils.scoring import normalize_score_0_100
 from app.utils.time import utc_epoch, utc_now
@@ -138,3 +140,23 @@ def test_heartbeat_age_uses_latest_activity():
 def test_report_hook_thresholds_use_0_100_scale():
     # Regression: thresholds were 8/7 on a 0-100 scale, so every competitor video was "winning".
     assert WINNING_HOOK_SCORE == 80 and STRONG_HOOK_SCORE == 70
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [("@Gym_Daily", "gym_daily"), ("fit.coach", "fit.coach"), ("https://instagram.com/abc/?hl=en", "abc")],
+)
+def test_normalize_handle_accepts_handles_and_urls(raw, expected):
+    assert normalize_handle(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["", "@", "bad handle", "semi;colon", "a" * 31])
+def test_normalize_handle_rejects_invalid(raw):
+    with pytest.raises(ValueError):
+        normalize_handle(raw)
+
+
+def test_percent_change_without_baseline_is_new_not_100_percent():
+    assert _format_percent_change(500, 0) == "New"
+    assert _format_percent_change(0, 0) == "0%"
+    assert _format_percent_change(150, 100) == "+50%"
