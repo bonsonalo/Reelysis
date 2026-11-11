@@ -109,9 +109,9 @@ A full browser run (Playwright) against the real API, Celery workers, Postgres a
 | 🟡 | First sync showed "+100%" on every stat (no previous sync to compare). | "New" when there is no baseline. | `dashboard_service._format_percent_change`, dashboard |
 | 🟡 | "New Analysis" without a connected account sent a request that 400'd silently. | Shows "Connect Instagram" instead. | dashboard |
 | 🟡 | After verifying email, "Go to dashboard" skipped onboarding; "Read the report" opened the list instead of the new report. | "Continue setup" → `/onboarding` until onboarded; opens `/reports/{newest id}`. | `VerifyEmailStatus.tsx`, onboarding |
+| 🟡 | `next build` downloaded the Geist fonts from Google Fonts at build time, and failed whenever that request failed (on this machine, Node tried IPv6 first). Any network blip broke CI or a Vercel deploy. | Self-hosted with the `geist` package: font files ship in `node_modules`, no build-time network call. | `app/layout.tsx` |
 | ⚪ | No favicon (404 on every page). | `app/icon.svg`. | — |
 
-Not a code bug: `next build` failed on this machine fetching Google Fonts over IPv6; `NODE_OPTIONS=--dns-result-order=ipv4first` fixes it (or self-host the fonts with the `geist` package to remove the build-time network call).
 
 ### 2.7 Missing features now built
 Password reset, email verification (soft — banner, not a block), change password, delete account, daily auto-sync, Instagram token auto-refresh + reconnect banner, PDF export (browser print), tests + CI. See `PRD.md`.

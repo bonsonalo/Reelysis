@@ -175,8 +175,6 @@ cd backend && python -m pytest -q
 
 58 tests (unit + integration). Override the targets with `TEST_DB_URL` / `TEST_REDIS_URL`. If Postgres isn't reachable the integration tests are skipped.
 
-If `next build` fails with "Failed to fetch `Geist` from Google Fonts" while the site is reachable, Node is trying IPv6 first; prefix the command with `NODE_OPTIONS=--dns-result-order=ipv4first`.
-
 ### End-to-end run without a Meta app
 
 `backend/scripts/fake_instagram.py` is a local stand-in for Instagram's OAuth and Graph API (one Business account, 20 Reels + 10 photos across two pages, insights, Allow/Cancel consent page). With it and `AI_SIMULATION_MODE=true` the whole product runs offline: signup → verify → connect → sync → niche → competitors → report → dashboard.
