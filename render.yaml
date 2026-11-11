@@ -17,7 +17,9 @@ services:
         value: 3.12.3
       - key: RUN_MIGRATIONS_ON_STARTUP
         value: "false"
-      # Set FRONTEND_URL, CORS_ORIGINS, DB_URL, REDIS_URL, secrets, etc. in the dashboard.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      # Set FRONTEND_URL, CORS_ORIGINS, DB_URL, REDIS_URL, SMTP_*, secrets, etc. in the dashboard.
 
   - type: worker
     name: reelysis-worker
@@ -31,4 +33,9 @@ services:
         value: 3.12.3
       - key: RUN_MIGRATIONS_ON_STARTUP
         value: "false"
-      # Copy the same env vars as reelysis-api (DB_URL, REDIS_URL, GEMINI_*, etc.).
+      # split = separate "default" and "slow" Celery processes (~2x RAM); single = one process.
+      - key: WORKER_MODE
+        value: split
+      - key: AUTO_SYNC_ENABLED
+        value: "true"
+      # Copy the same env vars as reelysis-api (DB_URL, REDIS_URL, GEMINI_*, SMTP_*, etc.).

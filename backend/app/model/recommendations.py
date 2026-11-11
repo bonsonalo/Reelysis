@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Relationship, Field, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
@@ -7,6 +8,9 @@ from uuid import UUID, uuid4
 
 class Recommendation(SQLModel, table= True):
     __tablename__= "recommendations"
+    __table_args__ = (
+        Index("ix_recommendations_account_report_id", "account_report_id"),
+    )
 
     id: UUID= Field(
         default_factory= uuid4,

@@ -1,6 +1,5 @@
 import asyncio
 import json
-from datetime import datetime
 from uuid import UUID
 from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -8,7 +7,7 @@ from fastapi import HTTPException
 
 from app.utils.time import utc_now
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, run_async_task
 from app.core.logger import logger
 from app.core.celery_app import celery_app
 from app.model.video_analysis import VideoAnalysis, MediaSource
@@ -20,47 +19,31 @@ from app.core.config import settings
 from app.service.competitor_service import prepare_competitor_data_for_report
 from app.service.transcript_service import run_transcription_sync
 from app.service.video_analysis_service import run_video_analysis_sync
+from app.service.job_utils import (
+    heartbeat_sync,
+    job_should_start,
+    mark_failed,
+    mark_running,
+    mark_succeeded,
+    reconcile_job,
+    set_progress,
+)
 
-STALE_RUNNING_REPORT_SECONDS = 10 * 60
-STALE_QUEUED_REPORT_SECONDS = 180
-
-
-def _report_job_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
-    reference = now or utc_now()
-    started = job.started_at
-    if started is None or started.year <= 1971:
-        return max(0.0, (reference - job.created_at).total_seconds())
-    return max(0.0, (reference - started).total_seconds())
+# Thresholds for a "high" hook score on the 0-100 scale used everywhere.
+WINNING_HOOK_SCORE = 80
+STRONG_HOOK_SCORE = 70
 
 
 async def reconcile_report_generation_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
-    """Fail report jobs left running too long (e.g. worker restart mid-task)."""
-    if job.job_type != "report_generation" or job.status not in ("queued", "running"):
+    """Fail report jobs whose worker stopped heartbeating (e.g. restart mid-task)."""
+    if job.job_type != "report_generation":
         return job
-
-    now = utc_now()
-    age = _report_job_age_seconds(job, now)
-
-    if job.status == "queued" and age >= STALE_QUEUED_REPORT_SECONDS:
-        logger.warning("Failing stale queued report_generation job %s (age %.0fs)", job.id, age)
-        job.status = "failed"
-        job.error_message = "Report timed out before starting. Wake the worker and try again."
-        job.completed_at = now
-        db.add(job)
-        await db.commit()
-        await db.refresh(job)
-        return job
-
-    if job.status == "running" and age >= STALE_RUNNING_REPORT_SECONDS:
-        logger.warning("Failing stale report_generation job %s (age %.0fs)", job.id, age)
-        job.status = "failed"
-        job.error_message = "Report generation timed out. Please try again."
-        job.completed_at = now
-        db.add(job)
-        await db.commit()
-        await db.refresh(job)
-
-    return job
+    return await reconcile_job(
+        job,
+        db,
+        queued_message="Report timed out before starting. Wake the worker and try again.",
+        running_message="Report generation was interrupted. Please try again.",
+    )
 
 
 async def trigger_report_generation_service(user_id: UUID, db: AsyncSession):
@@ -103,32 +86,31 @@ async def trigger_report_generation_service(user_id: UUID, db: AsyncSession):
 
 @celery_app.task(name="app.service.report_service.generate_report_task")
 def generate_report_task(job_id: str, user_id: str):
-    return asyncio.run(_generate_report_internal(job_id, user_id))
+    return run_async_task(_generate_report_internal, job_id, user_id)
 
 async def _generate_report_internal(job_id: str, user_id: str):
     async with AsyncSessionLocal() as db:
         job: AnalysisJob | None = None
         try:
             job = await db.get(AnalysisJob, UUID(job_id))
-            if not job:
+            if not job_should_start(job):
                 return
-            
-            job.status = "running"
-            job.started_at = utc_now()
-            job.progress = 2
+
+            mark_running(job, progress=2)
             await db.commit()
 
             user_uuid = UUID(user_id)
+            heartbeat = lambda: heartbeat_sync(job_id)  # noqa: E731 — called from worker threads
 
             # 1. Refresh competitor profiles + reels when stale (batch Bright Data).
             await prepare_competitor_data_for_report(db, user_uuid, job)
 
-            job.progress = max(job.progress, 58)
+            set_progress(job, max(job.progress, 58))
             await db.commit()
 
             # 2. Transcribe + analyze any pending media before building the brief.
-            await asyncio.to_thread(run_transcription_sync, user_uuid)
-            job.progress = 70
+            await asyncio.to_thread(run_transcription_sync, user_uuid, heartbeat)
+            set_progress(job, 70)
             await db.commit()
 
             video_budget = remaining_gemini_budget(reserve=settings.GEMINI_REPORT_RESERVE)
@@ -138,15 +120,15 @@ async def _generate_report_internal(job_id: str, user_id: str):
                     "Try again tomorrow, or run competitor discovery on a different day."
                 )
 
-            await asyncio.to_thread(run_video_analysis_sync, user_uuid, video_budget)
-            job.progress = 82
+            await asyncio.to_thread(run_video_analysis_sync, user_uuid, video_budget, heartbeat)
+            set_progress(job, 82)
             await db.commit()
 
             # 3. Harvest and aggregate analysis data.
             user_brief = await _prepare_user_brief(db, user_uuid)
             competitor_brief = await _prepare_competitor_brief(db, user_uuid)
-            
-            job.progress = 88
+
+            set_progress(job, 88)
             await db.commit()
 
             # 4. Call AI strategist.
@@ -157,53 +139,53 @@ async def _generate_report_internal(job_id: str, user_id: str):
                 )
 
             report_data = await generate_strategic_report_service(user_brief, competitor_brief)
+            if report_data is None:
+                raise RuntimeError("The AI strategist is not configured (missing GEMINI_API_KEY).")
 
-            job.progress = 95
+            set_progress(job, 95)
             await db.commit()
 
-            # 5. Save the final report.
+            # 5. Save the report, its roadmap and the job outcome in one transaction.
+            now = utc_now()
             report = AccountReport(
-                user_id=UUID(user_id),
-                title=f"Growth Strategy - {datetime.now().strftime('%B %Y')}",
+                user_id=user_uuid,
+                title=f"Growth Strategy - {now.strftime('%B %Y')}",
                 status="ready",
                 summary=report_data.summary,
                 report_json=report_data.model_dump(),
                 report_markdown=report_data.report_markdown,
-                created_at=utc_now(),
-                updated_at=utc_now()
+                created_at=now,
+                updated_at=now,
             )
             db.add(report)
-            await db.commit()
-            await db.refresh(report)
+            await db.flush()
 
-            # 6. Save individual roadmap recommendations.
             for item in report_data.roadmap:
-                rec = Recommendation(
-                    user_id=UUID(user_id),
-                    account_report_id=report.id,
-                    recommedation_type=item.type,
-                    title=item.title,
-                    description=item.description,
-                    priority=item.priority,
-                    evidence=item.evidence,
-                    status="pending"
+                db.add(
+                    Recommendation(
+                        user_id=user_uuid,
+                        account_report_id=report.id,
+                        recommedation_type=item.type,
+                        title=item.title,
+                        description=item.description,
+                        priority=item.priority,
+                        evidence=item.evidence,
+                        status="pending",
+                    )
                 )
-                db.add(rec)
-            
-            job.status = "succeeded"
-            job.progress = 100
-            job.completed_at = utc_now()
+
+            mark_succeeded(job)
             await db.commit()
 
         except Exception as e:
-            logger.error(f"Error in report generation task: {e}")
+            logger.exception(f"Error in report generation task: {e}")
             if job:
                 await db.rollback()
-                job.status = "failed"
-                job.error_message = str(e)[:2000]
-                job.completed_at = utc_now()
-                db.add(job)
-                await db.commit()
+                failed_job = await db.get(AnalysisJob, UUID(job_id))
+                if failed_job:
+                    mark_failed(failed_job, str(e))
+                    db.add(failed_job)
+                    await db.commit()
 
 async def get_latest_report_service(user_id: UUID, db: AsyncSession):
     """
@@ -288,7 +270,7 @@ async def _prepare_competitor_brief(db: AsyncSession, user_id: UUID):
     
     return {
         "competitor_video_count": len(analyses),
-        "winning_topics": [a.topic for a in analyses if a.hook_score >= 8],
+        "winning_topics": [a.topic for a in analyses if a.hook_score >= WINNING_HOOK_SCORE],
         "market_avg_hook_score": sum(a.hook_score for a in analyses) / len(analyses),
-        "successful_formats": list(set([a.category for a in analyses if a.hook_score >= 7]))
+        "successful_formats": sorted({a.category for a in analyses if a.hook_score >= STRONG_HOOK_SCORE})
     }

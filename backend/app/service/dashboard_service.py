@@ -223,6 +223,35 @@ async def get_growth_chart_service(user_id: UUID, db: AsyncSession):
 
     return {"data": chart_points}
 
+async def _latest_metrics_by_media(db: AsyncSession, media_ids: list[UUID]) -> dict[UUID, MediaMetric]:
+    """Latest snapshot per media item in one query (instead of one query per item)."""
+    if not media_ids:
+        return {}
+    stmt = (
+        select(MediaMetric)
+        .where(MediaMetric.media_item_id.in_(media_ids))
+        .order_by(MediaMetric.media_item_id, desc(MediaMetric.captured_at))
+    )
+    latest: dict[UUID, MediaMetric] = {}
+    for metric in (await db.exec(stmt)).all():
+        latest.setdefault(metric.media_item_id, metric)
+    return latest
+
+
+async def _latest_analysis_by_media(db: AsyncSession, media_ids: list[UUID]) -> dict[UUID, VideoAnalysis]:
+    if not media_ids:
+        return {}
+    stmt = (
+        select(VideoAnalysis)
+        .where(VideoAnalysis.media_item_id.in_(media_ids))
+        .order_by(VideoAnalysis.media_item_id, desc(VideoAnalysis.created_at))
+    )
+    latest: dict[UUID, VideoAnalysis] = {}
+    for analysis in (await db.exec(stmt)).all():
+        latest.setdefault(analysis.media_item_id, analysis)
+    return latest
+
+
 async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
     """
     Returns aggregated stats for the user's content pillars using real Reel engagement %.
@@ -233,6 +262,7 @@ async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
         VideoAnalysis.media_item_id.isnot(None),
     )
     analyses = (await db.exec(stmt)).all() or []
+    latest_metrics = await _latest_metrics_by_media(db, list({a.media_item_id for a in analyses}))
 
     pillar_stats: dict[str, dict] = {}
     for analysis in analyses:
@@ -242,13 +272,7 @@ async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
 
         pillar_stats[pillar]["count"] += 1
 
-        m_stmt = (
-            select(MediaMetric)
-            .where(MediaMetric.media_item_id == analysis.media_item_id)
-            .order_by(desc(MediaMetric.captured_at))
-            .limit(1)
-        )
-        latest_m = (await db.exec(m_stmt)).first()
+        latest_m = latest_metrics.get(analysis.media_item_id)
         if latest_m and latest_m.reach > 0:
             rate = (latest_m.total_interactions / latest_m.reach) * 100
             pillar_stats[pillar]["engagement_rates"].append(rate)
@@ -268,36 +292,33 @@ async def get_content_pillars_service(user_id: UUID, db: AsyncSession):
     rows.sort(key=lambda r: r["avg_engagement"], reverse=True)
     return {"data": rows}
 
-async def get_recent_videos_service(user_id: UUID, db: AsyncSession, limit: int = 6):
+async def get_recent_videos_service(user_id: UUID, db: AsyncSession, limit: int = 6, offset: int = 0):
     """
-    Returns the most recent Reels for the user with their latest metrics and AI scores.
+    Returns the user's Reels (newest first) with their latest metrics and AI scores.
     """
-    # 1. Get recent media items
-    stmt = select(MediaItem).where(
-        MediaItem.user_id == user_id
-    ).order_by(desc(MediaItem.published_at)).limit(limit)
-    
-    result = await db.exec(stmt)
-    media_items = result.all()
-    
+    total = (await db.exec(select(func.count(MediaItem.id)).where(MediaItem.user_id == user_id))).one()
+
+    stmt = (
+        select(MediaItem)
+        .where(MediaItem.user_id == user_id)
+        .order_by(desc(MediaItem.published_at))
+        .offset(offset)
+        .limit(limit)
+    )
+    media_items = (await db.exec(stmt)).all()
+    media_ids = [item.id for item in media_items]
+    latest_metrics = await _latest_metrics_by_media(db, media_ids)
+    latest_analysis = await _latest_analysis_by_media(db, media_ids)
+
     video_feed = []
     for item in media_items:
-        # Get latest snapshot metrics
-        m_stmt = select(MediaMetric).where(
-            MediaMetric.media_item_id == item.id
-        ).order_by(desc(MediaMetric.captured_at)).limit(1)
-        latest_m = (await db.exec(m_stmt)).first()
-        
-        # Get AI analysis
-        a_stmt = select(VideoAnalysis).where(
-            VideoAnalysis.media_item_id == item.id
-        ).order_by(desc(VideoAnalysis.created_at)).limit(1)
-        analysis = (await db.exec(a_stmt)).first()
-        
+        latest_m = latest_metrics.get(item.id)
+        analysis = latest_analysis.get(item.id)
+
         views = latest_m.view if latest_m else 0
         reach = latest_m.reach if latest_m else 0
         engagement = (latest_m.total_interactions / reach * 100) if latest_m and reach > 0 else 0
-        
+
         video_feed.append({
             "id": str(item.id),
             "thumbnail_url": item.thumbnail_url,
@@ -308,5 +329,5 @@ async def get_recent_videos_service(user_id: UUID, db: AsyncSession, limit: int 
             "permalink": item.permalink,
             "has_analysis": analysis is not None,
         })
-        
-    return {"data": video_feed}
+
+    return {"data": video_feed, "total": total}

@@ -15,3 +15,20 @@ class UserCreate(BaseInfo):
 
 class UserRead(BaseInfo):
     id: UUID
+
+class ForgotPasswordRequest(SQLModel):
+    email: EmailStr
+
+class ResetPasswordRequest(SQLModel):
+    token: str
+    password: str
+
+class ChangePasswordRequest(SQLModel):
+    current_password: str
+    new_password: str
+
+class VerifyEmailRequest(SQLModel):
+    token: str
+
+class DeleteAccountRequest(SQLModel):
+    password: str

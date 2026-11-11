@@ -42,6 +42,7 @@ class VideoFeedItem(BaseModel):
 
 class DashboardVideosResponse(BaseModel):
     data: List[VideoFeedItem]
+    total: int = 0
 
 class VideoDetailResponse(BaseModel):
     media: Any

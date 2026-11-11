@@ -16,9 +16,12 @@ export const useUpdateNiche = () => {
   return useMutation({
     mutationFn: (params: { niche: string; trigger_discovery?: boolean }) =>
       updateNiche(params.niche, params.trigger_discovery),
-    onSuccess: () => {
+    onSuccess: (_data, params) => {
       queryClient.invalidateQueries({ queryKey: ['instagram-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['competitors'] })
+      if (params.trigger_discovery) {
+        queryClient.invalidateQueries({ queryKey: ['analysis-job', 'competitor_discovery'] })
+      }
     },
   })
 }

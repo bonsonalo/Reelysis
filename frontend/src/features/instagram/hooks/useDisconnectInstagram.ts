@@ -5,8 +5,6 @@ const DISCONNECT_INVALIDATION_KEYS = [
   'instagram-accounts',
   'reports',
   'report',
-  'latest-report',
-  'roadmap',
   'competitors',
   'dashboard-stats',
   'dashboard-growth',

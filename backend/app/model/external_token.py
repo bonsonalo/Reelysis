@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Column, ForeignKey, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
@@ -6,6 +7,9 @@ from datetime import datetime, timezone, timedelta
 
 class ExternalToken(SQLModel, table= True):
     __tablename__= "external_tokens"
+    __table_args__ = (
+        Index("ix_external_tokens_user_id", "user_id"),
+    )
 
 
     id: UUID= Field(

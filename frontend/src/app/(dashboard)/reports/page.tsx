@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useReports } from '@/features/reports/hooks/useLatestReport'
+import { useReports } from '@/features/reports/hooks/useReports'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
 import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { getReportGenerationUi } from '@/features/reports/utils/reportGenerationProgress'
@@ -11,11 +11,12 @@ import { ReportsList } from '@/features/reports/components/ReportsList'
 import { ReportsEmptyState } from '@/features/reports/components/ReportsEmptyState'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { ReportsPageSkeleton } from '@/components/shared/PageSkeletons'
+import { PageErrorState } from '@/components/shared/PageErrorState'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function ReportsPage() {
-  const { data: reports, isLoading, refetch } = useReports()
+  const { data: reports, isLoading, isError, isRefetching, refetch } = useReports()
   const { mutate: generateReport, isPending: isStarting } = useGenerateRoadmap()
   const [pendingJobId, setPendingJobId] = useState<string | null>(null)
   const completedJobIdRef = useRef<string | null>(null)
@@ -61,6 +62,16 @@ export default function ReportsPage() {
 
   if (isLoading) {
     return <ReportsPageSkeleton />
+  }
+
+  if (isError && !reports) {
+    return (
+      <PageErrorState
+        title="Couldn’t load reports"
+        onRetry={() => refetch()}
+        retrying={isRefetching}
+      />
+    )
   }
 
   const reportCount = reports?.length ?? 0

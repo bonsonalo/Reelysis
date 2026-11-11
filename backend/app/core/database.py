@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -61,6 +63,21 @@ async def get_db():
         yield db
 
 
+def run_async_task(coro_fn, *args):
+    """
+    Run an async task body from a sync Celery task. Each asyncio.run() creates a new event loop,
+    and pooled asyncpg connections are bound to the loop that opened them, so the pool is
+    disposed before the loop closes; otherwise the next task in this worker process fails.
+    """
+    async def runner():
+        try:
+            return await coro_fn(*args)
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(runner())
+
+
 from app.model.user import User
 from app.model.auth import AuthSession
 from app.model.external_token import ExternalToken
@@ -73,3 +90,4 @@ from app.model.analysis_job import AnalysisJob
 from app.model.video_analysis import VideoAnalysis
 from app.model.account_report import AccountReport
 from app.model.recommendations import Recommendation
+from app.model.user_token import UserToken

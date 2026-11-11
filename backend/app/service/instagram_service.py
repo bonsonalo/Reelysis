@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 
 from app.core.config import settings
-from app.core.client.meta import meta_client
+from app.core.client.meta import InstagramAuthError, meta_client
 from app.core.redis import redis_client
 from app.model.instagram_accounts import InstagramAccount
 from app.core.logger import logger
@@ -18,6 +18,14 @@ from app.core.database import sync_engine
 from app.service.ai_service import detect_niche_service_sync
 from app.service.competitor_service import discover_competitors_service
 from app.utils.caption import parse_hashtags_from_caption, top_frequent_hashtags
+from app.service.job_utils import (
+    job_should_start,
+    mark_failed,
+    mark_running,
+    mark_succeeded,
+    reconcile_job,
+    set_progress,
+)
 
 from cryptography.fernet import Fernet
 from sqlmodel import Session, select, desc, delete
@@ -31,9 +39,8 @@ from app.model.competitor_accounts import CompetitorAccount
 
 fernet = Fernet(settings.TOKEN_ENCRYPTION_KEY.encode())
 
-STALE_QUEUED_SYNC_SECONDS = 15
-STALE_QUEUED_ABANDON_SECONDS = 600
-STALE_RUNNING_SYNC_SECONDS = 120
+# Reels/videos only: Reelysis analyses short-form video, not photos or carousels.
+SYNCABLE_MEDIA_TYPES = {"VIDEO", "REELS"}
 
 
 from app.utils.time import utc_now
@@ -43,41 +50,12 @@ def _utc_now() -> datetime:
     return utc_now()
 
 
-def _as_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def _seconds_since_timestamp(ts: datetime, now: datetime | None = None) -> float:
-    """Elapsed seconds since ts. Naive DB datetimes use local wall-clock comparison."""
-    reference = now or _utc_now()
-    if ts.tzinfo is None:
-        ref_naive = reference.astimezone().replace(tzinfo=None) if reference.tzinfo else reference
-        return max(0.0, (ref_naive - ts).total_seconds())
-    ref_utc = _as_utc(reference)
-    return max(0.0, (ref_utc - _as_utc(ts)).total_seconds())  # type: ignore[operator]
-
-
-def _seconds_between(later: datetime, earlier: datetime) -> float:
-    return _seconds_since_timestamp(earlier, later)
-
-
 def _dispatch_sync_celery(job_id: UUID, user_id: UUID) -> None:
     logger.info("Dispatching instagram sync celery task for job %s user %s", job_id, user_id)
     celery_app.send_task(
         "app.service.instagram_service.sync_instagram_data_task",
         args=[str(job_id), str(user_id)],
     )
-
-
-def _sync_job_running_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
-    started = job.started_at
-    if started is None or started.year <= 1971:
-        return _seconds_since_timestamp(job.created_at, now)
-    return _seconds_since_timestamp(started, now)
 
 
 async def _has_newer_terminal_sync_job(job: AnalysisJob, db: AsyncSession) -> bool:
@@ -100,44 +78,21 @@ async def reconcile_instagram_sync_job(job: AnalysisJob, db: AsyncSession) -> An
     if job.job_type != "instagram_sync" or job.status not in ("queued", "running"):
         return job
 
-    now = _utc_now()
-
-    if job.status == "queued":
-        if await _has_newer_terminal_sync_job(job, db):
-            logger.warning("Failing superseded queued sync job %s", job.id)
-            job.status = "failed"
-            job.error_message = "Sync timed out before starting. Please try again."
-            job.completed_at = now
-            db.add(job)
-            await db.commit()
-            await db.refresh(job)
-            return job
-
-        age = _seconds_since_timestamp(job.created_at, now)
-        if age >= STALE_QUEUED_ABANDON_SECONDS:
-            logger.warning("Failing abandoned queued sync job %s (age %.0fs)", job.id, age)
-            job.status = "failed"
-            job.error_message = "Sync timed out before starting. Please try again."
-            job.completed_at = now
-            db.add(job)
-            await db.commit()
-            await db.refresh(job)
-            return job
-        if age >= STALE_QUEUED_SYNC_SECONDS:
-            logger.warning("Re-dispatching stale queued sync job %s (age %.0fs)", job.id, age)
-            _dispatch_sync_celery(job.id, job.user_id)
-        return job
-
-    running_age = _sync_job_running_age_seconds(job, now)
-    if running_age >= STALE_RUNNING_SYNC_SECONDS:
-        logger.warning("Failing stale running sync job %s (age %.0fs)", job.id, running_age)
-        job.status = "failed"
-        job.error_message = "Sync was interrupted. Please try again."
-        job.completed_at = now
+    if job.status == "queued" and await _has_newer_terminal_sync_job(job, db):
+        logger.warning("Failing superseded queued sync job %s", job.id)
+        mark_failed(job, "Sync timed out before starting. Please try again.")
         db.add(job)
         await db.commit()
         await db.refresh(job)
-    return job
+        return job
+
+    return await reconcile_job(
+        job,
+        db,
+        queued_message="Sync timed out before starting. Please try again.",
+        running_message="Sync was interrupted. Please try again.",
+        redispatch=lambda j: _dispatch_sync_celery(j.id, j.user_id),
+    )
 
 
 def _parse_insight_metrics(insights: dict) -> dict:
@@ -166,16 +121,13 @@ def _parse_media_timestamp(item: dict) -> datetime:
 
 async def get_oauth_url_service(user_id: UUID):
     try:
-        logger.info("getitng started with oauth_url_service")
         oauth_data = meta_client.get_oauth_url()
-        logger.info("Got the oauth_data in instagram service")
         
         if not meta_client.app_id or meta_client.app_id == "None":
              logger.error("Meta App ID is missing or invalid")
              raise ValueError("Meta API configuration is missing")
 
         await redis_client.setex(f"oauth_state:{oauth_data['state']}", 600, str(user_id))
-        logger.info("Got done with get_oauth_url in insta service")
         return oauth_data['url']
     except redis.exceptions.ConnectionError as e:
         logger.error(f"Redis connection failed: {e}")
@@ -184,23 +136,23 @@ async def get_oauth_url_service(user_id: UUID):
         logger.error(f"Error generating OAuth URL: {e}")
         raise ValueError(str(e))
 
+class OAuthStateError(ValueError):
+    """The OAuth state is unknown or expired (stale tab, replay, or forged callback)."""
+
+
 async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession):
+    user_id_raw = await redis_client.get(f"oauth_state:{state}")
+    if not user_id_raw:
+        raise OAuthStateError("Invalid or expired state parameter")
     try:
-        logger.info("Getting started with instagram call back service")
-        user_id_raw = await redis_client.get(f"oauth_state:{state}")
-        if not user_id_raw:
-            raise ValueError("Invalid or expired state parameter")
+        logger.info("Handling Instagram OAuth callback")
         
         user_id = UUID(user_id_raw.decode() if isinstance(user_id_raw, bytes) else user_id_raw)
         await redis_client.delete(f"oauth_state:{state}")
-        logger.info("getting started with exchange code for access token in instagram service")
         token_data = await meta_client.exchange_code_for_access_token(code)
-        logger.info("Got the exchange")
         short_lived_token = token_data.get("access_token")
         if not short_lived_token:
             raise ValueError("Failed to obtain access token")
-        logger.info("Done with exchange_code_for_access_token function in instagram service")
-        logger.info("getting started with exchange_for_long_lived_token in instagram service")
             
         long_lived_token_data = await meta_client.exchange_for_long_lived_token(short_lived_token)
         long_lived_token = long_lived_token_data.get("access_token")
@@ -260,9 +212,18 @@ async def handle_oauth_callback_service(code: str, state: str, db: AsyncSession)
         raise ValueError(f"Failed to handle OAuth callback: {str(e)}")
 
 async def get_connected_accounts_service(user_id: UUID, db: AsyncSession):
-    stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_id)
-    result = await db.exec(stmt)
-    return result.all()
+    accounts = (await db.exec(select(InstagramAccount).where(InstagramAccount.user_id == user_id))).all()
+    token = (await db.exec(select(ExternalToken).where(ExternalToken.user_id == user_id))).first()
+    expires_at = token.expires_at if token else None
+    needs_reconnect = expires_at is None or expires_at <= utc_now()
+    return [
+        {
+            **account.model_dump(),
+            "token_expires_at": expires_at,
+            "needs_reconnect": needs_reconnect,
+        }
+        for account in accounts
+    ]
 
 
 async def _get_instagram_account(user_id: UUID, db: AsyncSession) -> InstagramAccount | None:
@@ -452,7 +413,8 @@ async def detect_instagram_niche_service(user_id: UUID, db: AsyncSession):
     captions = [item.caption for item in media_items if item.caption]
     hashtags = top_frequent_hashtags(captions)
 
-    detected = detect_niche_service_sync(
+    detected = await asyncio.to_thread(
+        detect_niche_service_sync,
         account.biography or "",
         captions,
         hashtags,
@@ -474,6 +436,68 @@ async def detect_instagram_niche_service(user_id: UUID, db: AsyncSession):
         "caption_count": len(captions),
     }
 
+def enqueue_sync_job_sync(db: Session, user_id: UUID) -> AnalysisJob | None:
+    """Queue a sync from a worker context (scheduler). Skips users with a sync already in flight."""
+    active = db.exec(
+        select(AnalysisJob).where(
+            AnalysisJob.user_id == user_id,
+            AnalysisJob.job_type == "instagram_sync",
+            AnalysisJob.status.in_(["queued", "running"]),
+        )
+    ).first()
+    if active:
+        return None
+    job = AnalysisJob(user_id=user_id, job_type="instagram_sync", status="queued", progress=0)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    _dispatch_sync_celery(job.id, user_id)
+    return job
+
+
+def refresh_token_if_expiring(db: Session, token_record: ExternalToken) -> str:
+    """Return a usable decrypted token, extending it first when it is close to expiry."""
+    decrypted = fernet.decrypt(token_record.encrypted_access_token.encode()).decode()
+    if token_record.expires_at <= utc_now():
+        raise InstagramAuthError("Instagram access expired. Please reconnect your Instagram account.")
+
+    refresh_window = timedelta(days=settings.IG_TOKEN_REFRESH_DAYS_BEFORE_EXPIRY)
+    if token_record.expires_at - utc_now() > refresh_window:
+        return decrypted
+    try:
+        data = asyncio.run(meta_client.refresh_long_lived_token(decrypted))
+    except InstagramAuthError:
+        raise
+    except Exception as e:
+        logger.warning("Instagram token refresh failed for user %s: %s", token_record.user_id, e)
+        return decrypted
+
+    new_token = data.get("access_token")
+    if not new_token:
+        return decrypted
+    token_record.encrypted_access_token = fernet.encrypt(new_token.encode()).decode()
+    token_record.expires_at = utc_now() + timedelta(seconds=int(data.get("expires_in", 5184000)))
+    db.add(token_record)
+    db.commit()
+    logger.info("Refreshed Instagram token for user %s", token_record.user_id)
+    return new_token
+
+
+def mark_token_invalid(db: Session, user_id: UUID) -> None:
+    """Expire the stored token so the UI shows a reconnect prompt."""
+    token = db.exec(select(ExternalToken).where(ExternalToken.user_id == user_id)).first()
+    if token and token.expires_at > utc_now():
+        token.expires_at = utc_now()
+        db.add(token)
+        db.commit()
+
+
+def _is_syncable(item: dict) -> bool:
+    media_type = (item.get("media_type") or "").upper()
+    product_type = (item.get("media_product_type") or "").upper()
+    return media_type == "VIDEO" or product_type in SYNCABLE_MEDIA_TYPES
+
+
 @celery_app.task(name="app.service.instagram_service.sync_instagram_data_task")
 def sync_instagram_data_task(job_id: str, user_id: str):
     """
@@ -483,31 +507,26 @@ def sync_instagram_data_task(job_id: str, user_id: str):
 
 
 def _sync_instagram_data_internal(job_id: str, user_id: str):
+    user_uuid = UUID(user_id)
     with Session(sync_engine) as db:
         job = None
         try:
             job = db.get(AnalysisJob, UUID(job_id))
-            if not job:
+            if not job_should_start(job):
                 return
-            if job.status in ("succeeded", "failed"):
-                logger.info("Sync job %s already %s, skipping", job_id, job.status)
-                return
-            job.status = "running"
-            job.started_at = utc_now()
+            mark_running(job)
             db.commit()
 
-            token_stmt = select(ExternalToken).where(ExternalToken.user_id == UUID(user_id))
-            token_record = db.exec(token_stmt).first()
+            token_record = db.exec(select(ExternalToken).where(ExternalToken.user_id == user_uuid)).first()
             if not token_record:
-                raise ValueError("Token not found")
+                raise ValueError("Instagram is not connected. Please connect your account again.")
 
-            decrypted_token = fernet.decrypt(token_record.encrypted_access_token.encode()).decode()
-
-            acc_stmt = select(InstagramAccount).where(InstagramAccount.user_id == UUID(user_id))
-            account = db.exec(acc_stmt).first()
+            account = db.exec(select(InstagramAccount).where(InstagramAccount.user_id == user_uuid)).first()
             if not account:
                 raise ValueError("Instagram account not found")
             ig_user_id = account.instagram_user_id
+
+            decrypted_token = refresh_token_if_expiring(db, token_record)
 
             profile_data = asyncio.run(meta_client.get_instagram_account(decrypted_token))
             account.biography = profile_data.get("biography") or account.biography
@@ -515,18 +534,33 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             account.media_count = profile_data.get("media_count", account.media_count)
             account.profile_picture_url = profile_data.get("profile_picture_url") or account.profile_picture_url
             db.add(account)
+            set_progress(job, 5)
             db.commit()
 
-            media_data = asyncio.run(meta_client.get_user_media(ig_user_id, decrypted_token))
-            items = media_data.get("data", [])
+            media_data = asyncio.run(
+                meta_client.get_user_media(ig_user_id, decrypted_token, max_items=settings.SYNC_MAX_MEDIA)
+            )
+            items = [item for item in media_data.get("data", []) if _is_syncable(item)]
             total_items = len(items)
+
+            # Earlier versions imported photos/carousels too; drop them so totals reflect Reels only.
+            db.exec(
+                delete(MediaItem).where(
+                    MediaItem.user_id == user_uuid,
+                    MediaItem.media_type.not_in(["VIDEO", "REEL", "REELS"]),
+                )
+            )
+            db.commit()
 
             all_captions: List[str] = []
 
             for index, item in enumerate(items):
                 insights = asyncio.run(meta_client.get_media_insights(item["id"], decrypted_token))
 
-                existing_media_stmt = select(MediaItem).where(MediaItem.external_media_id == item["id"])
+                existing_media_stmt = select(MediaItem).where(
+                    MediaItem.user_id == user_uuid,
+                    MediaItem.external_media_id == item["id"],
+                )
                 media_item = db.exec(existing_media_stmt).first()
 
                 caption = item.get("caption", "") or ""
@@ -538,7 +572,7 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
 
                 if not media_item:
                     media_item = MediaItem(
-                        user_id=UUID(user_id),
+                        user_id=user_uuid,
                         external_media_id=item["id"],
                         media_type=item["media_type"],
                         caption=caption,
@@ -570,8 +604,6 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                         item.get("id"),
                         list(insights.keys()) if isinstance(insights, dict) else type(insights),
                     )
-                else:
-                    logger.info("Parsed metrics for media %s: %s", item.get("id"), metric_data)
 
                 media_metric = MediaMetric(
                     media_item_id=media_item.id,
@@ -587,11 +619,11 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
                 )
                 db.add(media_metric)
 
-                if total_items:
-                    job.progress = int(((index + 1) / total_items) * 95)
-                else:
-                    job.progress = 95
+                set_progress(job, 5 + int(((index + 1) / total_items) * 90))
                 db.commit()
+
+            set_progress(job, 95)
+            db.commit()
 
             top_hashtags = top_frequent_hashtags(all_captions)
             if account.niche_confirmed:
@@ -618,25 +650,29 @@ def _sync_instagram_data_internal(job_id: str, user_id: str):
             account.last_synced_at = utc_now()
             account.followers_count = profile_data.get("followers_count", account.followers_count)
             account.media_count = profile_data.get("media_count", account.media_count)
-            
-            job.progress = 100
-            job.status = "succeeded"
-            job.completed_at = utc_now()
+
+            mark_succeeded(job)
             db.commit()
             db.refresh(account)
-            
+
             logger.info(f"Sync completed successfully for user {user_id}, niche detected: {detected_niche}, last_synced_at: {account.last_synced_at}")
-            
+
             # Trigger transcription only; Gemini video analysis runs during report generation.
             from app.service.transcript_service import enqueue_transcription_for_user
 
-            enqueue_transcription_for_user(db, UUID(user_id))
+            enqueue_transcription_for_user(db, user_uuid)
             logger.info(f"Transcription triggered for user {user_id}")
 
         except Exception as e:
             logger.exception(f"Error in sync task: {e}")
+            db.rollback()
+            if isinstance(e, InstagramAuthError):
+                mark_token_invalid(db, user_uuid)
             if job:
-                job.status = "failed"
-                job.error_message = str(e) or repr(e)
-                job.completed_at = utc_now()
-                db.commit()
+                job = db.get(AnalysisJob, UUID(job_id))
+                if job:
+                    message = str(e) or repr(e)
+                    if not isinstance(e, (InstagramAuthError, ValueError)):
+                        message = f"Sync failed: {message}"[:500]
+                    mark_failed(job, message)
+                    db.commit()

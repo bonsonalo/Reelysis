@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
@@ -9,6 +10,10 @@ from typing import Any
 
 class MediaItem(SQLModel, table= True):
     __tablename__= "media_items"
+    __table_args__ = (
+        Index("ix_media_items_user_id_published_at", "user_id", "published_at"),
+        Index("ix_media_items_user_id_external_media_id", "user_id", "external_media_id"),
+    )
 
 
     id: UUID = Field(

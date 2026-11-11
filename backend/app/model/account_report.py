@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from uuid import UUID, uuid4
@@ -12,6 +13,9 @@ from typing import Any
 
 class AccountReport(SQLModel, table= True):
     __tablename__= "account_reports"
+    __table_args__ = (
+        Index("ix_account_reports_user_id_created_at", "user_id", "created_at"),
+    )
 
 
     id: UUID= Field(

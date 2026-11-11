@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useLogin } from '../hooks/useLogin'
 import { useAuth } from '@/store/hook'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
+import { postAuthDestination } from '@/features/instagram/utils'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { AuthField } from '@/components/auth/AuthField'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,8 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const justReset = searchParams.get('reset') === '1'
   const { mutate: login, isPending } = useLogin()
   const { error, status } = useAuth()
   const { data: accounts, isLoading: isLoadingAccounts } = useInstagramAccounts({
@@ -24,16 +27,7 @@ export default function LoginForm() {
     if (status !== 'succeeded') return
     if (isLoadingAccounts) return
     if (!accounts) return
-
-    const account = accounts[0]
-    const isConnected = accounts.length > 0
-    const isOnboardingComplete = account?.niche_confirmed && account?.last_synced_at
-
-    if (isConnected && isOnboardingComplete) {
-      router.push('/dashboard')
-    } else {
-      router.push('/onboarding')
-    }
+    router.push(postAuthDestination(accounts))
   }, [status, accounts, isLoadingAccounts, router])
 
   const handleLogin = (e: React.FormEvent) => {
@@ -58,6 +52,12 @@ export default function LoginForm() {
       </div>
 
       <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
+        {justReset && !error && (
+          <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-400/90">
+            Password updated. Please sign in with your new password.
+          </div>
+        )}
+
         {error && (
           <div className="rounded-[10px] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error}
@@ -90,7 +90,7 @@ export default function LoginForm() {
           />
           <div className="mt-3 text-right">
             <Link
-              href="#"
+              href="/forgot-password"
               className="text-sm text-text-tertiary transition-colors duration-150 hover:text-text-secondary"
             >
               Forgot password?

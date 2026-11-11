@@ -1,8 +1,8 @@
+import { getApiErrorMessage } from '@/lib/utils';
 import { useMutation } from '@tanstack/react-query';
 import { useAppDispatch } from '@/store/hook';
 import { loginUser } from '../api';
 import { setUser, setError, setLoading } from '@/store/slices/authSlice';
-import { AxiosError } from 'axios';
 
 export function useLogin() {
   const dispatch = useAppDispatch();
@@ -15,8 +15,8 @@ export function useLogin() {
     onSuccess: (response) => {
       dispatch(setUser(response.data));
     },
-    onError: (error: AxiosError<{ detail: string }>) => {
-      dispatch(setError(error.response?.data?.detail ?? 'Login failed'));
+    onError: (error: unknown) => {
+      dispatch(setError(getApiErrorMessage(error, 'Login failed')));
     },
   });
 }

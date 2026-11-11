@@ -8,6 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.api.v1.routes import routers
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.middleware import OriginCheckMiddleware
 from app.core.migrations import run_migrations
 from app.core.rate_limit import limiter
 
@@ -38,6 +39,8 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
+app.add_middleware(OriginCheckMiddleware)
+# Added last so it runs first: CORS headers are also present on the CSRF 403.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list(),

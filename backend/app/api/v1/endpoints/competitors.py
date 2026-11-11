@@ -3,6 +3,7 @@ from typing import List
 from uuid import UUID
 from fastapi.responses import Response
 from app.api.dep import db_dependency, user_authentication_dependency
+from app.api.errors import internal_error
 from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
 from app.model.competitor_accounts import CompetitorAccount
 from app.schema.competitor_schema import AddCompetitorRequest
@@ -35,8 +36,8 @@ async def get_competitors(
         stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == current_user["id"])
         result = await db.exec(stmt)
         return result.all()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("competitors.get_competitors")
 
 @router.post("/", response_model=CompetitorAccount)
 async def add_competitor(
@@ -56,8 +57,8 @@ async def add_competitor(
         return competitor
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("competitors.add_competitor")
 
 @router.post("/discover")
 @limiter.limit(job_trigger_limit, key_func=get_user_key)
@@ -77,8 +78,8 @@ async def discover_competitors(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("competitors.discover_competitors")
 
 
 @router.get("/{competitor_id}/avatar")
@@ -158,5 +159,5 @@ async def remove_competitor(
         return {"message": "Competitor removed"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("competitors.remove_competitor")

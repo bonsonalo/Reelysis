@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from app.utils.time import utc_now
-from typing import Optional
+from typing import Callable, Optional
 from uuid import UUID
 
 from sqlmodel import Session, select
@@ -15,6 +15,7 @@ from app.core.logger import logger
 from app.model.analysis_job import AnalysisJob
 from app.model.competitor_media import CompetitorMedia
 from app.model.media_items import MediaItem
+from app.service.job_utils import job_should_start, mark_failed, mark_running, mark_succeeded, set_progress
 
 TRANSCRIBABLE_MEDIA_TYPES = {"REEL", "VIDEO", "reel", "video"}
 
@@ -143,11 +144,13 @@ async def run_bulk_transcription_service(user_id: UUID, db: AsyncSession) -> Ana
     return job
 
 
-def run_transcription_sync(user_id: UUID) -> None:
-    """Run pending transcriptions inline (no Celery, no video-analysis enqueue)."""
+def run_transcription_sync(user_id: UUID, on_item: Callable[[], None] | None = None) -> None:
+    """Run pending transcriptions inline (no Celery, no video-analysis enqueue). on_item = heartbeat."""
     with Session(sync_engine) as db:
         targets = _collect_transcription_targets(db, user_id)
         for kind, item_id in targets:
+            if on_item:
+                on_item()
             try:
                 if kind == "own":
                     item = db.exec(select(MediaItem).where(MediaItem.id == item_id)).first()
@@ -199,22 +202,18 @@ def _run_transcription_internal(job_id: str, user_id: str):
 
     with Session(sync_engine) as db:
         job = db.get(AnalysisJob, job_uuid)
-        if not job:
-            logger.error(f"Transcription job {job_uuid} not found")
+        if not job_should_start(job):
             return
 
         try:
-            job.status = "running"
-            job.started_at = utc_now()
+            mark_running(job)
             db.commit()
 
             targets = _collect_transcription_targets(db, user_uuid)
             total = len(targets)
 
             if total == 0:
-                job.status = "succeeded"
-                job.progress = 100
-                job.completed_at = utc_now()
+                mark_succeeded(job)
                 db.commit()
                 logger.info(
                     "Transcription complete for user %s; video analysis deferred to report generation.",
@@ -241,7 +240,7 @@ def _run_transcription_internal(job_id: str, user_id: str):
 
                     _apply_transcript_to_item(item, item.caption)
                     db.add(item)
-                    job.progress = int(((index + 1) / total) * 100)
+                    set_progress(job, int(((index + 1) / total) * 100))
                     db.commit()
                 except StaleDataError:
                     db.rollback()
@@ -252,9 +251,7 @@ def _run_transcription_internal(job_id: str, user_id: str):
                     )
                     continue
 
-            job.status = "succeeded"
-            job.progress = 100
-            job.completed_at = utc_now()
+            mark_succeeded(job)
             db.commit()
 
             logger.info(
@@ -267,7 +264,5 @@ def _run_transcription_internal(job_id: str, user_id: str):
             logger.exception(f"Error in transcription task: {e}")
             job = db.get(AnalysisJob, job_uuid)
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
-                job.completed_at = utc_now()
+                mark_failed(job, str(e))
                 db.commit()

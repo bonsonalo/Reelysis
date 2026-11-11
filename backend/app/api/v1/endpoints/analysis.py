@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query
 from uuid import UUID
 from typing import List, Optional
 
 from app.api.dep import db_dependency, user_authentication_dependency
-from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
+from app.api.errors import internal_error
 from app.service.analysis_service import get_job_status_service, get_user_jobs_service
 from app.service.report_service import (
-    trigger_report_generation_service, 
     get_latest_report_service,
     get_roadmap_service
 )
@@ -47,8 +46,8 @@ async def get_jobs(
     try:
         jobs = await get_user_jobs_service(current_user["id"], job_type, db, limit=limit)
         return jobs
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_jobs")
 
 @router.get("/dashboard/stats", response_model=DashboardStats)
 async def get_dashboard_stats(
@@ -61,8 +60,8 @@ async def get_dashboard_stats(
     try:
         stats = await get_dashboard_stats_service(current_user["id"], db)
         return stats
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_dashboard_stats")
 
 @router.get("/dashboard/growth", response_model=DashboardGrowthResponse)
 async def get_dashboard_growth(
@@ -75,8 +74,8 @@ async def get_dashboard_growth(
     try:
         data = await get_growth_chart_service(current_user["id"], db)
         return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_dashboard_growth")
 
 @router.get("/dashboard/pillars", response_model=DashboardPillarsResponse)
 async def get_dashboard_pillars(
@@ -89,23 +88,24 @@ async def get_dashboard_pillars(
     try:
         data = await get_content_pillars_service(current_user["id"], db)
         return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_dashboard_pillars")
 
 @router.get("/dashboard/videos", response_model=DashboardVideosResponse)
 async def get_dashboard_videos(
     db: db_dependency,
     current_user: user_authentication_dependency,
-    limit: int = Query(6)
+    limit: int = Query(6, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ):
     """
     Returns the user's most recent Reels with their performance and AI scores.
     """
     try:
-        data = await get_recent_videos_service(current_user["id"], db, limit)
+        data = await get_recent_videos_service(current_user["id"], db, limit, offset)
         return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_dashboard_videos")
 
 @router.get("/videos/{video_id}", response_model=VideoDetailResponse)
 async def get_video_analysis(
@@ -121,8 +121,8 @@ async def get_video_analysis(
         return data
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_video_analysis")
 
 @router.get("/report/latest", response_model=AccountReport)
 async def get_latest_report(
@@ -137,8 +137,8 @@ async def get_latest_report(
         return report
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_latest_report")
 
 @router.get("/report/roadmap", response_model=List[Recommendation])
 async def get_roadmap(
@@ -153,8 +153,8 @@ async def get_roadmap(
         return roadmap
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_roadmap")
 
 @router.patch("/report/roadmap/{recommendation_id}")
 async def update_recommendation_status(
@@ -166,7 +166,6 @@ async def update_recommendation_status(
     Updates the status of a specific recommendation (e.g., mark as completed).
     """
     try:
-        from sqlmodel import select
         stmt = select(Recommendation).where(
             Recommendation.id == recommendation_id,
             Recommendation.user_id == current_user["id"]
@@ -187,8 +186,8 @@ async def update_recommendation_status(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.update_recommendation_status")
 
 @router.get("/jobs/{job_id}", response_model=AnalysisJob)
 async def get_job_status(
@@ -204,24 +203,5 @@ async def get_job_status(
         return await get_job_status_service(job_id, current_user["id"], db)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/report/generate")
-@limiter.limit(job_trigger_limit, key_func=get_user_key)
-async def generate_report(
-    request: Request,
-    db: db_dependency,
-    current_user: user_authentication_dependency,
-):
-    """
-    Manually triggers the strategic report generation job.
-    """
-    try:
-        job = await trigger_report_generation_service(current_user["id"], db)
-        return {
-            "message": "Report generation triggered",
-            "job_id": job.id
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("analysis.get_job_status")

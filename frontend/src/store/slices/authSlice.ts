@@ -4,6 +4,8 @@ interface User {
   id: string
   name: string
   email: string
+  email_verified?: boolean
+  created_at?: string
 }
 
 interface AuthState {
@@ -43,8 +45,11 @@ const authSlice = createSlice({
     setLoading: (state) => {
       state.status = 'loading'
     },
+    setEmailVerified: (state) => {
+      if (state.currentUser) state.currentUser.email_verified = true
+    },
   },
 })
 
-export const { setUser, clearUser, setError, setLoading } = authSlice.actions
+export const { setUser, clearUser, setError, setLoading, setEmailVerified } = authSlice.actions
 export default authSlice.reducer

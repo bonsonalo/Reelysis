@@ -7,6 +7,7 @@ import { BrandLogo } from '@/components/shared/BrandLogo'
 import { PageContainer } from '@/components/shared/Panel'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser'
+import { EmailVerificationBanner } from '@/features/auth/components/EmailVerificationBanner'
 import { useAuth, useAppDispatch, useSidebar } from '@/store/hook'
 import { openMobileSidebar } from '@/store/slices/sidebarSlice'
 import { cn } from '@/lib/utils'
@@ -18,9 +19,11 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const { isAuthenticated } = useAuth()
-  const { isLoading } = useCurrentUser()
+  const { currentUser } = useAuth()
+  const { data: user, isLoading } = useCurrentUser()
   const { isMobileOpen, closeMobileSidebar } = useSidebar()
+  // Decide from the query itself: Redux is synced in an effect and lags one render.
+  const isAuthenticated = Boolean(user)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -49,10 +52,10 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-black text-white">
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-black text-white print:block print:h-auto print:overflow-visible print:bg-white print:text-black">
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/70 transition-opacity lg:hidden',
+          'print:hidden fixed inset-0 z-40 bg-black/70 transition-opacity lg:hidden',
           isMobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',
@@ -63,15 +66,18 @@ export default function DashboardLayout({
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[248px] shrink-0 border-r border-border-sidebar bg-surface-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0',
+          'print:hidden fixed inset-y-0 left-0 z-50 w-[248px] shrink-0 border-r border-border-sidebar bg-surface-sidebar transition-transform duration-200 ease-out lg:relative lg:translate-x-0',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <Sidebar />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-black">
-        <header className="flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 lg:hidden">
+      <div className="flex min-w-0 flex-1 flex-col bg-black print:block print:bg-white">
+        {(currentUser ?? user)?.email_verified === false && (
+          <EmailVerificationBanner email={user?.email} />
+        )}
+        <header className="print:hidden flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 lg:hidden">
           <BrandLogo size="sm" />
           <button
             type="button"
@@ -83,7 +89,7 @@ export default function DashboardLayout({
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
           <PageContainer>{children}</PageContainer>
         </main>
       </div>

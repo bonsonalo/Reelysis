@@ -81,6 +81,8 @@ export function SettingsField({
   onChange,
   placeholder,
   disabled,
+  type = 'text',
+  autoComplete,
 }: {
   id: string
   label: string
@@ -89,6 +91,8 @@ export function SettingsField({
   onChange: (value: string) => void
   placeholder?: string
   disabled?: boolean
+  type?: string
+  autoComplete?: string
 }) {
   return (
     <div className="space-y-2">
@@ -100,7 +104,8 @@ export function SettingsField({
       ) : null}
       <input
         id={id}
-        type="text"
+        type={type}
+        autoComplete={autoComplete}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

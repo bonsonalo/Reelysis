@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Column, ForeignKey, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
@@ -10,6 +11,9 @@ from app.utils.time import utc_now
 
 class AuthSession(SQLModel, table= True):
     __tablename__= "auth_sessions"
+    __table_args__ = (
+        Index("ix_auth_sessions_user_id", "user_id"),
+    )
 
 
 

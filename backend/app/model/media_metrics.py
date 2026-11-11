@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Column, Relationship, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime, timezone
@@ -10,6 +11,9 @@ from typing import Any
 
 class MediaMetric(SQLModel, table= True):
     __tablename__= "media_metrics"
+    __table_args__ = (
+        Index("ix_media_metrics_media_item_id_captured_at", "media_item_id", "captured_at"),
+    )
 
 
     id: UUID= Field(

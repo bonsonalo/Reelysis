@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getReport, getReports, getLatestReport, getRoadmap } from '../api';
+import { getReport, getReports } from '../api';
 
 export const useReports = () => {
   return useQuery({
@@ -21,27 +21,5 @@ export const useReport = (reportId: string) => {
     },
     enabled: !!reportId,
     staleTime: 1000 * 60 * 10,
-  });
-};
-
-export const useLatestReport = () => {
-  return useQuery({
-    queryKey: ['latest-report'],
-    queryFn: async () => {
-      const response = await getLatestReport();
-      return response.data;
-    },
-    staleTime: 1000 * 60 * 30,
-  });
-};
-
-export const useRoadmap = () => {
-  return useQuery({
-    queryKey: ['roadmap'],
-    queryFn: async () => {
-      const response = await getRoadmap();
-      return response.data;
-    },
-    staleTime: 1000 * 60 * 30,
   });
 };

@@ -1,5 +1,6 @@
 'use client'
 
+import { getApiErrorMessage } from '@/lib/utils'
 import { useState } from 'react'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { Button } from '@/components/ui/button'
@@ -30,10 +31,7 @@ export function AddCompetitorForm({ className, onAdded }: AddCompetitorFormProps
         onAdded?.()
       },
       onError: (err: unknown) => {
-        const message =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          'Failed to add competitor.'
-        setError(typeof message === 'string' ? message : 'Failed to add competitor.')
+        setError(getApiErrorMessage(err, 'Failed to add competitor.'))
       },
     })
   }

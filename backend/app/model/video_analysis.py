@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel, Column, ForeignKey, Relationship
 from enum import Enum
 from uuid import UUID, uuid4
@@ -12,6 +13,11 @@ class MediaSource(str, Enum):
 
 class VideoAnalysis(SQLModel, table= True):
     __tablename__= "video_analysis"
+    __table_args__ = (
+        Index("ix_video_analysis_user_id_media_source", "user_id", "media_source"),
+        Index("ix_video_analysis_media_item_id", "media_item_id"),
+        Index("ix_video_analysis_competitor_media_id", "competitor_media_id"),
+    )
 
 
     id: UUID= Field(

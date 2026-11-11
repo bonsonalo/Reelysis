@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Column, Relationship, ForeignKey
 from uuid import UUID, uuid4
 from datetime import datetime
@@ -7,6 +8,9 @@ from typing import Any, Optional
 
 class CompetitorAccount(SQLModel, table= True):
     __tablename__= "competitor_accounts"
+    __table_args__ = (
+        Index("ix_competitor_accounts_user_id", "user_id"),
+    )
 
 
     id: UUID= Field(

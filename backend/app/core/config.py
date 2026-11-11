@@ -40,6 +40,26 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH_REFRESH_PER_MINUTE: int = 30
     RATE_LIMIT_JOB_TRIGGERS_PER_HOUR: int = 15
     RATE_LIMIT_AI_TRIGGERS_PER_HOUR: int = 10
+    RATE_LIMIT_AUTH_EMAIL_PER_HOUR: int = 5
+    # Proxies in front of the API that append to X-Forwarded-For (Render = 1). 0 = ignore the header.
+    TRUSTED_PROXY_HOPS: int = 1
+
+    # Transactional email (password reset, email verification). Empty SMTP_HOST = log links in dev only.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "Reelysis <no-reply@reelysis.app>"
+    SMTP_USE_TLS: bool = True
+    PASSWORD_RESET_TOKEN_MINUTES: int = 30
+    EMAIL_VERIFY_TOKEN_HOURS: int = 48
+
+    # Celery beat: daily Instagram sync + long-lived token refresh.
+    AUTO_SYNC_ENABLED: bool = True
+    AUTO_SYNC_INTERVAL_HOURS: int = 24
+    IG_TOKEN_REFRESH_DAYS_BEFORE_EXPIRY: int = 10
+    # Media items imported per sync (each costs one Insights call).
+    SYNC_MAX_MEDIA: int = 50
 
     model_config= SettingsConfigDict(
         env_file=".env", 
@@ -72,4 +92,5 @@ try:
     logger.info("DB connection target: %s", describe_db_target(settings.DB_URL))
 
 except Exception as e:
-    logger.error(str(e))
+    logger.error("Invalid configuration: %s", e)
+    raise

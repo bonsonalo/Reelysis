@@ -1,8 +1,28 @@
 import { api } from '@/lib/axios'
 
-export const getInstagramAccounts = async () => {
-  const response = await api.get('/api/v1/instagram/accounts')
+export interface InstagramAccount {
+  id: string
+  username: string
+  account_type?: string
+  profile_picture_url?: string | null
+  biography?: string | null
+  niche_detected?: string | null
+  niche_confirmed?: string | null
+  followers_count?: number
+  media_count?: number
+  last_synced_at?: string | null
+  token_expires_at?: string | null
+  needs_reconnect?: boolean
+}
+
+export const getInstagramAccounts = async (): Promise<InstagramAccount[]> => {
+  const response = await api.get<InstagramAccount[]>('/api/v1/instagram/accounts')
   return response.data
+}
+
+export const startInstagramOAuth = async (): Promise<string | null> => {
+  const response = await api.get<{ oauth_url?: string }>('/api/v1/instagram/oauth/start')
+  return response.data?.oauth_url ?? null
 }
 
 export interface TriggerSyncResponse {
@@ -17,7 +37,10 @@ export const triggerInstagramSync = async (): Promise<TriggerSyncResponse> => {
 }
 
 export const confirmNiche = async (niche: string) => {
-  const response = await api.patch('/api/v1/instagram/niche/confirm', { niche })
+  const response = await api.patch<{ message: string; niche: string }>(
+    '/api/v1/instagram/niche/confirm',
+    { niche },
+  )
   return response.data
 }
 

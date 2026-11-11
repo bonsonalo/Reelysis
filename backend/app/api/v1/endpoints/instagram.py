@@ -11,7 +11,8 @@ from app.core.rate_limit import (
     limiter,
 )
 from app.service.instagram_service import (
-    get_oauth_url_service, 
+    OAuthStateError,
+    get_oauth_url_service,
     handle_oauth_callback_service,
     get_connected_accounts_service,
     disconnect_instagram_service,
@@ -21,7 +22,6 @@ from app.service.instagram_service import (
     detect_instagram_niche_service,
 )
 from app.api.dep import db_dependency, user_authentication_dependency
-from fastapi.responses import RedirectResponse
 from app.schema.instagram_schema import NicheConfirmRequest, NicheUpdateRequest
 from app.model.media_items import MediaItem
 
@@ -33,10 +33,8 @@ router= APIRouter(
 @router.get("/oauth/start")
 async def start_oauth(current_user: user_authentication_dependency):
     user_id= current_user["id"]
-    logger.info("got the user_id")
     try:
         oauth_url= await get_oauth_url_service(user_id)
-        logger.info("Done with start endpoint")
         return {"oauth_url": oauth_url}
 
     except ValueError as e:
@@ -47,15 +45,31 @@ async def start_oauth(current_user: user_authentication_dependency):
         raise HTTPException(status_code=500, detail="External connection failure. Please ensure Redis is running.")
 
 @router.get("/oauth/callback")
-async def oauth_callback(code: str, state: str, db: db_dependency):
+async def oauth_callback(
+    db: db_dependency,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+):
+    frontend = settings.FRONTEND_URL.rstrip("/")
+
+    def back_to_app(reason: str) -> RedirectResponse:
+        return RedirectResponse(url=f"{frontend}/onboarding?connected=false&error={reason}", status_code=302)
+
+    if error or not code:
+        logger.info("Instagram OAuth was cancelled or denied (%s)", error or "no code")
+        return back_to_app("access_denied")
+    if not state:
+        return back_to_app("invalid_state")
     try:
-        logger.info(f"CALLBACK HIT — full code param: {code}")
         await handle_oauth_callback_service(code, state, db)
-        frontend = settings.FRONTEND_URL.rstrip("/")
-        return RedirectResponse(url=f"{frontend}/onboarding?connected=true", status_code=302)
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+    except OAuthStateError:
+        logger.warning("Instagram OAuth callback with unknown or expired state")
+        return back_to_app("invalid_state")
+    except Exception:
+        logger.exception("Instagram OAuth callback failed")
+        return back_to_app("connect_failed")
+    return RedirectResponse(url=f"{frontend}/onboarding?connected=true", status_code=302)
 
 @router.get("/accounts")
 async def get_accounts(current_user: user_authentication_dependency, db: db_dependency):

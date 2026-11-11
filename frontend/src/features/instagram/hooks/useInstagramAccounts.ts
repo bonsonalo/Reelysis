@@ -1,13 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { getInstagramAccounts } from '../api'
+import { getInstagramAccounts, InstagramAccount } from '../api'
 
-export const useInstagramAccounts = (options?: { refetchInterval?: number | false, enabled?: boolean }) => {
+type AccountsRefetchInterval =
+  | number
+  | false
+  | ((query: { state: { data?: InstagramAccount[] } }) => number | false)
+
+export const useInstagramAccounts = (options?: {
+  refetchInterval?: AccountsRefetchInterval
+  enabled?: boolean
+}) => {
   return useQuery({
     queryKey: ['instagram-accounts'],
-    queryFn: async () => {
-      const data = await getInstagramAccounts()
-      return data
-    },
-    ...options
+    queryFn: getInstagramAccounts,
+    ...options,
   })
 }

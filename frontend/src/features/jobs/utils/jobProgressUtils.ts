@@ -64,22 +64,20 @@ export function getInstagramSyncUi(
   const jobStatus = status ?? 'queued'
   const pct = jobStatus === 'succeeded' ? 100 : Math.min(100, Math.max(0, progress))
 
+  // Mirrors the backend sync task: profile refresh (0–5), media import (5–95), niche (95–100).
+  // Transcription runs as a separate job after the sync finishes.
   const tasks: ProgressTask[] = [
     {
       label: 'Connecting to Instagram',
-      status: phaseStatus(pct, 0, 15, jobStatus),
+      status: phaseStatus(pct, 0, 5, jobStatus),
     },
     {
       label: 'Importing Reels and metrics',
-      status: phaseStatus(pct, 15, 65, jobStatus),
-    },
-    {
-      label: 'Transcribing and analyzing content',
-      status: phaseStatus(pct, 65, 88, jobStatus),
+      status: phaseStatus(pct, 5, 95, jobStatus),
     },
     {
       label: 'Detecting content niche',
-      status: hasNiche ? 'completed' : phaseStatus(pct, 88, 100, jobStatus),
+      status: hasNiche ? 'completed' : phaseStatus(pct, 95, 100, jobStatus),
     },
   ]
 

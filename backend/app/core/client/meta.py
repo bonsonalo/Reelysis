@@ -2,9 +2,29 @@ from app.core.config import settings
 from app.core.logger import logger
 import secrets
 import httpx
-from urllib.parse import quote
+from urllib.parse import urlencode
 
 META_HTTP_TIMEOUT = 30.0
+GRAPH_BASE_URL = "https://graph.instagram.com"
+MEDIA_PAGE_SIZE = 25
+
+
+class InstagramAuthError(Exception):
+    """The stored Instagram token is expired or revoked — the user must reconnect."""
+
+
+def _raise_for_auth_error(response: httpx.Response) -> None:
+    """Code 190 = expired/revoked token (102 = legacy session error). Other OAuthException codes are not auth."""
+    if response.status_code not in (400, 401, 403):
+        return
+    try:
+        error = response.json().get("error", {})
+    except ValueError:
+        return
+    if error.get("code") in (190, 102):
+        raise InstagramAuthError(
+            "Instagram access expired. Please reconnect your Instagram account."
+        )
 
 
 class MetaClient:
@@ -17,28 +37,22 @@ class MetaClient:
         return httpx.AsyncClient(timeout=META_HTTP_TIMEOUT)
 
     def get_oauth_url(self):
-        print("AUTHORIZE using redirect_uri:", repr(self.redirect_uri))
         state = secrets.token_urlsafe(32)
 
         scopes = [
             'instagram_business_basic',
             'instagram_business_manage_insights',
         ]
-        scope_param = ','.join(scopes)
-        
-        url = (
-            f'https://www.instagram.com/oauth/authorize?'
-            f'client_id={self.app_id.strip()}&'
-            f'redirect_uri={self.redirect_uri}&'
-            f'state={state}&'
-            f'response_type=code&'
-            f'scope={scope_param}'
-        )
-        return {'url': url, 'state': state}
+        query = urlencode({
+            'client_id': self.app_id.strip(),
+            'redirect_uri': self.redirect_uri,
+            'state': state,
+            'response_type': 'code',
+            'scope': ','.join(scopes),
+        })
+        return {'url': f'https://www.instagram.com/oauth/authorize?{query}', 'state': state}
 
     async def exchange_code_for_access_token(self, code: str):
-        print("RECEIVED CODE:", repr(code))
-        print("EXCHANGE using redirect_uri:", repr(self.redirect_uri))
         async with self._http_client() as client:
             response = await client.post(
                 'https://api.instagram.com/oauth/access_token',
@@ -50,15 +64,16 @@ class MetaClient:
                     'code': code,
                 },
             )
-            print("STATUS:", response.status_code)
-            print("BODY:", response.text)
+            if response.status_code >= 400:
+                # The body never contains a token on failure, but log only the status to be safe.
+                logger.error("Instagram code exchange failed with status %s", response.status_code)
             response.raise_for_status()
             return response.json()
 
     async def exchange_for_long_lived_token(self, short_lived_token: str):
         async with self._http_client() as client:
             response = await client.get(
-                f'https://graph.instagram.com/access_token',
+                f'{GRAPH_BASE_URL}/access_token',
                 params={
                     'grant_type': 'ig_exchange_token',
                     'client_id': self.app_id.strip(),
@@ -69,15 +84,30 @@ class MetaClient:
             response.raise_for_status()
             return response.json()
 
+    async def refresh_long_lived_token(self, long_lived_token: str):
+        """Extend a long-lived token by another ~60 days (token must be ≥24h old and not expired)."""
+        async with self._http_client() as client:
+            response = await client.get(
+                f'{GRAPH_BASE_URL}/refresh_access_token',
+                params={
+                    'grant_type': 'ig_refresh_token',
+                    'access_token': long_lived_token,
+                },
+            )
+            _raise_for_auth_error(response)
+            response.raise_for_status()
+            return response.json()
+
     async def get_instagram_account(self, access_token: str):
         async with self._http_client() as client:
             response = await client.get(
-                'https://graph.instagram.com/me',
+                f'{GRAPH_BASE_URL}/me',
                 params={
                     'fields': 'id,username,account_type,name,profile_picture_url,followers_count,media_count,biography',
                     'access_token': access_token
                 }
             )
+            _raise_for_auth_error(response)
             response.raise_for_status()
             details = response.json()
             return {
@@ -90,44 +120,50 @@ class MetaClient:
                 'media_count': details.get('media_count', 0)
             }
 
-    async def get_user_media(self, ig_user_id: str, access_token: str):
+    async def get_user_media(self, ig_user_id: str, access_token: str, max_items: int = 50):
+        """Follow paging.next until max_items items are collected (newest first)."""
+        items: list[dict] = []
+        url = f'{GRAPH_BASE_URL}/me/media'
+        params: dict | None = {
+            'fields': 'id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp',
+            'limit': MEDIA_PAGE_SIZE,
+            'access_token': access_token,
+        }
         async with self._http_client() as client:
-            response = await client.get(
-                'https://graph.instagram.com/me/media',
-                params={
-                    'fields': 'id,caption,media_type,media_url,permalink,thumbnail_url,timestamp',
-                    'access_token': access_token
-                }
-            )
-            response.raise_for_status()
-            return response.json()
+            while url and len(items) < max_items:
+                response = await client.get(url, params=params)
+                _raise_for_auth_error(response)
+                response.raise_for_status()
+                payload = response.json()
+                items.extend(payload.get('data', []))
+                # paging.next already contains every query param, including the token.
+                url = (payload.get('paging') or {}).get('next')
+                params = None
+        return {'data': items[:max_items]}
 
     async def get_media_insights(self, ig_media_id: str, access_token: str):
         async with self._http_client() as client:
             metrics = 'reach,views,likes,comments,saved,shares,total_interactions'
             response = await client.get(
-                f'https://graph.instagram.com/{ig_media_id}/insights',
+                f'{GRAPH_BASE_URL}/{ig_media_id}/insights',
                 params={
                     'metric': metrics,
                     'period': 'lifetime',
                     'access_token': access_token,
                 }
             )
+            _raise_for_auth_error(response)
             if response.status_code != 200:
                 logger.warning(
                     "Failed to fetch insights for media %s (%s): %s",
                     ig_media_id,
                     response.status_code,
-                    response.text,
+                    response.text[:500],
                 )
                 return {}
             payload = response.json()
             if not payload.get("data"):
-                logger.warning(
-                    "Insights returned empty data for media %s: %s",
-                    ig_media_id,
-                    response.text[:500],
-                )
+                logger.warning("Insights returned empty data for media %s", ig_media_id)
             return payload
 
 meta_client = MetaClient()

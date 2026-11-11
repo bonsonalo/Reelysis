@@ -8,6 +8,9 @@ import { useAuth } from '@/store/hook'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { AuthField } from '@/components/auth/AuthField'
 import { Button } from '@/components/ui/button'
+import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
+import { postAuthDestination } from '@/features/instagram/utils'
+import { PasswordRuleList } from './PasswordRuleList'
 
 export default function RegisterForm() {
   const [name, setName] = useState('')
@@ -16,12 +19,14 @@ export default function RegisterForm() {
   const router = useRouter()
   const { mutate: register, isPending } = useRegister()
   const { error, status } = useAuth()
+  const { data: accounts, isLoading: isLoadingAccounts } = useInstagramAccounts({
+    enabled: status === 'succeeded',
+  })
 
   useEffect(() => {
-    if (status === 'succeeded') {
-      router.push('/onboarding')
-    }
-  }, [status, router])
+    if (status !== 'succeeded' || isLoadingAccounts || !accounts) return
+    router.push(postAuthDestination(accounts))
+  }, [status, accounts, isLoadingAccounts, router])
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,6 +90,7 @@ export default function RegisterForm() {
           disabled={isPending}
           required
         />
+        {password ? <PasswordRuleList value={password} className="-mt-2" /> : null}
 
         <Button type="submit" className="mt-1 w-full sm:mt-2" size="lg" disabled={isPending}>
           <ButtonLoadingLabel loading={isPending} loadingLabel="Creating account…">

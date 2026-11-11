@@ -16,7 +16,8 @@ from app.model.media_items import MediaItem
 from app.model.media_metrics import MediaMetric
 from app.model.recommendations import Recommendation
 from app.model.video_analysis import VideoAnalysis
-from app.model.user import User 
+from app.model.user import User
+from app.model.user_token import UserToken
 
 from alembic import context
 
@@ -35,7 +36,8 @@ config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep the app's loggers alive when migrations run inside the API process.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

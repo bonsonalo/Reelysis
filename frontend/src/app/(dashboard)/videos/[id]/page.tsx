@@ -10,7 +10,8 @@ import { MetricLabel } from '@/components/shared/MetricInfoTip'
 import { METRIC_HELP } from '@/features/dashboard/constants/metricHelp'
 import { Panel } from '@/components/shared/Panel'
 import { AiInsightsPending } from '@/features/dashboard/components/AiInsightsPending'
-import { cn } from '@/lib/utils'
+import { cn, isNotFoundError } from '@/lib/utils'
+import { PageErrorState } from '@/components/shared/PageErrorState'
 
 function formatNumber(num: number) {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
@@ -109,7 +110,7 @@ export default function VideoDetailPage() {
   const params = useParams()
   const videoId = params.id as string
 
-  const { data, isLoading } = useVideoAnalysis(videoId)
+  const { data, isLoading, error, isRefetching, refetch } = useVideoAnalysis(videoId)
 
   if (isLoading) {
     return (
@@ -128,6 +129,16 @@ export default function VideoDetailPage() {
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (error && !isNotFoundError(error)) {
+    return (
+      <PageErrorState
+        title="Couldn’t load this reel"
+        onRetry={() => refetch()}
+        retrying={isRefetching}
+      />
     )
   }
 

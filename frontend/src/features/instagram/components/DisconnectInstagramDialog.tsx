@@ -15,8 +15,13 @@ type DisconnectInstagramDialogProps = {
   onConfirm: () => void
 }
 
-export function DisconnectInstagramDialog({
-  open,
+export function DisconnectInstagramDialog(props: DisconnectInstagramDialogProps) {
+  // Mount the body only while open so its "acknowledged" checkbox starts unticked every time.
+  if (!props.open) return null
+  return <DisconnectInstagramDialogBody {...props} />
+}
+
+function DisconnectInstagramDialogBody({
   username,
   isPending,
   error,
@@ -27,11 +32,6 @@ export function DisconnectInstagramDialog({
   const [acknowledged, setAcknowledged] = useState(false)
 
   useEffect(() => {
-    if (!open) {
-      setAcknowledged(false)
-      return
-    }
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !isPending) {
         onClose()
@@ -44,9 +44,7 @@ export function DisconnectInstagramDialog({
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, isPending, onClose])
-
-  if (!open) return null
+  }, [isPending, onClose])
 
   return (
     <div

@@ -1,5 +1,6 @@
 'use client'
 
+import { getApiErrorMessage } from '@/lib/utils'
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
@@ -30,19 +31,15 @@ function SettingsContent() {
   const { mutate: updateNiche, isPending: isUpdatingNiche } = useUpdateNiche()
   const { currentUser, status: authStatus } = useAuth()
   const account = accounts?.[0]
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [nicheDraft, setNicheDraft] = useState('')
+  const tabParam = searchParams.get('tab')
+  const activeTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : 'profile'
+  // null = untouched, so the input shows the saved niche until the user edits it.
+  const [nicheEdit, setNicheDraft] = useState<string | null>(null)
+  const nicheDraft = nicheEdit ?? (account?.niche_confirmed || account?.niche_detected || '')
   const [nicheMessage, setNicheMessage] = useState<string | null>(null)
   const [nicheError, setNicheError] = useState<string | null>(null)
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false)
   const [disconnectError, setDisconnectError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const tabParam = searchParams.get('tab')
-    if (isSettingsTab(tabParam)) {
-      setActiveTab(tabParam)
-    }
-  }, [searchParams])
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'account') return
@@ -55,14 +52,7 @@ function SettingsContent() {
     }
   }, [searchParams, activeTab])
 
-  useEffect(() => {
-    if (account) {
-      setNicheDraft(account.niche_confirmed || account.niche_detected || '')
-    }
-  }, [account?.niche_confirmed, account?.niche_detected])
-
   const handleTabChange = (tab: SettingsTab) => {
-    setActiveTab(tab)
     router.replace(`/settings?tab=${tab}`, { scroll: false })
   }
 
@@ -77,8 +67,7 @@ function SettingsContent() {
         )
       },
       onError: (err: unknown) => {
-        const message = (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail
+        const message = getApiErrorMessage(err, '')
         setNicheError(typeof message === 'string' ? message : 'Could not detect niche. Try again later.')
       },
     })
@@ -103,8 +92,7 @@ function SettingsContent() {
           )
         },
         onError: (err: unknown) => {
-          const message = (err as { response?: { data?: { detail?: string } } })?.response?.data
-            ?.detail
+          const message = getApiErrorMessage(err, '')
           setNicheError(typeof message === 'string' ? message : 'Failed to save niche.')
         },
       },
@@ -116,13 +104,12 @@ function SettingsContent() {
     disconnect(undefined, {
       onSuccess: () => {
         setDisconnectDialogOpen(false)
-        setNicheDraft('')
+        setNicheDraft(null)
         setNicheMessage(null)
         setNicheError(null)
       },
       onError: (err: unknown) => {
-        const message = (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail
+        const message = getApiErrorMessage(err, '')
         setDisconnectError(
           typeof message === 'string' ? message : 'Failed to disconnect. Please try again.',
         )
@@ -148,7 +135,11 @@ function SettingsContent() {
 
         <div className="min-w-0 flex-1 lg:max-w-2xl">
           {activeTab === 'profile' && (
-            <SettingsProfileTab name={currentUser?.name} email={currentUser?.email} />
+            <SettingsProfileTab
+              name={currentUser?.name}
+              email={currentUser?.email}
+              emailVerified={currentUser?.email_verified}
+            />
           )}
 
           {activeTab === 'account' && (

@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, ForeignKey, Column, Relationship
 from uuid import UUID, uuid4
 import sqlalchemy.dialects.postgresql as pg
@@ -12,6 +13,9 @@ class AccountType(str, Enum):
 
 class InstagramAccount(SQLModel, table= True):
     __tablename__= "instagram_accounts"
+    __table_args__ = (
+        Index("ix_instagram_accounts_user_id", "user_id"),
+    )
 
 
     id: UUID= Field(

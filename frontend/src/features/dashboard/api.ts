@@ -46,6 +46,7 @@ export interface VideoFeedItem {
 
 export interface DashboardVideosResponse {
   data: VideoFeedItem[];
+  total?: number;
 }
 
 export const getDashboardStats = () => {
@@ -60,6 +61,8 @@ export const getContentPillars = () => {
   return api.get<DashboardPillarsResponse>('/api/v1/analysis/dashboard/pillars');
 };
 
-export const getDashboardVideos = (limit: number = 6) => {
-  return api.get<DashboardVideosResponse>(`/api/v1/analysis/dashboard/videos?limit=${limit}`);
+export const getDashboardVideos = (limit: number = 6, offset: number = 0) => {
+  return api.get<DashboardVideosResponse>('/api/v1/analysis/dashboard/videos', {
+    params: { limit, offset },
+  });
 };

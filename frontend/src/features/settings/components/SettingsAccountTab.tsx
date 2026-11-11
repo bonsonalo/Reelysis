@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { PageEmptyState } from '@/components/shared/PageEmptyState'
 import { formatLastSynced } from '@/lib/utils'
+import { ReconnectInstagramBanner } from '@/features/instagram/components/ReconnectInstagramBanner'
 import {
   SettingsActions,
   SettingsField,
@@ -19,6 +20,7 @@ type ConnectedAccount = {
   last_synced_at?: string | null
   niche_confirmed?: string | null
   niche_detected?: string | null
+  needs_reconnect?: boolean
 }
 
 type SettingsAccountTabProps = {
@@ -81,6 +83,9 @@ export function SettingsAccountTab({
       />
 
       <div className="border-b border-border-subtle px-4 py-5 sm:px-6 sm:py-6">
+        {account.needs_reconnect ? (
+          <ReconnectInstagramBanner username={account.username} className="mb-5" />
+        ) : null}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <a
@@ -93,8 +98,15 @@ export function SettingsAccountTab({
             </a>
             <p className="mt-1.5 text-sm text-text-secondary">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-                Connected
+                <span
+                  className={
+                    account.needs_reconnect
+                      ? 'h-1.5 w-1.5 rounded-full bg-amber-400'
+                      : 'h-1.5 w-1.5 rounded-full bg-emerald-400'
+                  }
+                  aria-hidden
+                />
+                {account.needs_reconnect ? 'Reconnect needed' : 'Connected'}
               </span>
               <span className="mx-2 text-text-tertiary" aria-hidden>
                 ·

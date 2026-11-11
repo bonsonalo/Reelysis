@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 
 
 from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
@@ -12,6 +13,10 @@ from typing import Any
 
 class CompetitorMedia(SQLModel, table= True):
     __tablename__= "competitior_media"
+    __table_args__ = (
+        Index("ix_competitior_media_competitor_account_id", "competitor_account_id"),
+        Index("ix_competitior_media_user_id", "user_id"),
+    )
 
 
 
@@ -36,9 +41,11 @@ class CompetitorMedia(SQLModel, table= True):
             nullable= False
         )
     )
-    provider_media_id: UUID= Field(
+    provider_media_id: str | None= Field(
+        default= None,
         sa_column= Column(
-            pg.UUID
+            pg.VARCHAR,
+            index= True,
         )
     )
     media_type: str

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
@@ -163,6 +165,25 @@ def normalize_competitor_profiles(raw_results: list) -> list[dict]:
     return ranked
 
 
+def _parse_posted_at(entry: dict) -> datetime | None:
+    """Bright Data uses ISO strings (date_posted / timestamp) or unix seconds (taken_at). Returns naive UTC."""
+    for key in ("date_posted", "timestamp", "taken_at", "posted_at"):
+        value = entry.get(key)
+        if not value:
+            continue
+        try:
+            if isinstance(value, (int, float)):
+                parsed = datetime.fromtimestamp(float(value), tz=timezone.utc)
+            else:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        except (ValueError, OSError, OverflowError):
+            continue
+    return None
+
+
 def normalize_competitor_media(raw_results: list) -> list[dict]:
     """Map Bright Data reel/post records into competitor media rows."""
     normalized = []
@@ -173,14 +194,16 @@ def normalize_competitor_media(raw_results: list) -> list[dict]:
             hashtags = [tag.strip("#") for tag in hashtags.split() if tag.startswith("#")]
 
         metrics = {
-            "views": int(entry.get("views") or entry.get("view_count") or entry.get("video_view_count") or 0),
-            "likes": int(entry.get("likes") or entry.get("like_count") or 0),
-            "comments": int(entry.get("num_comments") or entry.get("comment_count") or 0),
+            "views": _coerce_int(
+                entry.get("views") or entry.get("view_count") or entry.get("video_view_count") or entry.get("video_play_count")
+            ),
+            "likes": _coerce_int(entry.get("likes") or entry.get("like_count")),
+            "comments": _coerce_int(entry.get("num_comments") or entry.get("comment_count")),
         }
 
         normalized.append(
             {
-                "id": entry.get("id") or entry.get("shortcode"),
+                "id": entry.get("id") or entry.get("shortcode") or entry.get("post_id"),
                 "caption": caption,
                 "media_type": entry.get("content_type") or entry.get("media_type") or "VIDEO",
                 "permalink": entry.get("url") or entry.get("post_url") or entry.get("permalink") or "",
@@ -189,6 +212,7 @@ def normalize_competitor_media(raw_results: list) -> list[dict]:
                 "hashtags": hashtags if isinstance(hashtags, list) else [],
                 "transcript_text": entry.get("transcript_text") or entry.get("transcript") or "",
                 "metrics": metrics,
+                "published_at": _parse_posted_at(entry),
             }
         )
     return normalized

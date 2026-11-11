@@ -11,12 +11,6 @@ export function formatCompetitorEngagement(rank: number): string {
   return percent.toFixed(0)
 }
 
-/** Bar fill: 5% engagement = full width. */
-export function competitorEngagementBarWidth(rank: number): number {
-  if (!rank) return 0
-  return Math.min(100, (rank / 500) * 100)
-}
-
 export function shouldShowCompetitorEngagement(
   followersCount: number,
   engagementRank: number,

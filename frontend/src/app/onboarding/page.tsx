@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/axios'
 
 // Hooks
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
+import { useStartInstagramOAuth } from '@/features/instagram/hooks/useStartInstagramOAuth'
+import { getOAuthErrorMessage } from '@/features/instagram/utils'
 import { useConfirmNiche } from '@/features/instagram/hooks/useConfirmNiche'
 import { useCompetitors, useRemoveCompetitor, useRediscoverCompetitors } from '@/features/competitors/hooks/useCompetitors'
 import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
@@ -45,16 +47,18 @@ export default function OnboardingPage() {
 
 function OnboardingContent() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const isJustConnected = searchParams.get('connected') === 'true'
+  const oauthErrorMessage = getOAuthErrorMessage(searchParams.get('error'))
   
   const [step, setStep] = useState<OnboardingStep>('CONNECT')
   const [localNiche, setLocalNiche] = useState('')
-  const [isConnecting, setIsConnecting] = useState(false)
   
   // Manual Gate States
   const [hasTriggeredSync, setHasTriggeredSync] = useState(false)
   const [hasApprovedCompetitors, setHasApprovedCompetitors] = useState(false)
+  const [skippedReport, setSkippedReport] = useState(false)
 
   // 1. Data Fetching
   const { 
@@ -63,7 +67,16 @@ function OnboardingContent() {
     refetch: refetchAccounts 
   } = useInstagramAccounts({
     enabled: true,
-    refetchInterval: step === 'ANALYZING' ? 2000 : false
+    refetchInterval: (query) => {
+      if (step !== 'ANALYZING') return false
+      // Stop polling once the sync has failed; the user retries explicitly.
+      const latestSync = queryClient.getQueryData<{ status?: string } | null>([
+        'analysis-job',
+        'instagram_sync',
+      ])
+      if (latestSync?.status === 'failed' && !query.state.data?.[0]?.last_synced_at) return false
+      return 2000
+    },
   })
 
   useEffect(() => {
@@ -120,6 +133,11 @@ function OnboardingContent() {
 
   // 2. Mutations
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
+  const {
+    mutate: startOAuth,
+    isPending: isStartingOAuth,
+    error: startOAuthError,
+  } = useStartInstagramOAuth()
   const { mutate: confirmNiche, isPending: isConfirmingNiche } = useConfirmNiche()
   const { mutate: removeCompetitor } = useRemoveCompetitor()
   const { mutate: rediscoverCompetitors, isPending: isRediscovering } = useRediscoverCompetitors()
@@ -140,6 +158,9 @@ function OnboardingContent() {
   )
 
   // 3. Flow Logic
+  // The step is deliberately sticky state rather than a pure derivation: once the user reaches
+  // COMPETITORS or later it must not jump back when polled data changes, so it syncs in an effect.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isLoadingAccounts) return
 
@@ -150,15 +171,18 @@ function OnboardingContent() {
 
     if (!isConnected) {
       setStep('CONNECT')
-    } else if (!account.last_synced_at || isSyncing || syncJob?.status === 'running' || syncJob?.status === 'queued' || !account.niche_detected) {
+    } else if (!account.last_synced_at || isSyncing || syncJob?.status === 'running' || syncJob?.status === 'queued') {
       setStep('ANALYZING')
       if (!account.last_synced_at && !isSyncing && !syncJob && !hasTriggeredSync) {
         setHasTriggeredSync(true)
         triggerSync()
       }
     } else if (!account.niche_confirmed) {
+      // Niche detection can fail (e.g. AI quota); the user can still type one in.
+      if (step !== 'NICHE') {
+        setLocalNiche(account.niche_detected || '')
+      }
       setStep('NICHE')
-      setLocalNiche(account.niche_detected || '')
     } else if (roadmapJob?.status === 'running' || roadmapJob?.status === 'queued') {
       setStep('GENERATING_ROADMAP')
     } else if (roadmapJob?.status === 'succeeded') {
@@ -178,20 +202,15 @@ function OnboardingContent() {
     } else {
       setStep('FINDING_COMPETITORS')
     }
-  }, [isConnected, account, isSyncing, syncJob, discoveryJob, roadmapJob, competitors, isLoadingAccounts, triggerSync, hasApprovedCompetitors, isJustConnected, hasTriggeredSync])
+  }, [isConnected, account, isSyncing, syncJob, discoveryJob, roadmapJob, competitors, isLoadingAccounts, triggerSync, hasApprovedCompetitors, isJustConnected, hasTriggeredSync, step])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // 4. Handlers
-  const handleConnect = async () => {
-    setIsConnecting(true)
-    try {
-      const response = await api.get('/api/v1/instagram/oauth/start')
-      if (response.data?.oauth_url) {
-        window.location.href = response.data.oauth_url
-      }
-    } catch (error) {
-      console.error('Failed to start OAuth:', error)
-      setIsConnecting(false)
-    }
+  const handleConnect = () => startOAuth()
+
+  const handleRetrySync = () => {
+    setHasTriggeredSync(true)
+    triggerSync()
   }
 
   const handleConfirmNiche = () => {
@@ -211,18 +230,49 @@ function OnboardingContent() {
   }
 
   // 5. Render
-  switch (step) {
+  // The flow effect never leaves GENERATING_ROADMAP, so a finished report completes here.
+  const visibleStep: OnboardingStep =
+    step === 'GENERATING_ROADMAP' && roadmapJob?.status === 'succeeded' ? 'COMPLETED' : step
+
+  switch (visibleStep) {
     case 'CONNECT':
-      return <ConnectStep onConnect={handleConnect} isConnecting={isConnecting} />
+      return (
+        <ConnectStep
+          onConnect={handleConnect}
+          isConnecting={isStartingOAuth}
+          errorMessage={
+            startOAuthError
+              ? 'Could not start the Instagram connection. Please try again.'
+              : oauthErrorMessage
+          }
+        />
+      )
     
-    case 'ANALYZING':
+    case 'ANALYZING': {
+      const isSyncFailed = syncJob?.status === 'failed' && !isSyncing
+      const needsReconnect = isSyncFailed && Boolean(account?.needs_reconnect)
       return (
         <AnalyzingStep
           variant="shimmer"
           statusText={syncUi.description}
-          errorMessage={syncJob?.status === 'failed' ? syncJob.error_message : undefined}
-        />
+          errorMessage={isSyncFailed ? syncJob?.error_message : undefined}
+        >
+          {needsReconnect ? (
+            <Button onClick={handleConnect} disabled={isStartingOAuth}>
+              <ButtonLoadingLabel loading={isStartingOAuth} loadingLabel="Redirecting…">
+                Reconnect Instagram
+              </ButtonLoadingLabel>
+            </Button>
+          ) : isSyncFailed ? (
+            <Button onClick={handleRetrySync} disabled={isSyncing}>
+              <ButtonLoadingLabel loading={isSyncing} loadingLabel="Starting…">
+                Retry sync
+              </ButtonLoadingLabel>
+            </Button>
+          ) : null}
+        </AnalyzingStep>
       )
+    }
     
     case 'NICHE':
       return (
@@ -324,7 +374,13 @@ function OnboardingContent() {
               >
                 Retry
               </Button>
-              <Button onClick={() => setStep('COMPLETED')} variant="outline">
+              <Button
+                onClick={() => {
+                  setSkippedReport(true)
+                  setStep('COMPLETED')
+                }}
+                variant="outline"
+              >
                 Skip and continue
               </Button>
             </div>
@@ -341,19 +397,30 @@ function OnboardingContent() {
               <Check className="h-6 w-6 text-primary" strokeWidth={2} />
             </div>
             <h1 className="text-lg font-semibold text-white sm:text-xl">
-              Your strategy report is ready
+              {skippedReport ? 'You’re all set' : 'Your strategy report is ready'}
             </h1>
             <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-text-secondary">
-              We analyzed your Reels and competitors. Open the dashboard to read
-              your report and next steps.
+              {skippedReport
+                ? 'Your Reels and competitors are synced, but the report didn’t finish. You can generate it any time from Reports.'
+                : 'We analyzed your Reels and competitors. Open the dashboard to read your report and next steps.'}
             </p>
-            <Button
-              onClick={() => router.push('/dashboard')}
-              className="mt-8 w-full sm:w-auto"
-              size="lg"
-            >
-              Go to dashboard
-            </Button>
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button
+                onClick={() => router.push('/dashboard')}
+                className="w-full sm:w-auto"
+                size="lg"
+              >
+                Go to dashboard
+              </Button>
+              <Button
+                onClick={() => router.push('/reports')}
+                variant="outline"
+                className="w-full sm:w-auto"
+                size="lg"
+              >
+                {skippedReport ? 'Go to reports' : 'Read the report'}
+              </Button>
+            </div>
           </div>
         </OnboardingStepFrame>
       )

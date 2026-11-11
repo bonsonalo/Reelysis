@@ -1,21 +1,40 @@
 'use client'
 
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { getApiErrorMessage } from '@/lib/utils'
+import { useDeleteAccount } from '@/features/auth/hooks/useAccountSecurity'
+import { DeleteAccountDialog } from './DeleteAccountDialog'
 import {
   getDisplayName,
   getUserInitials,
   SettingsPanelHeader,
   SettingsRow,
   SettingsSection,
+  SettingsSectionHeader,
 } from './settingsUi'
 
 type SettingsProfileTabProps = {
   name?: string | null
   email?: string
+  emailVerified?: boolean
 }
 
-export function SettingsProfileTab({ name, email }: SettingsProfileTabProps) {
+export function SettingsProfileTab({ name, email, emailVerified }: SettingsProfileTabProps) {
   const displayName = getDisplayName(name, email)
   const initials = getUserInitials(name, email)
+  const { mutate: deleteAccount, isPending: isDeleting } = useDeleteAccount()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDelete = (password: string) => {
+    setDeleteError(null)
+    deleteAccount(password, {
+      onSuccess: () => setDialogOpen(false),
+      onError: (err) =>
+        setDeleteError(getApiErrorMessage(err, 'Could not delete your account. Try again.')),
+    })
+  }
 
   return (
     <SettingsSection>
@@ -36,7 +55,14 @@ export function SettingsProfileTab({ name, email }: SettingsProfileTabProps) {
         </div>
       </div>
 
-      <div className="border-t border-border-subtle px-4 sm:px-6">
+      <div className="divide-y divide-border-subtle border-t border-border-subtle px-4 sm:px-6">
+        <SettingsRow label="Email status">
+          {emailVerified ? (
+            <span className="text-emerald-400">Verified</span>
+          ) : (
+            <span className="text-amber-300">Not verified</span>
+          )}
+        </SettingsRow>
         <SettingsRow
           label="Plan"
           description="Paid plans are not available yet. Everyone starts on Free."
@@ -44,6 +70,35 @@ export function SettingsProfileTab({ name, email }: SettingsProfileTabProps) {
           <span className="text-text-secondary">Free</span>
         </SettingsRow>
       </div>
+
+      <div className="border-t border-border-subtle px-4 py-5 sm:px-6 sm:py-6">
+        <SettingsSectionHeader
+          title="Delete account"
+          description="Permanently remove your Reelysis account and all of its data."
+        />
+        <Button
+          type="button"
+          variant="destructive"
+          className="w-full sm:w-auto"
+          onClick={() => {
+            setDeleteError(null)
+            setDialogOpen(true)
+          }}
+          disabled={isDeleting}
+        >
+          Delete account
+        </Button>
+      </div>
+
+      <DeleteAccountDialog
+        open={dialogOpen}
+        isPending={isDeleting}
+        error={deleteError}
+        onClose={() => {
+          if (!isDeleting) setDialogOpen(false)
+        }}
+        onConfirm={handleDelete}
+      />
     </SettingsSection>
   )
 }

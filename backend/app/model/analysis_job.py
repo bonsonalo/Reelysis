@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 
 
 
@@ -15,6 +16,9 @@ from typing import Any
 
 class AnalysisJob(SQLModel, table= True):
     __tablename__= "analysis_jobs"
+    __table_args__ = (
+        Index("ix_analysis_jobs_user_id_job_type_created_at", "user_id", "job_type", "created_at"),
+    )
 
 
 

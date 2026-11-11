@@ -65,3 +65,24 @@ export function isLatestSyncAttemptFailed(
   const jobFinished = new Date(jobTimeSource).getTime()
   return jobFinished > lastSuccess
 }
+
+type ApiErrorLike = {
+  response?: { status?: number; data?: { detail?: unknown } }
+}
+
+/** Human-readable message from an axios error (FastAPI `detail`), with a fallback. */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  const response = (error as ApiErrorLike | null)?.response
+  if (response?.status === 429) return 'Too many attempts. Please wait a bit and try again.'
+  const detail = response?.data?.detail
+  if (typeof detail === 'string' && detail.trim()) return detail
+  // FastAPI 422s: [{loc, msg, ...}] — show the first message without pydantic's prefix.
+  if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') {
+    return detail[0].msg.replace(/^Value error, /, '')
+  }
+  return fallback
+}
+
+export function isNotFoundError(error: unknown): boolean {
+  return (error as ApiErrorLike | null)?.response?.status === 404
+}

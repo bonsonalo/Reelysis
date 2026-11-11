@@ -1,7 +1,7 @@
 from google import genai
 from app.core.config import settings
 from app.core.logger import logger
-from app.schema.ai_schema import VideoAnalysisResponse, StrategicReportResponse
+from app.schema.ai_schema import RecommendationItem, StrategicReportResponse, VideoAnalysisResponse
 import json
 import os
 import re
@@ -101,16 +101,25 @@ def _niche_handles_cache_key(niche: str) -> str:
     return f"competitor_handles:{niche.strip().lower()}"
 
 
-def _get_sync_redis():
-    import redis
+_sync_redis = None
 
-    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+def _get_sync_redis():
+    """One shared connection pool per process (redis-py clients are thread-safe)."""
+    global _sync_redis
+    if _sync_redis is None:
+        import redis
+
+        _sync_redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _sync_redis
 
 
 def _gemini_usage_key() -> str:
-    from datetime import date
+    """Gemini's free-tier daily quota resets at midnight Pacific time, so count by that day."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
 
-    return f"gemini_usage:{date.today().isoformat()}"
+    return f"gemini_usage:{datetime.now(ZoneInfo('America/Los_Angeles')).date().isoformat()}"
 
 
 def get_gemini_calls_today() -> int:
@@ -146,8 +155,9 @@ def reserve_gemini_call() -> bool:
             return False
         return True
     except Exception as e:
-        logger.warning("Could not reserve Gemini call slot: %s", e)
-        return True
+        # Fail closed: without the counter we cannot guarantee the budget.
+        logger.error("Could not reserve Gemini call slot (Redis unavailable): %s", e)
+        return False
 
 
 def _parse_gemini_retry_seconds(error: Exception) -> int | None:
@@ -441,41 +451,9 @@ def suggest_competitor_handles_sync(
     return ([], "Could not suggest competitor handles from Gemini.")
 
 
-async def detect_niche_service(
-    biography: str,
-    captions: list[str],
-    hashtags: list[str] | None = None,
-):
-    """
-    Async version of niche detection for non-Celery contexts.
-    """
-    if settings.AI_SIMULATION_MODE:
-        logger.info("AI Simulation Mode: Mocking niche detection")
-        return "Lifestyle & Productivity"
-
-    if not settings.GEMINI_API_KEY:
-        logger.warning("No Gemini API key provided. Falling back to default niche.")
-        return "Uncategorized"
-
-    try:
-        client = get_genai_client()
-        prompt = _build_niche_detection_prompt(biography, captions, hashtags)
-        response = client.models.generate_content(
-            model=settings.AI_MODEL_FLASH,
-            contents=prompt,
-        )
-        niche = (response.text or "").strip()
-        if not niche:
-            raise ValueError("Empty niche response from Gemini")
-        logger.info(f"AI Niche Detection Result: {niche}")
-        return niche
-    except Exception as e:
-        logger.error(f"Error in Gemini niche detection: {e}")
-        return None
-
 async def analyze_video_service(caption: str, transcript: str, hashtags: list[str] = None):
     """
-    Uses Gemini 1.5 Flash to analyze an individual video's creative and strategic elements.
+    Uses Gemini Flash to analyze an individual video's creative and strategic elements.
     Returns a structured VideoAnalysisResponse object.
     """
     # Check settings for AI simulation mode (works in both FastAPI and Celery contexts)
@@ -570,7 +548,22 @@ async def generate_strategic_report_service(user_data: dict, competitor_data: li
             competitor_strengths=["Strength A"],
             user_gaps=["Gap X"],
             user_advantages=["Advantage Y"],
-            roadmap=[],
+            roadmap=[
+                RecommendationItem(
+                    title="Open with the payoff",
+                    description="State the result in the first second, then show how you got there.",
+                    priority=5,
+                    evidence="Simulated: competitor Reels with direct hooks score higher.",
+                    type="hook",
+                ),
+                RecommendationItem(
+                    title="Post two how-to Reels a week",
+                    description="Your how-to pillar has the best engagement; make it a regular slot.",
+                    priority=3,
+                    evidence="Simulated: how-to content leads your pillar table.",
+                    type="topic",
+                ),
+            ],
             report_markdown="# Mock Strategy Report\nYour growth roadmap is here..."
         )
 

@@ -42,15 +42,6 @@ export const generateReport = () => {
   return api.post<{ message: string; job_id: string }>('/api/v1/reports/generate');
 };
 
-// Legacy analysis routes — kept for backward compatibility
-export const getLatestReport = () => {
-  return api.get<AccountReport>('/api/v1/analysis/report/latest');
-};
-
-export const getRoadmap = () => {
-  return api.get<Recommendation[]>('/api/v1/analysis/report/roadmap');
-};
-
 export const updateRecommendationStatus = (id: string) => {
   return api.patch<{ id: string; status: string }>(`/api/v1/analysis/report/roadmap/${id}`);
 };

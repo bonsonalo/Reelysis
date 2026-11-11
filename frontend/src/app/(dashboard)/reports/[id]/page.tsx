@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useReport } from '@/features/reports/hooks/useLatestReport'
+import { useReport } from '@/features/reports/hooks/useReports'
 import { useUpdateRecommendation } from '@/features/reports/hooks/useUpdateRecommendation'
 import { useGenerateRoadmap } from '@/features/reports/hooks/useGenerateRoadmap'
 import { useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
@@ -12,11 +13,12 @@ import { getReportGenerationUi } from '@/features/reports/utils/reportGeneration
 import { Recommendation } from '@/features/reports/api'
 import { ButtonLoadingLabel } from '@/components/shared/ButtonLoadingLabel'
 import { ReportDetailPageSkeleton } from '@/components/shared/PageSkeletons'
+import { PageErrorState } from '@/components/shared/PageErrorState'
 import { Panel } from '@/components/shared/Panel'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, ArrowLeft, Check, Loader2, Plus } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, Download, Loader2, Plus } from 'lucide-react'
 import Markdown from 'react-markdown'
-import { cn } from '@/lib/utils'
+import { cn, isNotFoundError } from '@/lib/utils'
 
 const FILTER_OPTIONS = ['all', 'pending', 'completed'] as const
 type FilterOption = (typeof FILTER_OPTIONS)[number]
@@ -28,8 +30,10 @@ function formatRecommendationType(type: string) {
 export default function ReportDetailPage() {
   const params = useParams()
   const reportId = params.id as string
+  const router = useRouter()
+  const queryClient = useQueryClient()
 
-  const { data: report, isLoading } = useReport(reportId)
+  const { data: report, isLoading, error, isRefetching, refetch } = useReport(reportId)
   const { mutate: updateRecommendation, isPending: isUpdating } = useUpdateRecommendation()
   const { mutate: generateReport, isPending: isStarting } = useGenerateRoadmap()
   const [pendingJobId, setPendingJobId] = useState<string | null>(null)
@@ -50,16 +54,12 @@ export default function ReportDetailPage() {
 
   const [filter, setFilter] = useState<FilterOption>('all')
 
+  // isGenerating is derived from the job status, so nothing needs resetting here.
   useEffect(() => {
-    if (!pendingJob) return
-    if (pendingJob.status === 'succeeded') {
-      setPendingJobId(null)
-      window.location.href = '/reports'
-    }
-    if (pendingJob.status === 'failed') {
-      setPendingJobId(null)
-    }
-  }, [pendingJob?.status, pendingJob])
+    if (pendingJob?.status !== 'succeeded') return
+    queryClient.invalidateQueries({ queryKey: ['reports'] })
+    router.push('/reports')
+  }, [pendingJob?.status, queryClient, router])
 
   const handleToggleRecommendation = (id: string) => {
     setUpdatingId(id)
@@ -70,6 +70,16 @@ export default function ReportDetailPage() {
 
   if (isLoading) {
     return <ReportDetailPageSkeleton />
+  }
+
+  if (error && !isNotFoundError(error)) {
+    return (
+      <PageErrorState
+        title="Couldn’t load this report"
+        onRetry={() => refetch()}
+        retrying={isRefetching}
+      />
+    )
   }
 
   if (!report) {
@@ -101,11 +111,11 @@ export default function ReportDetailPage() {
   })
 
   return (
-    <div className="space-y-6 pb-16 md:space-y-8 md:pb-20">
+    <div className="print-report space-y-6 pb-16 md:space-y-8 md:pb-20">
       <header className="border-b border-border-subtle pb-6 md:pb-8">
         <Link
           href="/reports"
-          className="mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
+          className="print:hidden mb-5 inline-flex items-center gap-2 text-sm text-text-secondary transition-colors duration-150 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           All reports
@@ -119,43 +129,56 @@ export default function ReportDetailPage() {
               {report.summary}
             </p>
           </div>
-          <Button
-            onClick={() =>
-              generateReport(undefined, {
-                onSuccess: (data) => {
-                  if (data?.job_id) setPendingJobId(String(data.job_id))
-                },
-              })
-            }
-            disabled={isGenerating || isStarting}
-            className="w-full shrink-0 md:w-auto"
-          >
-            <ButtonLoadingLabel
-              loading={isGenerating || isStarting}
-              loadingLabel="Generating…"
+          <div className="print:hidden flex w-full shrink-0 flex-col gap-2 sm:flex-row md:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="w-full md:w-auto"
+              title="Opens the print dialog — choose “Save as PDF”"
             >
-              <>
-                <Plus className="h-4 w-4" />
-                Generate report
-              </>
-            </ButtonLoadingLabel>
-          </Button>
+              <Download className="h-4 w-4" />
+              Export PDF
+            </Button>
+            <Button
+              onClick={() =>
+                generateReport(undefined, {
+                  onSuccess: (data) => {
+                    if (data?.job_id) setPendingJobId(String(data.job_id))
+                  },
+                })
+              }
+              disabled={isGenerating || isStarting}
+              className="w-full md:w-auto"
+            >
+              <ButtonLoadingLabel
+                loading={isGenerating || isStarting}
+                loadingLabel="Generating…"
+              >
+                <>
+                  <Plus className="h-4 w-4" />
+                  Generate report
+                </>
+              </ButtonLoadingLabel>
+            </Button>
+          </div>
         </div>
       </header>
 
       {(isGenerating || isStarting) && (
-        <ReportGenerationPanel
-          reportUi={getReportGenerationUi(
-            pendingJob?.progress ?? 0,
-            pendingJob?.status ?? 'queued',
-          )}
-          errorMessage={
-            pendingJob?.status === 'failed' ? pendingJob.error_message : undefined
-          }
-        />
+        <div className="print:hidden">
+          <ReportGenerationPanel
+            reportUi={getReportGenerationUi(
+              pendingJob?.progress ?? 0,
+              pendingJob?.status ?? 'queued',
+            )}
+            errorMessage={
+              pendingJob?.status === 'failed' ? pendingJob.error_message : undefined
+            }
+          />
+        </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 md:gap-8 xl:grid-cols-5 xl:gap-10">
+      <div className="grid print:block grid-cols-1 gap-5 md:gap-8 xl:grid-cols-5 xl:gap-10">
         <section className="space-y-3 md:space-y-5 xl:col-span-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
             <div>
@@ -164,7 +187,7 @@ export default function ReportDetailPage() {
                 {pendingCount} to do · {completedCount} done
               </p>
             </div>
-            <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] border border-border-subtle bg-surface-input p-0.5 md:overflow-visible">
+            <div className="print:hidden inline-flex max-w-full overflow-x-auto rounded-[10px] border border-border-subtle bg-surface-input p-0.5 md:overflow-visible">
               {FILTER_OPTIONS.map((value) => (
                 <button
                   key={value}
@@ -201,7 +224,7 @@ export default function ReportDetailPage() {
                     <div
                       key={item.id}
                       className={cn(
-                        'flex gap-3 px-3.5 py-3 transition-colors duration-150 md:gap-4 md:px-5 md:py-5 lg:px-6',
+                        'print-avoid-break flex gap-3 px-3.5 py-3 transition-colors duration-150 md:gap-4 md:px-5 md:py-5 lg:px-6',
                         isCompleted && 'bg-white/[0.01]',
                       )}
                     >
@@ -259,14 +282,14 @@ export default function ReportDetailPage() {
           </Panel>
         </section>
 
-        <section className="space-y-3 md:space-y-5 xl:col-span-2">
+        <section className="space-y-3 md:space-y-5 xl:col-span-2 print:mt-8">
           <div>
             <h2 className="text-sm font-semibold text-white md:text-base">Full report</h2>
             <p className="mt-0.5 text-xs text-text-secondary md:mt-1 md:text-sm">
               Complete strategy write-up
             </p>
           </div>
-          <Panel className="max-h-[min(720px,calc(100dvh-10rem))] overflow-y-auto p-3.5 custom-scrollbar md:max-h-[min(720px,calc(100vh-12rem))] md:p-6 xl:sticky xl:top-8">
+          <Panel className="print-scroll-reset max-h-[min(720px,calc(100dvh-10rem))] overflow-y-auto p-3.5 custom-scrollbar md:max-h-[min(720px,calc(100vh-12rem))] md:p-6 xl:sticky xl:top-8">
             <div className="prose prose-invert prose-sm max-w-none prose-headings:font-semibold prose-headings:text-white prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-label prose-a:text-primary">
               <Markdown>{report.report_markdown}</Markdown>
             </div>

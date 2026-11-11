@@ -19,6 +19,7 @@ class User(SQLModel, table= True):
     email: EmailStr = Field(unique= True)
     name: str
     password_hash: str
+    email_verified_at: datetime | None = Field(default=None)
     created_at: datetime= Field(
         default_factory=utc_now
         )
@@ -60,6 +61,10 @@ class User(SQLModel, table= True):
         cascade_delete= True
     )
     recommendations: list["Recommendation"]= Relationship(
+        back_populates= "user",
+        cascade_delete= True
+    )
+    user_tokens: list["UserToken"]= Relationship(
         back_populates= "user",
         cascade_delete= True
     )

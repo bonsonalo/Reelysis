@@ -11,7 +11,6 @@ export const useGenerateRoadmap = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
-      queryClient.invalidateQueries({ queryKey: ['latest-report'] })
       queryClient.invalidateQueries({ queryKey: ['analysis-job', 'report_generation'] })
       if (data?.job_id) {
         queryClient.invalidateQueries({ queryKey: ['analysis-job-by-id', data.job_id] })

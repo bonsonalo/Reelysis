@@ -12,9 +12,16 @@ from app.core.config import settings
 
 
 def _client_ip(request: Request) -> str:
+    """
+    Each trusted proxy appends the address it received the request from, so the client IP is the
+    entry TRUSTED_PROXY_HOPS from the right. Entries further left are client-controlled.
+    """
+    hops = settings.TRUSTED_PROXY_HOPS
     forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    if forwarded and hops > 0:
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            return parts[-hops] if len(parts) >= hops else parts[0]
     if request.client and request.client.host:
         return request.client.host
     return get_remote_address(request)
@@ -73,3 +80,7 @@ def job_trigger_limit() -> str:
 
 def ai_trigger_limit() -> str:
     return f"{settings.RATE_LIMIT_AI_TRIGGERS_PER_HOUR}/hour"
+
+
+def auth_email_limit() -> str:
+    return f"{settings.RATE_LIMIT_AUTH_EMAIL_PER_HOUR}/hour"

@@ -26,7 +26,10 @@ import { useDashboardVideos } from '@/features/dashboard/hooks/useDashboardVideo
 import { useAnalysisJob, useAnalysisJobById } from '@/features/instagram/hooks/useAnalysisJob'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { useTriggerSync } from '@/features/instagram/hooks/useTriggerSync'
+import { ReconnectInstagramBanner } from '@/features/instagram/components/ReconnectInstagramBanner'
 import { formatLastSynced, formatSyncError, isLatestSyncAttemptFailed, cn } from '@/lib/utils'
+
+const SYNC_POLL_TIMEOUT_MS = 5 * 60 * 1000
 
 function formatNumber(num: number) {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
@@ -77,7 +80,7 @@ export default function DashboardPage() {
 
   const { mutate: triggerSync, isPending: isSyncing } = useTriggerSync()
   const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useDashboardStats()
-  const { data: growth, refetch: refetchGrowth } = useDashboardGrowth()
+  const { data: growth, isLoading: isLoadingGrowth, refetch: refetchGrowth } = useDashboardGrowth()
   const { data: pillars, isLoading: isLoadingPillars, refetch: refetchPillars } =
     useContentPillars()
   const { data: videos, isLoading: isLoadingVideos, refetch: refetchVideos } =
@@ -105,8 +108,6 @@ export default function DashboardPage() {
   })
 
   const completedJobIdRef = useRef<string | null>(null)
-  const pollStartedAtRef = useRef<number | null>(null)
-  const SYNC_POLL_TIMEOUT_MS = 5 * 60 * 1000
   const account = accounts?.[0]
   const showSyncFailure =
     isLatestSyncAttemptFailed(account?.last_synced_at, syncJob) && !!syncJob?.error_message
@@ -121,7 +122,6 @@ export default function DashboardPage() {
 
   const handleSync = () => {
     if (syncInProgress) return
-    pollStartedAtRef.current = Date.now()
     triggerSync(undefined, {
       onSuccess: (data) => {
         setPendingSyncJobId(String(data.job_id))
@@ -129,31 +129,23 @@ export default function DashboardPage() {
     })
   }
 
+  // Give up client-side polling after a while even if the job never changes; the
+  // backend reconciler will eventually mark a stuck job as failed.
   useEffect(() => {
-    if (!pendingSyncJobId) {
-      pollStartedAtRef.current = null
-      return
-    }
-    if (!pollStartedAtRef.current) {
-      pollStartedAtRef.current = Date.now()
-    }
-  }, [pendingSyncJobId])
+    if (!pendingSyncJobId) return
+    const timer = window.setTimeout(() => {
+      setPendingSyncJobId((current) => (current === pendingSyncJobId ? null : current))
+      queryClient.invalidateQueries({ queryKey: ['analysis-job', 'instagram_sync'] })
+    }, SYNC_POLL_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [pendingSyncJobId, queryClient])
 
   useEffect(() => {
     if (!pendingSyncJobId || !pendingSyncJob) return
 
     const isDone =
       pendingSyncJob.status === 'succeeded' || pendingSyncJob.status === 'failed'
-    if (!isDone) {
-      if (
-        pollStartedAtRef.current &&
-        Date.now() - pollStartedAtRef.current > SYNC_POLL_TIMEOUT_MS
-      ) {
-        setPendingSyncJobId(null)
-        pollStartedAtRef.current = null
-      }
-      return
-    }
+    if (!isDone) return
     if (completedJobIdRef.current === pendingSyncJobId) return
 
     completedJobIdRef.current = pendingSyncJobId
@@ -165,7 +157,6 @@ export default function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['instagram-accounts'] })
     refreshDashboardData()
     setPendingSyncJobId(null)
-    pollStartedAtRef.current = null
   }, [pendingSyncJobId, pendingSyncJob, queryClient])
 
   const syncUi = getInstagramSyncUi(
@@ -232,6 +223,8 @@ export default function DashboardPage() {
           </ButtonLoadingLabel>
         </Button>
       </header>
+
+      {account?.needs_reconnect && <ReconnectInstagramBanner username={account.username} />}
 
       {syncInProgress && (
         <ProcessStatus statusText={syncUi.description} tasks={syncUi.tasks} />
@@ -307,7 +300,9 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="h-[220px] w-full min-w-0 sm:h-[260px]">
-            {growth?.data && growth.data.length > 0 ? (
+            {isLoadingGrowth ? (
+              <div className="h-full w-full animate-pulse rounded-[10px] bg-white/[0.03]" />
+            ) : growth?.data && growth.data.length > 0 ? (
               <GrowthChart data={growth.data} />
             ) : (
               <div className="flex h-full items-center justify-center">

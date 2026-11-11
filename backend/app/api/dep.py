@@ -1,4 +1,3 @@
-from jose import JWTError
 from passlib.context import CryptContext
 from pydantic import EmailStr
 from sqlmodel import select
@@ -10,7 +9,7 @@ import uuid
 from app.core.config import settings
 from datetime import timedelta
 import jwt
-from uuid import UUID   
+from uuid import UUID
 from app.model.user import User
 from app.core.logger import logger
 from app.core.database import get_db
@@ -34,13 +33,21 @@ async def authenticate_user(user_credential: LoginInfo, db: AsyncSession):
         raise ValueError("Authentication failed")
 
 
-async def create_access_token(email: EmailStr, id: uuid.UUID, token_purpose: str, expires_delta: timedelta):
+async def create_access_token(
+    email: EmailStr,
+    id: uuid.UUID,
+    token_purpose: str,
+    expires_delta: timedelta,
+    extra_claims: dict | None = None,
+):
     try:
         encode= {
             "sub": email,
             "id": str(id),
             "token_type": token_purpose
         }
+        if extra_claims:
+            encode.update(extra_claims)
 
         expire= utc_now() + expires_delta
         encode.update({"exp": expire})
@@ -51,7 +58,25 @@ async def create_access_token(email: EmailStr, id: uuid.UUID, token_purpose: str
     except Exception as e:
         logger.error(f"Error creating access token: {e}")
         raise ValueError("Token creation failed")
-    
+
+
+def decode_token(token: str, expected_type: str) -> dict:
+    """Decode and validate a JWT of the given token_type. Raises ValueError on any problem."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except jwt.PyJWTError as e:
+        raise ValueError(f"Invalid token: {e}") from e
+
+    email = payload.get("sub")
+    raw_id = payload.get("id")
+    if not email or not raw_id or payload.get("token_type") != expected_type:
+        raise ValueError("Invalid token payload")
+    try:
+        payload["id"] = UUID(raw_id)
+    except (ValueError, TypeError) as e:
+        raise ValueError("Invalid token payload") from e
+    return payload
+
 
 
 db_dependency= Annotated[AsyncSession, Depends(get_db)]
@@ -61,20 +86,13 @@ async def get_current_user(request: Request):
         token= request.cookies.get("access_token")
         if not token:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        
-        try:
-            payload= jwt.decode(token, settings.SECRET_KEY, algorithms= [settings.ALGORITHM])
-            email: str= payload.get("sub")
-            id: UUID= UUID(payload.get("id"))
-            token_type: str= payload.get("token_type")
 
-            if email is None or id is None or token_type != "access":
-                logger.error("Invalid token payload")
-                raise HTTPException(status_code=401, detail="Invalid token")
-            return {"email": email, "id": id}
-        except JWTError as e:
-            logger.error(f"JWT decode error: {e}")
+        try:
+            payload = decode_token(token, "access")
+        except ValueError as e:
+            logger.info("Rejected access token: %s", e)
             raise HTTPException(status_code=401, detail="Invalid token")
-        
+        return {"email": payload["sub"], "id": payload["id"]}
+
 
 user_authentication_dependency= Annotated[dict, Depends(get_current_user)]

@@ -1,10 +1,9 @@
 import asyncio
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import UUID
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, run_async_task
 from app.core.logger import logger
 from app.core.celery_app import celery_app
 from app.core.client.social_data import social_data_client, normalize_competitor_media
@@ -18,6 +17,14 @@ from app.utils.competitor_metrics import (
     engagement_rate_to_rank,
 )
 from app.utils.cdn_image import prefetch_competitor_avatar
+from app.service.job_utils import (
+    job_should_start,
+    mark_failed,
+    mark_running,
+    mark_succeeded,
+    reconcile_job,
+    set_progress,
+)
 
 
 # MVP limits — store up to 10, deep-fetch reels for top 5 only (saves Bright Data + Gemini analysis credits)
@@ -38,8 +45,6 @@ PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 15, 20, 25, 30] + [30] * 12 + [45] * 
 REPORT_COMPETITOR_FRESHNESS_SECONDS = 7 * 24 * 60 * 60
 
 MEDIA_SNAPSHOT_POLL_DELAYS_SECONDS = [0, 5, 8, 10, 12, 15, 15, 15, 15, 15]
-STALE_QUEUED_DISCOVERY_SECONDS = 180
-STALE_RUNNING_DISCOVERY_SECONDS = 720
 
 # initial = first onboarding discover (may use cached Gemini handles)
 # refresh_suggestions = explicit rediscover (fresh Gemini + replace auto-discovered set)
@@ -50,58 +55,16 @@ DISCOVERY_MODE_REFRESH = "refresh_suggestions"
 from app.utils.time import utc_now
 
 
-def _utc_now() -> datetime:
-    return utc_now()
-
-
-def _seconds_since_timestamp(ts: datetime, now: datetime | None = None) -> float:
-    reference = now or _utc_now()
-    if ts.tzinfo is None:
-        ref_naive = reference.astimezone().replace(tzinfo=None) if reference.tzinfo else reference
-        return max(0.0, (ref_naive - ts).total_seconds())
-    return max(0.0, (reference.astimezone(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds())
-
-
-def _discovery_job_age_seconds(job: AnalysisJob, now: datetime | None = None) -> float:
-    started = job.started_at
-    if started is None or started.year <= 1971:
-        return _seconds_since_timestamp(job.created_at, now)
-    return _seconds_since_timestamp(started, now)
-
-
 async def reconcile_competitor_discovery_job(job: AnalysisJob, db: AsyncSession) -> AnalysisJob:
-    """Fail or re-dispatch stale competitor discovery jobs."""
-    if job.job_type != "competitor_discovery" or job.status not in (
-        "queued",
-        "running",
-    ):
+    """Fail stale competitor discovery jobs."""
+    if job.job_type != "competitor_discovery":
         return job
-
-    now = _utc_now()
-    age = _discovery_job_age_seconds(job, now)
-
-    if job.status == "queued":
-        if age >= STALE_QUEUED_DISCOVERY_SECONDS:
-            logger.warning("Failing stale queued discovery job %s (age %.0fs)", job.id, age)
-            job.status = "failed"
-            job.error_message = "Discovery timed out before starting. Please try again."
-            job.completed_at = now
-            db.add(job)
-            await db.commit()
-            await db.refresh(job)
-            return job
-        return job
-
-    if age >= STALE_RUNNING_DISCOVERY_SECONDS:
-        logger.warning("Failing stale running discovery job %s (age %.0fs)", job.id, age)
-        job.status = "failed"
-        job.error_message = "Discovery timed out. Please try again."
-        job.completed_at = now
-        db.add(job)
-        await db.commit()
-        await db.refresh(job)
-
-    return job
+    return await reconcile_job(
+        job,
+        db,
+        queued_message="Discovery timed out before starting. Please try again.",
+        running_message="Discovery timed out. Please try again.",
+    )
 
 
 async def _get_running_competitor_job(user_id: UUID, db: AsyncSession) -> AnalysisJob | None:
@@ -239,7 +202,7 @@ async def rediscover_competitors_service(user_id: UUID, db: AsyncSession):
 
 @celery_app.task(name="app.service.competitor_service.fetch_competitor_media_task")
 def fetch_competitor_media_task(competitor_id: str, user_id: str):
-    return asyncio.run(_fetch_competitor_media_internal(competitor_id, user_id))
+    return run_async_task(_fetch_competitor_media_internal, competitor_id, user_id)
 
 
 async def _fetch_competitor_media_internal(competitor_id: str, user_id: str):
@@ -293,12 +256,12 @@ def poll_competitor_results_task(job_id: str, user_id: str):
     Celery task: Gemini handle suggestions → Bright Data profiles → save competitors.
     Reel fetching runs in a separate background task so discovery can finish quickly.
     """
-    return asyncio.run(_poll_results_internal(job_id, user_id))
+    return run_async_task(_poll_results_internal, job_id, user_id)
 
 
 @celery_app.task(name="app.service.competitor_service.fetch_competitor_media_batch_task")
 def fetch_competitor_media_batch_task(competitor_ids: list[str], user_id: str):
-    return asyncio.run(_fetch_media_batch_internal(competitor_ids, user_id))
+    return run_async_task(_fetch_media_batch_internal, competitor_ids, user_id)
 
 
 async def _fetch_media_batch_internal(competitor_ids: list[str], user_id: str):
@@ -316,7 +279,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
         job = None
         try:
             job = await db.get(AnalysisJob, UUID(job_id))
-            if not job:
+            if not job_should_start(job):
                 return
 
             niche = job.input_payload.get("niche", "")
@@ -324,8 +287,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
             force_refresh = discovery_mode == DISCOVERY_MODE_REFRESH
             user_uuid = UUID(user_id)
 
-            job.status = "running"
-            job.started_at = utc_now()
+            mark_running(job)
             await db.commit()
 
             account_stmt = select(InstagramAccount).where(InstagramAccount.user_id == user_uuid)
@@ -361,7 +323,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
                 "snapshot_id": snapshot_id,
                 "suggested_handles": suggested_handles,
             }
-            job.progress = 10
+            set_progress(job, 10)
             await db.commit()
 
             # STAGE 2: Wait for profile snapshot (~10 min max)
@@ -395,9 +357,7 @@ async def _poll_results_internal(job_id: str, user_id: str):
                     "Try adding handles manually."
                 )
 
-            job.status = "succeeded"
-            job.progress = 100
-            job.completed_at = utc_now()
+            mark_succeeded(job)
             await db.commit()
 
             # STAGE 4: Reel fetch + transcription in background (not part of discovery job polling)
@@ -408,12 +368,14 @@ async def _poll_results_internal(job_id: str, user_id: str):
             )
 
         except Exception as e:
-            logger.error(f"Error in competitor discovery task: {e}")
+            logger.exception(f"Error in competitor discovery task: {e}")
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
-                job.completed_at = utc_now()
-                await db.commit()
+                await db.rollback()
+                failed_job = await db.get(AnalysisJob, UUID(job_id))
+                if failed_job:
+                    mark_failed(failed_job, str(e))
+                    db.add(failed_job)
+                    await db.commit()
 
 
 async def _poll_profile_snapshot(
@@ -442,9 +404,12 @@ async def _poll_profile_snapshot(
         )
         if job and db is not None:
             span = max(progress_end - progress_start, 1)
-            job.progress = min(
-                progress_end,
-                progress_start + int(((attempt + 1) / len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS)) * span),
+            set_progress(
+                job,
+                min(
+                    progress_end,
+                    progress_start + int(((attempt + 1) / len(PROFILE_SNAPSHOT_POLL_DELAYS_SECONDS)) * span),
+                ),
             )
             db.add(job)
             await db.commit()
@@ -452,9 +417,13 @@ async def _poll_profile_snapshot(
 
 
 async def _get_top_competitors(db: AsyncSession, user_id: UUID) -> list[CompetitorAccount]:
-    stmt = select(CompetitorAccount).where(CompetitorAccount.user_id == user_id)
-    competitors = (await db.exec(stmt)).all()
-    return competitors[:MAX_COMPETITORS_TO_ANALYZE]
+    stmt = (
+        select(CompetitorAccount)
+        .where(CompetitorAccount.user_id == user_id)
+        .order_by(CompetitorAccount.followers_count.desc(), CompetitorAccount.engagement_rank.desc())
+        .limit(MAX_COMPETITORS_TO_ANALYZE)
+    )
+    return list((await db.exec(stmt)).all())
 
 
 async def competitor_data_needs_refresh(db: AsyncSession, user_id: UUID) -> bool:
@@ -465,15 +434,12 @@ async def competitor_data_needs_refresh(db: AsyncSession, user_id: UUID) -> bool
     if not top:
         return False
 
-    now = _utc_now()
+    now = utc_now()
     for competitor in top:
         synced_at = competitor.last_synced_at
         if synced_at is None:
             return True
-        if synced_at.tzinfo is None:
-            age = _seconds_since_timestamp(synced_at.replace(tzinfo=timezone.utc), now)
-        else:
-            age = _seconds_since_timestamp(synced_at, now)
+        age = (now - synced_at.replace(tzinfo=None)).total_seconds()
         if age > REPORT_COMPETITOR_FRESHNESS_SECONDS:
             return True
 
@@ -513,7 +479,7 @@ async def prepare_competitor_data_for_report(
 
     handles = [c.handle for c in top]
     if job:
-        job.progress = 5
+        set_progress(job, 5)
         db.add(job)
         await db.commit()
 
@@ -539,14 +505,14 @@ async def prepare_competitor_data_for_report(
         raise Exception("Could not refresh competitor profiles before report generation.")
 
     if job:
-        job.progress = 40
+        set_progress(job, 40)
         db.add(job)
         await db.commit()
 
     await _fetch_all_competitor_media(db, updated_ids[:MAX_COMPETITORS_TO_ANALYZE], user_id)
 
     if job:
-        job.progress = 55
+        set_progress(job, 55)
         db.add(job)
         await db.commit()
 
@@ -851,25 +817,57 @@ async def _save_competitor_media(db: AsyncSession, competitor_id: UUID, user_id:
         await _enrich_competitor_from_provider_entry(db, competitor_id, raw)
 
     entries = normalize_competitor_media(results)
+    existing = (
+        await db.exec(select(CompetitorMedia).where(CompetitorMedia.competitor_account_id == competitor_id))
+    ).all()
+    by_key = {}
+    for row in existing:
+        for key in (row.provider_media_id, row.permalink):
+            if key:
+                by_key[key] = row
+
     for entry in entries[:MAX_VIDEOS_PER_COMPETITOR]:
+        provider_id = str(entry.get("id") or "") or None
+        permalink = entry.get("permalink", "")
         provider_transcript = (entry.get("transcript_text") or entry.get("transcript") or "").strip()
         audio_url = entry.get("audio_url") or entry.get("media_url") or ""
+        published_at = entry.get("published_at") or utc_now()
+
+        media = by_key.get(provider_id) or by_key.get(permalink)
+        if media:
+            # Re-scrape: refresh metrics and URLs (CDN links expire) but keep transcript + analyses.
+            media.caption = entry.get("caption", "") or media.caption
+            media.metrics = entry.get("metrics", {}) or media.metrics
+            media.thumbnail_url = entry.get("thumbnail_url") or media.thumbnail_url
+            media.audio_url = audio_url or media.audio_url
+            media.published_at = published_at
+            if provider_id and not media.provider_media_id:
+                media.provider_media_id = provider_id
+            if provider_transcript and media.transcript_source in ("", "none", "simulation"):
+                media.transcript_text = provider_transcript
+                media.transcript_source = "provider"
+            db.add(media)
+            continue
+
         media = CompetitorMedia(
             user_id=user_id,
             competitor_account_id=competitor_id,
-            provider_media_id=UUID(str(uuid4())) if not entry.get("id") else None,
+            provider_media_id=provider_id,
             media_type=entry.get("media_type", "VIDEO"),
             caption=entry.get("caption", ""),
             hashtags={"names": entry.get("hashtags", [])},
-            permalink=entry.get("permalink", ""),
+            permalink=permalink,
             thumbnail_url=entry.get("thumbnail_url", ""),
             audio_url=audio_url,
             transcript_text=provider_transcript,
             transcript_source="provider" if provider_transcript else "none",
             metrics=entry.get("metrics", {}),
-            published_at=utc_now(),
+            published_at=published_at,
         )
         db.add(media)
+        for key in (provider_id, permalink):
+            if key:
+                by_key[key] = media
     try:
         await db.commit()
     except Exception as e:

@@ -33,6 +33,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/store/hook'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
+import { postAuthDestination } from '@/features/instagram/utils'
 
 export default function LandingPage() {
   const router = useRouter()
@@ -44,7 +45,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isLoadingAccounts && accounts !== undefined) {
-      router.push(accounts.length > 0 ? '/dashboard' : '/onboarding')
+      router.push(postAuthDestination(accounts))
     }
   }, [isAuthenticated, accounts, isLoadingAccounts, router])
 

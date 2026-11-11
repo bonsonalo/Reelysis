@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 
 from app.api.dep import db_dependency, user_authentication_dependency
+from app.api.errors import internal_error
 from app.core.rate_limit import get_user_key, job_trigger_limit, limiter
 from app.schema.report_schema import ReportDetailResponse, ReportListItem, RecommendationResponse
 from app.service.report_service import (
@@ -41,8 +42,8 @@ async def generate_report(
             "message": "Report generation triggered",
             "job_id": job.id,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("reports.generate_report")
 
 
 @router.get("/{report_id}", response_model=ReportDetailResponse)
@@ -82,5 +83,5 @@ async def get_report(
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise internal_error("reports.get_report")

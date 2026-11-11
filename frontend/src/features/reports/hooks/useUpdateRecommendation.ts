@@ -7,7 +7,6 @@ export const useUpdateRecommendation = () => {
   return useMutation({
     mutationFn: (id: string) => updateRecommendationStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roadmap'] });
       queryClient.invalidateQueries({ queryKey: ['report'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
     },

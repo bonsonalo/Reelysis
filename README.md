@@ -225,73 +225,69 @@ These are real issues debugged during deployment — useful context for technica
 
 ## Local development
 
-
-
 ### Prerequisites
 
-- Python 3.12+
-- Node.js 20+
-- PostgreSQL (or Supabase dev URL)
-- Redis
-
-
+- Python 3.12+, Node.js 20+, pnpm
+- PostgreSQL and Redis (Docker is easiest)
 
 ### Backend
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # fill DB_URL, REDIS_URL, API keys
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env   # fill in secrets; AI_SIMULATION_MODE=true needs no AI keys
 python scripts/run_migrations.py
 uvicorn app.main:app --reload
 ```
 
-
-
-### Worker
+### Worker (sync, discovery, transcription, reports, daily scheduler)
 
 ```bash
 cd backend
-bash scripts/worker.sh
+bash scripts/worker.sh   # two queues (default + slow) and Celery beat; WORKER_MODE=single for one process
 ```
-
-
 
 ### Frontend
 
 ```bash
 cd frontend
 pnpm install
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL
+cp .env.example .env.local   # NEXT_PUBLIC_API_URL
 pnpm dev
 ```
 
+### Tests
+
+```bash
+docker run -d --name reelysis-test-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=reelysis_test -p 5433:5432 postgres:16
+docker run -d --name reelysis-test-redis -p 6380:6379 redis:7
+cd backend && python -m pytest -q
+cd frontend && pnpm exec tsc --noEmit && pnpm lint && pnpm build
+```
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull request.
+
 ---
-
-
 
 ## Environment variables (overview)
 
+| Variable | Purpose |
+| --- | --- |
+| `DB_URL` | PostgreSQL connection string (Supabase pooler URLs are normalised automatically) |
+| `REDIS_URL` | Celery broker + app cache |
+| `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT signing |
+| `TOKEN_ENCRYPTION_KEY` | Fernet key that encrypts stored Instagram tokens |
+| `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` | Instagram OAuth |
+| `GEMINI_API_KEY`, `ASSEMBLYAI_API_KEY`, `BRIGHT_DATA_API_KEY` | AI analysis, transcription, competitor data |
+| `AI_SIMULATION_MODE` | Mock all AI/scraping for local development |
+| `SMTP_*` | Password-reset and verification emails |
+| `FRONTEND_URL`, `CORS_ORIGINS` | Redirects, email links, CORS and CSRF origin check |
+| `NEXT_PUBLIC_API_URL` (frontend) | API base URL |
 
-| Variable                         | Purpose                               |
-| -------------------------------- | ------------------------------------- |
-| `DB_URL`                         | Supabase PostgreSQL connection string |
-| `REDIS_URL`                      | Celery broker + app cache             |
-| `JWT_SECRET`                     | Access / refresh token signing        |
-| `META_APP_ID`, `META_APP_SECRET` | Instagram OAuth                       |
-| `GEMINI_API_KEY`                 | AI analysis and reports               |
-| `ASSEMBLYAI_API_KEY`             | Video transcription                   |
-| `BRIGHT_DATA_*`                  | Competitor public data                |
-| `FRONTEND_URL`, `CORS_ORIGINS`   | Cross-origin config                   |
-
-
-See `backend/app/core/config.py` for the full list.
+Full list with defaults: `backend/.env.example` and `docs/SETUP_AND_ENVIRONMENT.md`. Detailed docs live in [`docs/`](docs/README.md).
 
 ---
-
-
 
 ## Author
 

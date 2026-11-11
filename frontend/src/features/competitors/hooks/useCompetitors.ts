@@ -1,7 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCompetitors, removeCompetitor, addCompetitor, rediscoverCompetitors } from '../api'
+import { getCompetitors, removeCompetitor, addCompetitor, rediscoverCompetitors, CompetitorAccount } from '../api'
 
-export const useCompetitors = (options?: { refetchInterval?: number | false | ((query: any) => number | false | undefined) }) => {
+type CompetitorsRefetchInterval =
+  | number
+  | false
+  | ((query: { state: { data?: CompetitorAccount[] } }) => number | false | undefined)
+
+export const useCompetitors = (options?: { refetchInterval?: CompetitorsRefetchInterval }) => {
   return useQuery({
     queryKey: ['competitors'],
     queryFn: async () => {
