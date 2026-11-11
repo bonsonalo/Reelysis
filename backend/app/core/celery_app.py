@@ -39,6 +39,7 @@ celery_app.conf.update(
         "app.service.transcript_service.run_transcription_task": {"queue": SLOW_QUEUE},
         "app.service.competitor_service.fetch_competitor_media_task": {"queue": SLOW_QUEUE},
         "app.service.competitor_service.fetch_competitor_media_batch_task": {"queue": SLOW_QUEUE},
+        "app.service.competitor_service.refresh_competitor_profile_task": {"queue": SLOW_QUEUE},
     },
     beat_schedule={
         "enqueue-daily-instagram-syncs": {

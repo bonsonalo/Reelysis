@@ -9,9 +9,11 @@ from app.model.competitor_accounts import CompetitorAccount
 from app.schema.competitor_schema import AddCompetitorRequest
 from app.service.competitor_service import (
     add_competitor_by_handle_service,
+    enqueue_competitor_profile_refresh,
     rediscover_competitors_service,
 )
 from app.utils.cdn_image import (
+    claim_avatar_refresh,
     competitor_avatar_cache_key,
     fetch_cdn_image,
     get_cached_avatar,
@@ -107,9 +109,13 @@ async def get_competitor_avatar(
             await set_cached_avatar(cache_key, content, media_type)
         except HTTPException as exc:
             if exc.status_code in (502, 504):
+                # 502 means the CDN refused the link, which happens once the signed link expires.
+                # Timeouts (504) are usually transient, so they don't trigger a paid lookup.
+                if exc.status_code == 502 and await claim_avatar_refresh(competitor_id):
+                    enqueue_competitor_profile_refresh(competitor_id)
                 raise HTTPException(
                     status_code=404,
-                    detail="Avatar unavailable. Try refreshing competitor data.",
+                    detail="Avatar unavailable. Refreshing competitor data.",
                 ) from exc
             raise
     return Response(

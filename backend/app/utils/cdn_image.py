@@ -12,7 +12,8 @@ ALLOWED_CDN_HOST_SUFFIXES = ("cdninstagram.com", "fbcdn.net")
 # Demo seed script uses placeholder images (not Instagram CDN).
 ALLOWED_DEMO_HOST_SUFFIXES = ("placehold.co",)
 
-AVATAR_CACHE_TTL_SECONDS = 7 * 24 * 3600
+# At most one paid profile refresh per competitor per window when its picture link has expired.
+AVATAR_REFRESH_INTERVAL_SECONDS = 24 * 3600
 INSTAGRAM_CDN_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -67,14 +68,32 @@ async def get_cached_avatar(cache_key: str) -> tuple[bytes, str] | None:
 
 
 async def set_cached_avatar(cache_key: str, content: bytes, media_type: str) -> None:
+    # No expiry: the signed CDN link it came from dies within days, so this copy may be the only
+    # one left. A profile refresh overwrites it with the new picture.
     try:
         client = _redis_binary_client()
         pipe = client.pipeline()
-        pipe.setex(f"{cache_key}:bytes", AVATAR_CACHE_TTL_SECONDS, content)
-        pipe.setex(f"{cache_key}:type", AVATAR_CACHE_TTL_SECONDS, media_type.encode("utf-8"))
+        pipe.set(f"{cache_key}:bytes", content)
+        pipe.set(f"{cache_key}:type", media_type.encode("utf-8"))
         await pipe.execute()
     except Exception as e:
         logger.warning("Avatar cache write failed for %s: %s", cache_key, e)
+
+
+async def claim_avatar_refresh(competitor_id: UUID) -> bool:
+    """True for the first caller per competitor per window; refreshes cost a paid profile lookup."""
+    try:
+        claimed = await _redis_binary_client().set(
+            f"avatar:refresh:{competitor_id}",
+            b"1",
+            nx=True,
+            ex=AVATAR_REFRESH_INTERVAL_SECONDS,
+        )
+        return bool(claimed)
+    except Exception as e:
+        # Without the lock every page view could trigger a paid lookup, so skip the refresh.
+        logger.warning("Avatar refresh claim failed for %s: %s", competitor_id, e)
+        return False
 
 
 async def fetch_cdn_image(url: str) -> tuple[bytes, str]:

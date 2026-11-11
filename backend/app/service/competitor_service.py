@@ -194,6 +194,27 @@ async def rediscover_competitors_service(user_id: UUID, db: AsyncSession):
     )
 
 
+def enqueue_competitor_profile_refresh(competitor_id: UUID) -> None:
+    celery_app.send_task(
+        "app.service.competitor_service.refresh_competitor_profile_task",
+        args=[str(competitor_id)],
+    )
+
+
+@celery_app.task(name="app.service.competitor_service.refresh_competitor_profile_task")
+def refresh_competitor_profile_task(competitor_id: str):
+    return run_async_task(_refresh_competitor_profile_internal, competitor_id)
+
+
+async def _refresh_competitor_profile_internal(competitor_id: str):
+    """Re-scrape one profile for a fresh picture link (the old signed CDN link expired)."""
+    async with AsyncSessionLocal() as db:
+        try:
+            await _refresh_competitor_profiles(db, [UUID(competitor_id)], force=True)
+        except Exception as e:
+            logger.exception(f"Error refreshing profile for competitor {competitor_id}: {e}")
+
+
 @celery_app.task(name="app.service.competitor_service.fetch_competitor_media_task")
 def fetch_competitor_media_task(competitor_id: str, user_id: str):
     return run_async_task(_fetch_competitor_media_internal, competitor_id, user_id)

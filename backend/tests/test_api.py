@@ -444,3 +444,91 @@ async def test_add_competitor_validates_and_normalizes_handle(client, sent_email
 
     duplicate = await client.post("/api/v1/competitors/", json={"handle": "@GYM.DAILY"})
     assert duplicate.status_code == 400
+
+
+async def _competitor_with_picture(client, monkeypatch, handle):
+    from app.model.competitor_accounts import CompetitorAccount
+    from app.service import competitor_service
+
+    monkeypatch.setattr(competitor_service.celery_app, "send_task", lambda *a, **k: None)
+    competitor_id = (await client.post("/api/v1/competitors/", json={"handle": handle})).json()["id"]
+    with Session(sync_engine) as db:
+        competitor = db.get(CompetitorAccount, competitor_id)
+        competitor.profile_picture_url = "https://scontent.cdninstagram.com/v/pic.jpg?oe=00000000"
+        db.add(competitor)
+        db.commit()
+    return competitor_id
+
+
+async def test_expired_avatar_link_queues_one_profile_refresh(client, sent_emails, monkeypatch):
+    from fastapi import HTTPException
+    from app.api.v1.endpoints import competitors as competitors_endpoint
+
+    await signup(client)
+    competitor_id = await _competitor_with_picture(client, monkeypatch, "expired.pic")
+
+    async def cdn_refuses(url):
+        raise HTTPException(status_code=502, detail="Failed to fetch image from provider")
+
+    queued = []
+    monkeypatch.setattr(competitors_endpoint, "fetch_cdn_image", cdn_refuses)
+    monkeypatch.setattr(competitors_endpoint, "enqueue_competitor_profile_refresh", queued.append)
+
+    for _ in range(3):
+        response = await client.get(f"/api/v1/competitors/{competitor_id}/avatar")
+        assert response.status_code == 404
+    assert [str(c) for c in queued] == [competitor_id]
+
+
+async def test_fetched_avatar_is_cached_without_expiry(client, sent_emails, monkeypatch):
+    from app.api.v1.endpoints import competitors as competitors_endpoint
+    from app.utils.cdn_image import _redis_binary_client
+
+    await signup(client)
+    competitor_id = await _competitor_with_picture(client, monkeypatch, "fresh.pic")
+
+    async def cdn_ok(url):
+        return b"\x89PNG-bytes", "image/png"
+
+    monkeypatch.setattr(competitors_endpoint, "fetch_cdn_image", cdn_ok)
+    response = await client.get(f"/api/v1/competitors/{competitor_id}/avatar")
+    assert response.status_code == 200
+    assert response.content == b"\x89PNG-bytes"
+    assert await _redis_binary_client().ttl(f"avatar:competitor:{competitor_id}:bytes") == -1
+
+
+async def test_profile_refresh_task_stores_new_picture(client, sent_emails, monkeypatch):
+    from app.core.celery_app import celery_app
+    from app.model.competitor_accounts import CompetitorAccount
+    from app.service import competitor_service
+    from app.utils import cdn_image
+
+    await signup(client)
+    competitor_id = await _competitor_with_picture(client, monkeypatch, "renewed.pic")
+    new_link = "https://scontent.cdninstagram.com/v/new.jpg?oe=FFFFFFFF"
+
+    async def snapshot(handle):
+        return "snap_1"
+
+    async def results(snapshot_id):
+        return [{"account": "renewed.pic", "followers": 1200, "profile_image_link": new_link}]
+
+    async def cdn_ok(url):
+        assert url == new_link
+        return b"new-picture", "image/jpeg"
+
+    monkeypatch.setattr(competitor_service.social_data_client, "fetch_profile_snapshot", snapshot)
+    monkeypatch.setattr(competitor_service.social_data_client, "get_snapshot_results", results)
+    monkeypatch.setattr(cdn_image, "fetch_cdn_image", cdn_ok)
+
+    await competitor_service._refresh_competitor_profile_internal(competitor_id)
+
+    with Session(sync_engine) as db:
+        assert db.get(CompetitorAccount, competitor_id).profile_picture_url == new_link
+    assert await cdn_image.get_cached_avatar(f"avatar:competitor:{competitor_id}") == (
+        b"new-picture",
+        "image/jpeg",
+    )
+    route = celery_app.conf.task_routes["app.service.competitor_service.refresh_competitor_profile_task"]
+    assert route["queue"] == "slow"
+    assert "app.service.competitor_service.refresh_competitor_profile_task" in celery_app.tasks
