@@ -160,3 +160,62 @@ def test_percent_change_without_baseline_is_new_not_100_percent():
     assert _format_percent_change(500, 0) == "New"
     assert _format_percent_change(0, 0) == "0%"
     assert _format_percent_change(150, 100) == "+50%"
+
+
+@pytest.fixture
+def wake_pings(monkeypatch):
+    """Record worker wake pings synchronously instead of making HTTP calls."""
+    from app.core import worker_wake
+
+    pings: list[str] = []
+
+    class InlineThread:
+        def __init__(self, target, args=(), daemon=None):
+            self._run = lambda: target(*args)
+
+        def start(self):
+            self._run()
+
+    monkeypatch.setattr(worker_wake, "_ping", pings.append)
+    monkeypatch.setattr(worker_wake.threading, "Thread", InlineThread)
+    monkeypatch.setattr(worker_wake, "_last_ping", 0.0)
+    monkeypatch.setattr(worker_wake, "_active_tasks", 0)
+    monkeypatch.setattr(settings, "WORKER_WAKE_URL", "https://worker.example.com")
+    return pings
+
+
+def test_queueing_a_job_wakes_the_worker_at_most_once_per_interval(wake_pings, monkeypatch):
+    from celery.signals import after_task_publish
+    from app.core import worker_wake
+
+    clock = [1000.0]
+    monkeypatch.setattr(worker_wake.time, "monotonic", lambda: clock[0])
+
+    after_task_publish.send(sender="some.task", headers={}, body=())
+    after_task_publish.send(sender="some.task", headers={}, body=())
+    assert wake_pings == ["https://worker.example.com"]
+
+    clock[0] += worker_wake.PING_INTERVAL_SECONDS
+    after_task_publish.send(sender="some.task", headers={}, body=())
+    assert len(wake_pings) == 2
+
+
+def test_worker_pings_itself_only_while_a_task_runs(wake_pings):
+    from celery.signals import task_postrun, task_prerun
+    from app.core import worker_wake
+
+    assert worker_wake.keep_awake_tick() is False
+    task_prerun.send(sender=None, task_id="t1", task=None)
+    assert worker_wake.keep_awake_tick() is True
+    task_postrun.send(sender=None, task_id="t1", task=None)
+    worker_wake._last_ping = 0.0
+    assert worker_wake.keep_awake_tick() is False
+    assert wake_pings == ["https://worker.example.com"]
+
+
+def test_worker_wake_is_off_without_a_url(wake_pings, monkeypatch):
+    from app.core import worker_wake
+
+    monkeypatch.setattr(settings, "WORKER_WAKE_URL", "")
+    assert worker_wake.ping_worker() is False
+    assert wake_pings == []

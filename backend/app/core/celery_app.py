@@ -52,3 +52,6 @@ celery_app.conf.update(
         },
     },
 )
+
+# Registers the publish/run signal handlers that keep a sleeping free-tier worker awake.
+import app.core.worker_wake  # noqa: E402, F401

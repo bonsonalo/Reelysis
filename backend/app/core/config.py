@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     IG_TOKEN_REFRESH_DAYS_BEFORE_EXPIRY: int = 10
     # Media items imported per sync (each costs one Insights call).
     SYNC_MAX_MEDIA: int = 50
+    # Public URL of the Celery worker when it runs as a free Render Web Service, which sleeps after
+    # 15 minutes without HTTP traffic (queued jobs don't count). Set on BOTH the API and the worker:
+    # the API pings it when queueing a job, the worker pings itself while a job runs. Empty = off.
+    WORKER_WAKE_URL: str = ""
 
     model_config= SettingsConfigDict(
         env_file=".env", 

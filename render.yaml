@@ -39,3 +39,5 @@ services:
       - key: AUTO_SYNC_ENABLED
         value: "true"
       # Copy the same env vars as reelysis-api (DB_URL, REDIS_URL, GEMINI_*, SMTP_*, etc.).
+      # If this runs as a free Web Service instead (sleeps when idle), set WORKER_WAKE_URL to its
+      # public URL on both services.
