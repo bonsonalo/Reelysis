@@ -13,10 +13,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#efefee" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -29,7 +26,7 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
-      data-theme="light"
+      data-theme="dark"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />

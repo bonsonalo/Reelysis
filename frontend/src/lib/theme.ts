@@ -10,9 +10,9 @@ const CHANGE_EVENT = 'reelysis-theme-change'
 function readPreference(): ThemePreference {
   try {
     const value = localStorage.getItem(STORAGE_KEY)
-    return value === 'light' || value === 'dark' ? value : 'system'
+    return value === 'light' || value === 'system' ? value : 'dark'
   } catch {
-    return 'system'
+    return 'dark'
   }
 }
 
@@ -37,7 +37,7 @@ export function useTheme() {
   const preference = useSyncExternalStore<ThemePreference>(
     subscribe,
     readPreference,
-    () => 'system',
+    () => 'dark',
   )
 
   // While on "system", follow the OS when it switches.
@@ -51,8 +51,7 @@ export function useTheme() {
 
   const setPreference = useCallback((next: ThemePreference) => {
     try {
-      if (next === 'system') localStorage.removeItem(STORAGE_KEY)
-      else localStorage.setItem(STORAGE_KEY, next)
+      localStorage.setItem(STORAGE_KEY, next)
     } catch {}
     applyPreference(next)
     window.dispatchEvent(new Event(CHANGE_EVENT))
