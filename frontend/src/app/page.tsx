@@ -25,7 +25,7 @@ import {
   steps,
 } from '@/components/landing/landingContent'
 import { buttonStyles } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { ThemeSwitchButton, ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useAuth } from '@/store/hook'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { postAuthDestination } from '@/features/instagram/utils'
@@ -84,6 +84,7 @@ export default function LandingPage() {
             </nav>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
+            <ThemeSwitchButton />
             {!isAuthenticated && (
               <Link
                 href="/login"

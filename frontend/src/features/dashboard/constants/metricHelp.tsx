@@ -33,7 +33,7 @@ export const METRIC_HELP = {
     body: (
       <Tip
         what="How often people interact (like, comment, save) vs. who saw it."
-        aim="3%+ is solid · 6%+ is great"
+        aim="3% or more is solid; 6% or more is great."
       />
     ),
   },
@@ -42,7 +42,7 @@ export const METRIC_HELP = {
     body: (
       <Tip
         what="Your best opening hook, rated 0–100. Does it stop the scroll?"
-        aim="80+ strong · 50–79 okay · below 50, sharpen the opener"
+        aim="80+ is strong, 50–79 is okay, below 50 means the opener needs work."
       />
     ),
   },
@@ -51,7 +51,7 @@ export const METRIC_HELP = {
     body: (
       <Tip
         what="How sure the AI is about this analysis."
-        aim="70%+ with a transcript · lower = mostly caption-only"
+        aim="70% or more when there is a transcript; lower means the analysis relied on the caption."
       />
     ),
   },
@@ -60,7 +60,7 @@ export const METRIC_HELP = {
     body: (
       <Tip
         what="How strong your opening is at grabbing attention (0–100)."
-        aim="80+ strong · 50–79 okay · below 50, work on the first 3 seconds"
+        aim="80+ is strong, 50–79 is okay, below 50 means the first 3 seconds need work."
       />
     ),
   },
@@ -73,7 +73,7 @@ export const METRIC_HELP = {
     body: (
       <Tip
         what="Likes + comments ÷ views for this Reel."
-        aim="2–5% is solid · 8%+ is excellent"
+        aim="2–5% is solid; 8% or more is excellent."
       />
     ),
   },

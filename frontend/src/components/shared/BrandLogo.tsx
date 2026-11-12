@@ -18,7 +18,7 @@ const sizeClasses = {
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>
-      <rect width="24" height="24" rx="6" fill="#e0612a" />
+      <rect width="24" height="24" rx="6" fill="var(--primary)" />
       <rect x="7.5" y="4.5" width="9" height="15" rx="2" fill="none" stroke="#fff" strokeWidth="1.75" />
       <rect x="9.5" y="7" width="5" height="2.25" rx="0.75" fill="#fff" />
     </svg>

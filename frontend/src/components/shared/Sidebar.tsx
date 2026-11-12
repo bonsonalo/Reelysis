@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { UserAvatar } from '@/components/shared/UserAvatar'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { ThemeSwitchButton, ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 import { cn } from '@/lib/utils'
 import { useLogout } from '@/features/auth/hooks/useLogout'
@@ -136,16 +136,19 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex h-14 shrink-0 items-center justify-between px-5">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 pl-5 pr-3">
         <BrandLogo size="md" onClick={handleNavClick} />
-        <button
-          type="button"
-          onClick={() => dispatch(closeMobileSidebar())}
-          className="rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground lg:hidden"
-          aria-label="Close menu"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <ThemeSwitchButton />
+          <button
+            type="button"
+            onClick={() => dispatch(closeMobileSidebar())}
+            className="rounded-md p-1.5 text-text-tertiary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-px px-3 py-2" aria-label="Main">

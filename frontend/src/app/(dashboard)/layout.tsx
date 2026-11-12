@@ -6,6 +6,7 @@ import { Loader2, Menu } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { PageContainer } from '@/components/shared/Panel'
 import { Sidebar } from '@/components/shared/Sidebar'
+import { ThemeSwitchButton } from '@/components/shared/ThemeToggle'
 import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser'
 import { EmailVerificationBanner } from '@/features/auth/components/EmailVerificationBanner'
 import { useAuth, useAppDispatch, useSidebar } from '@/store/hook'
@@ -79,14 +80,17 @@ export default function DashboardLayout({
         )}
         <header className="print:hidden flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-4 sm:px-6 lg:hidden">
           <BrandLogo size="sm" />
-          <button
-            type="button"
-            onClick={() => dispatch(openMobileSidebar())}
-            className="rounded-md p-2 text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground "
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeSwitchButton />
+            <button
+              type="button"
+              onClick={() => dispatch(openMobileSidebar())}
+              className="rounded-md p-2 text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground "
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto print:overflow-visible">

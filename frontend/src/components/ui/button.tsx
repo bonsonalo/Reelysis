@@ -6,11 +6,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: "default" | "sm" | "lg" | "icon"
 }
 
-// Ink primary + bordered white secondary (Stripe/Linear light). Orange stays a brand mark,
-// not a button fill, so white-on-orange never has to carry 14px text.
+// Brand-orange primary (--ink) + bordered secondary. Semibold keeps white-on-orange
+// readable at 14px; each theme sets its own orange in globals.css.
 const buttonVariants = {
   default:
-    "bg-ink text-ink-foreground shadow-raised hover:bg-ink-hover active:bg-ink-active",
+    "bg-ink font-semibold text-ink-foreground shadow-raised hover:bg-ink-hover active:bg-ink-active",
   destructive:
     "bg-danger-solid text-white shadow-raised hover:bg-danger-solid-hover active:bg-danger-solid-active",
   outline:

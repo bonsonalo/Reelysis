@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, FileText } from 'lucide-react'
+import { ChevronRight, FileText } from 'lucide-react'
 import { Panel } from '@/components/shared/Panel'
-import { cn, parseApiDate } from '@/lib/utils'
+import { parseApiDate } from '@/lib/utils'
 import type { ReportListItem } from '@/features/reports/api'
 
 type ReportsListProps = {
@@ -54,10 +54,6 @@ export function ReportsList({ reports }: ReportsListProps) {
               <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-secondary">
                 {latest.summary}
               </p>
-              <span className="mt-2 inline-flex items-center gap-1 text-xs text-text-secondary transition-colors duration-150 group-hover:text-foreground">
-                View report
-                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
-              </span>
             </div>
             <div className="shrink-0 text-right">
               <p className="text-xs font-medium text-text-label">
@@ -81,10 +77,6 @@ export function ReportsList({ reports }: ReportsListProps) {
                   {latest.summary}
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors duration-150 group-hover:text-foreground">
-                View report
-                <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
-              </span>
             </div>
             <div className="shrink-0 text-left md:text-right">
               <p className="text-sm font-medium text-text-label">
@@ -131,7 +123,7 @@ export function ReportsList({ reports }: ReportsListProps) {
                     <p className="text-xs tabular-nums text-text-tertiary">
                       {formatDate(report.created_at)}
                     </p>
-                    <ArrowRight className="h-3.5 w-3.5 text-text-tertiary transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                    <ChevronRight className="h-4 w-4 text-text-placeholder transition-colors duration-150 group-hover:text-text-secondary" />
                   </div>
                 </div>
 
@@ -147,12 +139,7 @@ export function ReportsList({ reports }: ReportsListProps) {
                   <p className="text-sm tabular-nums text-text-tertiary md:text-right">
                     {formatDate(report.created_at)}
                   </p>
-                  <ArrowRight
-                    className={cn(
-                      'h-4 w-4 text-text-tertiary transition-[color,transform] duration-150',
-                      'group-hover:translate-x-0.5 group-hover:text-foreground',
-                    )}
-                  />
+                  <ChevronRight className="h-4 w-4 text-text-placeholder transition-colors duration-150 group-hover:text-text-secondary" />
                 </div>
               </Link>
             ))}

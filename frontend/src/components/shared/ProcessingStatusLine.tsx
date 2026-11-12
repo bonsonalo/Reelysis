@@ -6,8 +6,8 @@ function WorkingSpinner() {
       className="relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center"
       aria-hidden
     >
-      <span className="absolute h-4 w-4 rounded-full border border-primary/20" />
-      <span className="absolute h-4 w-4 animate-spin rounded-full border border-transparent border-t-primary [animation-duration:0.8s]" />
+      <span className="absolute h-4 w-4 rounded-full border-2 border-border-strong" />
+      <span className="absolute h-4 w-4 animate-spin rounded-full border-2 border-transparent border-t-text-secondary [animation-duration:0.9s] motion-reduce:animate-none" />
     </span>
   )
 }
@@ -46,7 +46,7 @@ export function ProcessingStatusLine({
         <WorkingSpinner />
         <p
           key={statusText}
-          className="shimmer-text animate-in fade-in duration-500 text-sm font-medium leading-relaxed md:text-[15px]"
+          className="text-sm font-medium leading-relaxed text-text-label md:text-[15px]"
         >
           {statusText}
         </p>

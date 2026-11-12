@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { LegalDocumentShell } from '@/components/legal/LegalDocumentShell'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service · Reelysis',
+  title: 'Terms of service | Reelysis',
   description: 'Terms governing your use of Reelysis.',
 }
 

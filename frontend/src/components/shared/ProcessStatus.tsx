@@ -7,19 +7,11 @@ import type { ProgressTask, ProgressTaskStatus } from '@/features/jobs/utils/job
 
 export type { ProgressTask, ProgressTaskStatus }
 
-function ThinkingDots({ className }: { className?: string }) {
+function WorkingSpinner({ className }: { className?: string }) {
   return (
-    <span
-      className={cn('inline-flex shrink-0 items-center justify-center gap-1', className)}
-      aria-hidden
-    >
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70"
-          style={{ animationDelay: `${i * 160}ms`, animationDuration: '1.2s' }}
-        />
-      ))}
+    <span className={cn('relative inline-flex h-4 w-4 shrink-0', className)} aria-hidden>
+      <span className="absolute inset-0 rounded-full border-2 border-border-strong" />
+      <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-text-secondary [animation-duration:0.9s] motion-reduce:animate-none" />
     </span>
   )
 }
@@ -33,7 +25,7 @@ function TaskStatusIcon({ status }: { status: ProgressTaskStatus }) {
     )
   }
   if (status === 'running') {
-    return <ThinkingDots className="h-5 w-5" />
+    return <span className="flex h-5 w-5 shrink-0 items-center justify-center"><WorkingSpinner /></span>
   }
   return (
     <span
@@ -65,7 +57,7 @@ export function ProcessStatus({
       className={cn('animate-in fade-in duration-300', className)}
     >
       <div className="flex items-start gap-3.5">
-        <ThinkingDots className="mt-1 shrink-0" />
+        <WorkingSpinner className="mt-0.5" />
         <p className="text-sm leading-relaxed text-text-label">{statusText}</p>
       </div>
 

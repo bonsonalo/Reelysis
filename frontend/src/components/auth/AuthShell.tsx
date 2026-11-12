@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { BrandLogo } from '@/components/shared/BrandLogo'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { ThemeSwitchButton, ThemeToggle } from '@/components/shared/ThemeToggle'
 
 type AuthShellProps = {
   children: React.ReactNode
@@ -9,8 +9,9 @@ type AuthShellProps = {
 export function AuthShell({ children }: AuthShellProps) {
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col bg-background text-foreground">
-      <header className="shrink-0 px-4 pt-6 sm:px-8 sm:pt-8">
+      <header className="flex shrink-0 items-center justify-between px-4 pt-6 sm:px-8 sm:pt-8">
         <BrandLogo href="/" size="md" />
+        <ThemeSwitchButton />
       </header>
 
       <main className="flex flex-1 items-start justify-center px-4 pb-10 pt-10 sm:items-center sm:px-6 sm:pt-6">

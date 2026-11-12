@@ -190,16 +190,9 @@ export default function VideoDetailPage() {
               {title || caption || 'Untitled reel'}
             </h1>
             {analysis && (
-              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+              <p className="mt-2 text-sm text-text-secondary">
                 <span className="capitalize">{analysis.content_pillar}</span>
-                {detail?.pacing && (
-                  <>
-                    <span className="text-text-tertiary" aria-hidden>
-                      ·
-                    </span>
-                    <span>{detail.pacing} pacing</span>
-                  </>
-                )}
+                {detail?.pacing && `, ${detail.pacing.toLowerCase()} pacing`}
               </p>
             )}
           </div>

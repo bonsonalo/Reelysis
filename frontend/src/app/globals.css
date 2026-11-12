@@ -7,140 +7,140 @@
 :root {
   color-scheme: light;
 
-  /* Light: a grey canvas with soft off-white cards, so nothing glares. */
-  --background: #ebedf0;
-  --foreground: #17191f;
-  --card: #f8f9fa;
-  --card-foreground: #17191f;
-  --popover: #f8f9fa;
-  --popover-foreground: #17191f;
-  /* Brand orange: marks, chart series, focus. Text uses --brand-text for contrast. */
-  --primary: #e0612a;
+  /* Light: neutral grey (no blue cast), soft off-white panels. One brand orange throughout. */
+  --background: #efefee;
+  --foreground: #1c1c1c;
+  --card: #fafafa;
+  --card-foreground: #1c1c1c;
+  --popover: #fbfbfb;
+  --popover-foreground: #1c1c1c;
+  --primary: #ec5418;
   --primary-foreground: #ffffff;
-  --brand-text: #a8471f;
-  --brand-tint: #f1dfd4;
-  /* Primary buttons: soft charcoal with white text. */
-  --ink: #30343d;
+  --brand-text: #a83c0d;
+  --brand-tint: #f4e4db;
+  /* Primary buttons: the brand orange with white semibold text (as Zapier and Strava do). */
+  --ink: #ec5418;
   --ink-foreground: #ffffff;
-  --ink-hover: #3b404a;
-  --ink-active: #262930;
-  --secondary: #e3e5e9;
-  --secondary-foreground: #17191f;
-  --muted: #e3e5e9;
-  --muted-foreground: #454b59;
-  --accent: #e3e5e9;
-  --accent-foreground: #17191f;
-  --destructive: #b91c1c;
+  --ink-hover: #d94a12;
+  --ink-active: #c4420f;
+  --secondary: #e7e7e5;
+  --secondary-foreground: #1c1c1c;
+  --muted: #e7e7e5;
+  --muted-foreground: #505050;
+  --accent: #e7e7e5;
+  --accent-foreground: #1c1c1c;
+  --destructive: #c42b1c;
   --destructive-foreground: #ffffff;
-  --border: #dcdfe4;
-  --input: #cfd3d9;
-  --ring: #e0612a;
+  --border: #dededc;
+  --input: #d2d2cf;
+  --ring: #ec5418;
   --radius: 0.625rem;
 
-  --surface-page: #ebedf0;
-  --surface-sidebar: #e3e5e9;
-  --surface-subtle: #eef0f2;
-  --surface-card: #f8f9fa;
-  --surface-input: #fbfbfc;
-  --surface-hover: #e9ebee;
-  --surface-pressed: #dfe2e6;
-  --nav-hover: #d9dce1;
-  --video: #1d2026;
+  --surface-page: #efefee;
+  --surface-sidebar: #e7e7e5;
+  --surface-subtle: #f3f3f2;
+  --surface-card: #fafafa;
+  --surface-input: #ffffff;
+  --surface-hover: #ececea;
+  --surface-pressed: #e2e2e0;
+  --nav-hover: #dcdcda;
+  --video: #1c1c1c;
 
-  --border-subtle: #dcdfe4;
-  --border-sidebar: #d4d7dd;
-  --border-strong: #c6cad1;
+  --border-subtle: #dededc;
+  --border-sidebar: #d8d8d5;
+  --border-strong: #c9c9c6;
 
-  --text-secondary: #454b59;
-  --text-label: #2f333c;
-  --text-tertiary: #5f6572;
-  --text-placeholder: #8b909a;
+  --text-secondary: #505050;
+  --text-label: #2e2e2e;
+  --text-tertiary: #666666;
+  --text-placeholder: #9a9a98;
 
-  --success: #15803d;
-  --success-tint: #e8f5ec;
-  --warning: #b45309;
-  --warning-tint: #fbf1e1;
-  --danger: #b91c1c;
-  --danger-tint: #fbeaea;
-  --danger-solid: #b91c1c;
-  --danger-solid-hover: #9f1818;
-  --danger-solid-active: #861414;
+  --success: #166f47;
+  --success-tint: #e3f1e9;
+  --warning: #a35200;
+  --warning-tint: #f8ecdc;
+  --danger: #c42b1c;
+  --danger-tint: #f9e6e4;
+  --danger-solid: #c42b1c;
+  --danger-solid-hover: #ab2416;
+  --danger-solid-active: #931e12;
 
-  --chart-views: #e0612a;
-  --chart-reach: #9aa0ab;
-  --chart-grid: #e1e4e8;
-  --chart-cursor: #c6cad1;
+  --chart-views: #ec5418;
+  --chart-reach: #9a9a98;
+  --chart-grid: #e3e3e1;
+  --chart-cursor: #c9c9c6;
 
-  --shadow-raised: 0 1px 2px rgba(23, 25, 31, 0.05);
-  --shadow-overlay: 0 1px 2px rgba(23, 25, 31, 0.06), 0 8px 24px -6px rgba(23, 25, 31, 0.12);
+  --shadow-raised: 0 1px 2px rgba(28, 28, 28, 0.05);
+  --shadow-overlay: 0 1px 2px rgba(28, 28, 28, 0.06), 0 8px 24px -6px rgba(28, 28, 28, 0.14);
 }
 
-/* Dark: charcoal rather than the old pure black, with orange carrying the brand and the primary action. */
+/* Dark: the original Reelysis design — pure black page, #0a0a0a sidebar, #121212 cards,
+   zinc greys and #f97316 orange buttons. Extra tokens the new components need are derived from it. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #131418;
-  --foreground: #ebecef;
-  --card: #1b1c21;
-  --card-foreground: #ebecef;
-  --popover: #1f2026;
-  --popover-foreground: #ebecef;
-  --primary: #ec6f36;
-  --primary-foreground: #1a0f09;
-  --brand-text: #f39062;
-  --brand-tint: #2b1e17;
-  --ink: #ec6f36;
-  --ink-foreground: #1a0f09;
-  --ink-hover: #f27f4a;
-  --ink-active: #dc6129;
-  --secondary: #24252b;
-  --secondary-foreground: #ebecef;
-  --muted: #24252b;
-  --muted-foreground: #b0b4bd;
-  --accent: #24252b;
-  --accent-foreground: #ebecef;
-  --destructive: #dc2626;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #121212;
+  --card-foreground: #ffffff;
+  --popover: #18181b;
+  --popover-foreground: #ffffff;
+  --primary: #f97316;
+  --primary-foreground: #ffffff;
+  --brand-text: #f97316;
+  --brand-tint: #1d1d1f;
+  --ink: #f97316;
+  --ink-foreground: #ffffff;
+  --ink-hover: #ea580c;
+  --ink-active: #c2410c;
+  --secondary: #27272a;
+  --secondary-foreground: #ffffff;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #2a2c33;
-  --input: #383a42;
-  --ring: #ec6f36;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #f97316;
 
-  --surface-page: #131418;
-  --surface-sidebar: #0f1013;
-  --surface-subtle: #18191e;
-  --surface-card: #1b1c21;
-  --surface-input: #16171b;
-  --surface-hover: #24252b;
-  --surface-pressed: #2c2e35;
-  --nav-hover: #1d1e23;
-  --video: #0b0c0e;
+  --surface-page: #000000;
+  --surface-sidebar: #0a0a0a;
+  --surface-subtle: #0a0a0a;
+  --surface-card: #121212;
+  --surface-input: #18181b;
+  --surface-hover: #1a1a1e;
+  --surface-pressed: #27272a;
+  --nav-hover: #18181a;
+  --video: #000000;
 
-  --border-subtle: #2a2c33;
-  --border-sidebar: #202227;
-  --border-strong: #3a3d45;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-sidebar: rgba(255, 255, 255, 0.1);
+  --border-strong: #52525b;
 
-  --text-secondary: #b0b4bd;
-  --text-label: #d4d6db;
-  --text-tertiary: #8a8f9a;
-  --text-placeholder: #6a6f79;
+  --text-secondary: #a1a1aa;
+  --text-label: #d4d4d8;
+  --text-tertiary: #71717a;
+  --text-placeholder: #71717a;
 
-  --success: #4ade80;
-  --success-tint: #12261b;
-  --warning: #f5b544;
-  --warning-tint: #2a2112;
+  --success: #34d399;
+  --success-tint: #0b1f17;
+  --warning: #fbbf24;
+  --warning-tint: #1f1a0c;
   --danger: #f87171;
-  --danger-tint: #2d1717;
-  --danger-solid: #dc2626;
-  --danger-solid-hover: #e23b3b;
-  --danger-solid-active: #c51f1f;
+  --danger-tint: #2a1111;
+  --danger-solid: #b91c1c;
+  --danger-solid-hover: #dc2626;
+  --danger-solid-active: #991b1b;
 
-  --chart-views: #ec6f36;
-  --chart-reach: #6b717c;
-  --chart-grid: #26282e;
-  --chart-cursor: #3a3d45;
+  --chart-views: #f97316;
+  --chart-reach: #d4d4d8;
+  --chart-grid: #1c1c1c;
+  --chart-cursor: #2a2a2a;
 
-  --shadow-raised: 0 1px 0 rgba(0, 0, 0, 0.35);
-  --shadow-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --shadow-raised: none;
+  --shadow-overlay: 0 12px 32px -8px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {

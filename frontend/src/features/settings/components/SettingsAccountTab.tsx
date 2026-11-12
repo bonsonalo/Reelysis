@@ -99,7 +99,7 @@ export function SettingsAccountTab({
               >
                 @{account.username}
               </a>
-              <p className="mt-1.5 text-sm text-text-secondary">
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
                 <span className="inline-flex items-center gap-1.5">
                   <span
                     className={
@@ -111,10 +111,7 @@ export function SettingsAccountTab({
                   />
                   {account.needs_reconnect ? 'Reconnect needed' : 'Connected'}
                 </span>
-                <span className="mx-2 text-text-tertiary" aria-hidden>
-                  ·
-                </span>
-                Last synced {formatLastSynced(account.last_synced_at)}
+                <span>Last synced {formatLastSynced(account.last_synced_at)}</span>
               </p>
             </div>
           </div>

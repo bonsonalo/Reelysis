@@ -46,3 +46,30 @@ export function ThemeToggle({ compact = false, className }: { compact?: boolean;
     </div>
   )
 }
+
+/**
+ * One-click light/dark switch for headers. The icon is picked by CSS from the
+ * current theme, so it is right on first paint without reading state.
+ */
+export function ThemeSwitchButton({ className }: { className?: string }) {
+  const { setPreference } = useTheme()
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+        setPreference(isDark ? 'light' : 'dark')
+      }}
+      className={cn(
+        'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
+        className,
+      )}
+      aria-label="Switch between light and dark theme"
+      title="Switch theme"
+    >
+      <Moon className="h-4 w-4 dark:hidden" aria-hidden />
+      <Sun className="hidden h-4 w-4 dark:block" aria-hidden />
+    </button>
+  )
+}

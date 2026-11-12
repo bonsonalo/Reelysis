@@ -1,6 +1,7 @@
 'use client'
 
 import { BrandLogo } from '@/components/shared/BrandLogo'
+import { ThemeSwitchButton } from '@/components/shared/ThemeToggle'
 import { landingShellClass } from '@/components/landing/landingContent'
 import { useInstagramAccounts } from '@/features/instagram/hooks/useInstagramAccounts'
 
@@ -19,12 +20,15 @@ export default function OnboardingLayout({
           className={`flex h-14 items-center justify-between ${landingShellClass}`}
         >
           <BrandLogo href="/" size="md" />
-          {isConnected && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success-tint px-2.5 py-1 text-xs font-medium text-success">
-              <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
-              Instagram connected
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success-tint px-2.5 py-1 text-xs font-medium text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+                Instagram connected
+              </span>
+            )}
+            <ThemeSwitchButton />
+          </div>
         </div>
       </header>
 
